@@ -1,0 +1,89 @@
+name: macOS
+
+# Whether each program still builds on macOS, on GitHub's hosted runners: the first step of
+# PDR-0002's criterion, a macOS build made by them by 2026-12-31. It informs, it is not a
+# required check: macOS is not yet a system the project ships to (charter).
+#
+# Run on a pull request that changes a program or its package, on main, and on demand
+# (Actions → macOS → Run workflow). `check`: what compiles; `speech`: Apple's SpeechAnalyzer (D42).
+# The app a Mac opens is macos-app.yml's: built on main, and on a pull request that changes
+# install, which makes it — the macOS minutes spent where they say something (the decider,
+# 2026-10-26: "il faut le faire avec parcimonie lorsque c'est utile uniquement").
+
+on:
+  pull_request:
+    paths: &programs
+      - "modules/capture/**"
+      - "modules/summary/**"
+      - "modules/export/**"
+      - "modules/send/**"
+      - "modules/transcription/**"
+      - "modules/shell/**"
+      - ".github/workflows/macos.yml"
+  push:
+    branches: [main]
+    paths: *programs
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: macOS — ${{ matrix.module }}
+    runs-on: macos-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [capture, summary, export, send, transcription, shell]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: cargo check
+        working-directory: modules/${{ matrix.module }}
+        run: cargo check --locked --all-targets
+
+  # D42's second criterion: Apple's SpeechAnalyzer through kitokey-speech, heard on a French
+  # sentence `say` speaks. A runner that offers no SpeechTranscriber or no French voice says it was
+  # not run — as a warning, never as a pass of the criterion (ADR-0012).
+  speech:
+    name: macOS — SpeechAnalyzer
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: kitokey-speech, built
+        working-directory: modules/transcription/speech
+        run: swift build -c release
+
+      - name: A French sentence, heard back
+        working-directory: modules/transcription/speech
+        run: |
+          program=.build/release/kitokey-speech
+          if ! "$program" status fr-FR > status.json 2> status.err; then
+            echo "::warning::D42: not run — $(cat status.err)"; exit 0
+          fi
+          cat status.json
+          if ! grep -q '"available":true' status.json || ! grep -q '"supported":true' status.json; then
+            echo "::warning::D42: not run — this runner's SpeechTranscriber does not hear fr-FR"; exit 0
+          fi
+          voice=$(say -v '?' | awk '/fr_FR/ {print $1; exit}')
+          if [ -z "$voice" ]; then
+            echo "::warning::D42: not run — this runner has no French voice to speak the sentence"; exit 0
+          fi
+          grep -q '"installed":true' status.json || "$program" install fr-FR
+          say -v "$voice" -o sentence.aiff "Bonjour à tous, la réunion commence maintenant."
+          afconvert -f WAVE -d LEI16@16000 -c 1 sentence.aiff sentence.wav
+          "$program" transcribe sentence.wav fr-FR | tee heard.jsonl
+          grep -qi 'réunion' heard.jsonl
+          grep -q '"start"' heard.jsonl

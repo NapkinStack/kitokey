@@ -1,0 +1,144 @@
+# Machine-readable source of truth for the module.
+# Read by: humans (onboarding), agents (scoping), CI (fitness functions).
+# Any divergence between this file and the code fails CI.
+
+module:
+  name: "export"
+
+  # ONE sentence. If it needs an "and", the module probably does two things.
+  responsibility: >
+    Delivers the files of a session to where the user wants them.
+
+  owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
+  contact: "@NapkinStack/maintainers"
+
+  # proposed | active | maintenance | deprecated | retired   (.nstack/handbook/02-modules.md §6)
+  # active since D108 (2026-11-26): created by ADR-0001, its owner above, its contract exporting/v1 consumed
+  # by the shell.
+  lifecycle: active
+
+  # What does a failure of this module cost? nothing, thrown away | a user's patience |
+  # a day of work | a key, an order, money, personal data. The decider settles it; what
+  # each value requires is the table in .nstack/handbook/05-workflow.md §7.
+  # prototype | standard | high | critical
+  criticality: "standard"
+
+  # Does a user see this module? true requires a test sheet on its pull requests from
+  # standard up (.nstack/handbook/05-workflow.md §7).
+  user_facing: true
+
+  # The module's name in the code, when it differs from the folder (package, namespace).
+  # Used by boundary detection.
+  # code_name: export
+
+  # Only when lifecycle = deprecated. The check turns red once the date has passed.
+  # deprecation:
+  #   replaced_by:
+  #   removal_date: YYYY-MM-DD
+
+# Contracts PROVIDED by this module. `path` holds its document (B7).
+provides:
+  - contract: exporting
+    version: v1
+    path: contracts/exporting/v1
+    stability: experimental
+#  - contract: export-api
+#    version: v1
+#    path: contracts/export-api/v1
+#    stability: experimental      # experimental | stable | deprecated
+#    # removal_date: YYYY-MM-DD   # required when stability = deprecated
+
+# Contracts CONSUMED - this is the DECLARED graph.
+# CI compares it with the contracts this module's files read: one read and not declared
+# fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
+consumes:
+  - contract: session-audio
+    version: v1
+    module: capture
+  - contract: session-audio
+    version: v2
+    module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
+  - contract: minutes
+    version: v1
+    module: summary
+  - contract: minutes
+    version: v2
+    module: summary
+  - contract: minutes
+    version: v3
+    module: summary
+  - contract: minutes
+    version: v4
+    module: summary
+  - contract: transcript
+    version: v1
+    module: transcription
+#  - contract: identity-api
+#    version: v1
+#    module: identity
+
+# Data owned. Nobody else accesses it directly.
+data:
+  owns: []
+  shared: []                     # any exception requires a named ADR
+
+# Significant external dependencies.
+# Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
+dependencies:
+  - name: serde_json
+    purpose: Reads the session's started, the transcript's lines, the minutes' quoted values; writes front matter values
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: Meeting::read and markdown in src/lib.rs; any JSON library replaces it.
+  - name: pulldown-cmark
+    purpose: Renders the summary's Markdown into the HTML page, its raw HTML said as text
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One loop in html() of src/lib.rs; any CommonMark renderer that gives events replaces it.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
+  - name: docx-rs
+    purpose: Writes the Word document — its heading styles, paragraphs, runs and table (MIT, without its image feature)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: docx() and paragraphs() in src/lib.rs; any OOXML writer with styles and tables replaces it.
+  - name: typst, typst-layout, typst-pdf
+    purpose: Lays the meeting out and writes it as a tagged PDF, PDF/UA-1 (Apache-2.0; D108's spike, issue 129)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      pdf() in src/pdf.rs writes one typst source and compiles it; another typesetter that writes PDF/UA
+      from a source — a headless browser's print — replaces it, at the cost of its tags or its size.
+  - name: fontdb
+    purpose: >-
+      Finds the system's font files for the PDF — fontconfig's folders on Linux, the system's on macOS
+      and Windows; already built as typst's (MIT)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: system() in src/main.rs; a list of the system's font folders read by hand replaces it.
+#  - name:
+#    purpose:
+#    adr:
+#    exit_strategy:
+
+# Standard verbs: the same names everywhere, running this module's stack commands
+# (.nstack/handbook/09-platform.md §2). `nstack <verb> <module>` runs them from this folder.
+# No stack is imposed. check and test are required once the module holds more than its
+# description (fitness M7): declare them before its first file of code.
+commands:
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  test: cargo test --locked
+  release: bash scripts/release.sh
+#  bootstrap:                    # optional: make the module usable from a fresh clone
+#  run:                          # optional: local start, with doubles for the dependencies
+#  e2e:                          # optional: end-to-end scenarios; evidence written to .evidence/
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  adr: docs/adr/
+  # runbook: docs/runbook.md     # required when criticality >= high

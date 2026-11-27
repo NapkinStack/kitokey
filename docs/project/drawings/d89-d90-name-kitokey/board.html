@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, septième tour : le nom, son « i » coupé par le rond</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes. The name is set in Montserrat 700 (OFL) as
+     installed on the author's workstation; the name kept is outlined before it is published.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Yellow = the author's notes, never the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+  .tiles { display: flex; align-items: flex-end; gap: 14px; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 10px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .tray { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; font-size: 11px; }
+  .tray.darkbar { background: #000; color: #FFF; --rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .wm { font-family: Montserrat, system-ui, sans-serif; font-weight: 700; letter-spacing: -.02em; display: inline-flex; align-items: baseline; line-height: 1; }
+  .wm .ii { position: relative; display: inline-block; }
+  .wm .ii .dot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--wdot, currentColor); box-shadow: 0 0 0 var(--cut) var(--cutc, var(--surface)); }
+  .cands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .cand { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .cand.pick { box-shadow: 0 0 0 2px var(--note-line); }
+  .cand .name { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .cand .name .l { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+  .cand .idea { font-size: 12.5px; color: var(--soft); min-height: 38px; }
+  .cand .tray { padding: 8px 10px; gap: 10px; font-size: 10px; }
+  .head { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-weight: 700; font-size: 15px; width: 280px; }
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; padding-left: 4px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .arrow { font-size: 22px; color: var(--soft); }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+<section data-board="1">
+  <h2>1 · Le nom, septième tour — le « i » dessiné comme le fût de la marque : le rond d’enregistrement le coupe (D89)</h2>
+  <div class="col" style="gap:18px">
+    <div class="card" style="display:flex;align-items:center;gap:32px" data-pair></div>
+    <div class="row" style="gap:20px">
+      <div class="col" style="gap:6px"><h3>Au repos</h3><div class="card" data-n="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div class="card" data-n="rec"></div></div>
+      <div class="col" style="gap:6px"><h3>Sur l’accent</h3><div class="card" style="background:#2253CF;border-color:#2253CF;color:#fff" data-n="inv"></div></div>
+    </div>
+    <div class="row" style="gap:20px;align-items:flex-end">
+      <div class="col" style="gap:6px"><h3>Construction — le i grossi</h3><div class="grid24" style="padding:12px 20px" data-n="zoom"></div></div>
+      <div class="col" style="gap:6px"><h3>Avec l’icône — 48, 32, 24 px</h3><div class="card" style="display:flex;align-items:center;gap:36px" data-lock></div></div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le « i » est tracé comme le fût de la marque : son trait monte jusqu’au rond, qui le coupe d’un jour de même proportion que dans la marque (0,41 fois le trait) ; le rond a la largeur du trait, son haut à la hauteur du « k ».</li>
+      <li>Au repos, le rond a la couleur du nom ; pendant un enregistrement (animation de kitokey.com, écran de fin du programme d’installation), il rougit et grossit comme dans la marque (× 1,375). Le « t » n’est pas touché.</li>
+      <li>Le nom est composé en Montserrat 700 (OFL) puis vectorisé avant publication : aucune police à installer.</li>
+    </ul>
+  </div>
+</section>
+<script>
+  const ctx = document.createElement("canvas").getContext("2d");
+  let uid = 0;
+  // The name: "k", a dotless i whose stem is drawn up to the dot, "tokey"; the dot's gap cuts the stem as in the mark.
+  const name = (s, { rec = false, dot = "currentColor" } = {}) => {
+    ctx.font = `700 ${s}px Montserrat`;
+    const ls = -0.02 * s, k = ctx.measureText("k"), i = ctx.measureText("ı");
+    const stem = i.actualBoundingBoxRight + i.actualBoundingBoxLeft, x0 = k.width + ls - i.actualBoundingBoxLeft, cx = x0 + stem / 2;
+    const base = s * 0.95, top = base - k.actualBoundingBoxAscent, r0 = stem / 2, r = rec ? r0 * 1.375 : r0, gap = stem * 0.41;
+    const cy = top + r0, xh = base - i.actualBoundingBoxAscent, w = ctx.measureText("kıtokey").width + 7 * ls, id = `n${++uid}`;
+    return `<svg width="${Math.ceil(w)}" height="${Math.ceil(s * 1.3)}" style="display:block;overflow:visible"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="-10" y="-10" width="${w + 20}" height="${s * 1.5 + 20}"><rect x="-10" y="-10" width="${w + 20}" height="${s * 1.5 + 20}" fill="#fff"/><circle cx="${cx}" cy="${cy}" r="${r + gap}" fill="#000"/></mask></defs><g mask="url(#${id})" fill="currentColor"><text x="0" y="${base}" font-family="Montserrat" font-weight="700" font-size="${s}" letter-spacing="${ls}">kıtokey</text><rect x="${x0}" y="${cy}" width="${stem}" height="${xh - cy + 1}"/></g><circle cx="${cx}" cy="${cy}" r="${r}" style="fill:${rec ? dot : "currentColor"}"/></svg>`;
+  };
+  // The accepted mark (sixth round), for the pair and the lock-up.
+  const K = `<path d="M6.5 7v13M6.5 14.2 17 4M9.8 11 17.3 20" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const tile = n => { const id = `t${++uid}`; return `<svg width="${n}" height="${n}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><svg x="10" y="10" width="44" height="44" viewBox="0 0 24 24"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><circle cx="6.5" cy="5.6" r="2.9" fill="#000"/></mask></defs><g mask="url(#${id})">${K}</g><circle cx="6.5" cy="5.6" r="1.6" fill="#fff"/></svg></svg>`; };
+  document.querySelector("[data-pair]").innerHTML = `${tile(96)}<span style="font-size:22px;color:var(--soft)">⇄</span>${name(80)}<span class="cap" style="max-width:280px">Le même geste : le rond coupe le fût du K dans la marque, le fût du i dans le nom.</span>`;
+  document.querySelector("[data-n=rest]").innerHTML = name(48);
+  document.querySelector("[data-n=rec]").innerHTML = name(48, { rec: true, dot: "var(--red)" });
+  document.querySelector("[data-n=inv]").innerHTML = name(48);
+  document.querySelector("[data-n=zoom]").innerHTML = name(160);
+  document.querySelector("[data-lock]").innerHTML = [[48, 36], [32, 24], [24, 18]].map(([t, n]) => `<span style="display:flex;align-items:center;gap:${t / 4}px">${tile(t)}${name(n)}</span>`).join("");
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>

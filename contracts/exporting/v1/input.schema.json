@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "The exporting program's input",
+  "description": "exporting/v1 — one JSON object on the program's input, then its end: where to write, the words a file shows that no contract carries, in the person's language, and for the format `ics` the dates to write. What a schema cannot say is on the contract's page.",
+  "type": "object",
+  "properties": {
+    "to": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "transcript": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "me": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "others": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "time": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "speaker": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
+    },
+    "dates": {
+      "description": "The format `ics` alone reads it, one event per item, in its order; every other format ignores it. Each `id` is unique in the array, and each `date` a day of the calendar: what a schema cannot say is on the contract's page.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "pattern": "[\\n\\r]"
+            }
+          },
+          "who": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "pattern": "[\\n\\r]"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passage": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "what"
+        ]
+      }
+    }
+  },
+  "required": [
+    "to",
+    "name",
+    "transcript",
+    "me",
+    "others",
+    "time",
+    "speaker",
+    "text"
+  ]
+}

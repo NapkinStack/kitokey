@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# What this module ships, into $NSTACK_DIST: kitokey, its desktop entry and icon under the
+# application's id, and its version. The program is built for the system KITOKEY_TARGET names —
+# in a container of that system (containers/<target>.Containerfile), so that it links the
+# libraries that system has, never this machine's (D27); unset, for this machine.
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artefacts folder}
+target=${KITOKEY_TARGET:-}
+# Windows names a program with its .exe (D53).
+exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
+# What the program owes its crates' authors goes beside it, for the package to ship (D102).
+cp "$here/THIRD-PARTY-NOTICES.html" "$dist/"
+if [ -z "$target" ]; then
+  (cd "$here" && cargo build --locked --release)
+  built=${CARGO_TARGET_DIR:-$here/target}/release
+else
+  recipe=$here/containers/$target.Containerfile
+  [ -f "$recipe" ] || { echo "release: kitokey is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
+  image=kitokey-build-shell:$target
+  podman build -q -t "$image" -f "$recipe" "$here/containers" >/dev/null
+  # Kept between releases, outside the repository: the build — one per image, so that another
+  # recipe (headers, compilers) builds again from nothing — and the crates fetched.
+  cache=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-build/$target
+  kept=$cache/shell-$(podman image inspect -f '{{.Id}}' "$image" | cut -c1-12)
+  mkdir -p "$kept" "$cache/registry"
+  # No relabelling of what is mounted (`:Z` would relabel the files in place): labels left alone;
+  # the source seen through a throwaway layer (`:O`): Tauri's build writes its schemas there
+  # (gen/), and none of it reaches the tree.
+  podman run --rm --security-opt label=disable -v "$here:/src:O" -v "$kept:/target" \
+    -v "$cache/registry:/opt/cargo/registry" -e CARGO_TARGET_DIR=/target -w /src "$image" \
+    cargo build --locked --release -q
+  built=$kept/release
+fi
+cp "$built/kitokey$exe" "$here/linux/com.napkinstack.Kitokey.desktop" "$dist/"
+cp "$here/icons/icon.png" "$dist/com.napkinstack.Kitokey.png"
+# Windows names its Python python, never python3.
+python=python3; [ -n "$exe" ] && python=python
+"$python" -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$here/tauri.conf.json" > "$dist/VERSION"

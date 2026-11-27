@@ -1,0 +1,469 @@
+# Installing and updating the foundation
+
+> **This project was created by `nstack init`**, the command of the NapkinStack engineering
+> framework. This page is the manual for the foundation: what to install, what to set on the
+> forge, how a new version arrives. The method itself is the rest of `.nstack/handbook/`; the project's
+> own front page is its `README.md`, and nothing here belongs on it.
+
+```mermaid
+flowchart LR
+    I["nstack init<br/>project created and committed"]:::cmd --> G["GitHub repository<br/>checklist applied"]:::team
+    G --> D["nstack doctor<br/>workstation and settings"]:::cmd
+    D --> X["nstack discover idea.md<br/>then the discovery, with your agent"]:::cmd
+    X --> F["Framing with your agent<br/>charter + first cycle"]:::team
+    F --> M["nstack new-module<br/>first module"]:::cmd
+    M --> W["Work in pull requests<br/>CI: fitness, hooks, secrets, sheet, cycle"]:::team
+    W --> U["nstack update<br/>new version, reviewed branch"]:::cmd
+    U --> W
+
+    classDef cmd fill:#1f2937,color:#fff
+    classDef team fill:#065f46,color:#fff
+```
+
+**Legend** — grey: an `nstack` command · green: the work of the team and its agent.
+CI decides as soon as the rulesets require it: what does not pass does not merge (see
+"Prerequisites").
+
+## Prerequisites
+
+- **Workstation**: uv and git; read access to GitHub (the NapkinStack skeleton) and to
+  PyPI.
+- **GitHub repository.** Workflows inform; only rulesets and push protection block. What
+  each case allows:
+
+| Setting | Public repository | Private, Free plan | Private, Team or Pro |
+|---|---|---|---|
+| Rulesets: PR, review, CODEOWNERS, required checks | Yes | **No: nothing blocks the merge** | Yes |
+| Secret scanning and push protection | Yes | No | Paid Secret Protection option |
+| Private vulnerability reporting | Yes | Does not exist | Does not exist |
+| CI minutes | Unlimited | 2 000 per month | Per the plan |
+
+`nstack doctor` reads these settings and answers in one word. **Guarded**: the forge refuses
+what the checklist asks it to refuse. **Unguarded**: nothing here refuses a merge — and it
+keeps apart what your plan forbids, which you can do nothing about, from what is simply not
+in place yet. A project that has done everything its plan allows is reported as compliant,
+and still told that it is unguarded: the checks below keep telling the truth, and none of
+them stops a merge on their own.
+
+Whatever the plan allows, the project receives one more workflow, **Commits on main**: it
+fails when a commit reached `main` outside a pull request, and names it. It records; it does
+not refuse — on a repository where nothing can refuse, it is the only thing that will ever
+mention such a commit, and where a ruleset does refuse, it catches a bypass.
+
+**Where the CI runs.** Every job runs on GitHub's hosted Ubuntu unless the repository
+variable `NSTACK_RUNS_ON` names another runner label — a self-hosted runner, for a private
+repository whose hosted minutes are spent: `gh variable set NSTACK_RUNS_ON --body
+<label>`. Such a runner needs `git` on its path, and whatever each module's commands need —
+its toolchain, its system libraries — which hosted Ubuntu mostly preinstalls; the workflows
+install uv themselves. A runner stopped leaves every run queued until it returns. Removing
+the variable sends new runs to hosted runners; queued ones keep the label they asked for, and
+are cancelled, then run again, by whoever holds **Actions: write** — never the agent's App,
+which has no other use for it. What a
+pull request costs there or on hosted minutes: about five jobs across the workflows for a
+change to one module, each billed at least a minute, plus what the module's own commands take. Never on a public repository: there, a pull request from a
+fork would run its code on that machine — and hosted minutes are unlimited anyway.
+
+## Installation
+
+```bash
+# 1. Tooling at the project's NapkinStack version, as CI installs it (prerequisite: uv)
+bash .nstack/install-engine.sh
+
+# 2. Hooks, once per clone
+pre-commit install
+
+# 3. Frame the project with your agent (nstack discover, .nstack/playbooks/framing.md), then create the first module
+nstack new-module billing acme/billing standard
+
+# 4. Check that the guardrails answer
+nstack fitness
+```
+
+That version is the one in `.copier-answers.yml`; it only changes through `nstack update`,
+in a reviewed pull request. A release comes from the registry; a commit, from the framework's
+repository, and every run then says an unpublished framework judges it.
+
+## Receiving a new version of NapkinStack
+
+```bash
+uv tool install "napkinstack==X.Y.Z" --refresh-package napkinstack --with-executables-from pre-commit  # the version you want; the index read afresh
+git switch main                          # an update starts from the default branch
+nstack update                            # branch nstack/update-vX.Y.Z, merged and committed
+git push -u origin nstack/update-vX.Y.Z  # then the PR, validated by CI
+```
+
+A version published minutes ago may not be served yet: PyPI's CDN can list the previous ones for a
+few minutes, and `--refresh-package` clears only uv's own cache. *No version of napkinstack==X.Y.Z*
+right after a release means wait a few minutes, then run the same command again.
+*Executable already exists: pre-commit* means the engine was installed another way — from its
+sources, say: `bash .nstack/install-engine.sh` deletes a link the removed engine left pointing
+nowhere and installs the version the project records; a `pre-commit` of another installation it
+never touches. Then run the `uv tool install` line above again for X.Y.Z.
+
+An agent passes its session — `nstack update --session <its identifier>` — and the commit
+carries the trailer every commit of an agent carries (`AGENTS.md`, *Identity*). In an agent's run
+(`nstack agent run`), `update` without it refuses before it writes anything.
+
+**When: at a cycle's boundary** — close the cycle, take the update, then accept the next one.
+Upgrading mid-cycle changes the judge while a cycle is being judged.
+
+**Everyone else, once that pull request is merged**, installs the same version — the first
+command above. Until then every `nstack` command says, before anything else, that the
+workstation is behind the project.
+
+The merge keeps the project's adaptations and never touches the modules' code. A conflict
+stays marked in the file, uncommitted: the team decides, and both the hook and CI reject
+any remaining marker.
+
+## When the framework is wrong
+
+A message that misleads, a check that misjudges, a page that contradicts a command: it is not
+worked around here, it is fixed where it lives — and this project is the proof.
+
+```mermaid
+flowchart LR
+    D["A defect met<br/>in this project"]:::pr --> C["The framework's sources,<br/>cloned beside the project"]:::fw
+    C --> T["A failing test,<br/>then the fix"]:::fw
+    T --> J["This project, judged<br/>by the sources"]:::pr
+    J --> P["A pull request<br/>to the framework"]:::fw
+    P -.->|"while it is reviewed"| R["nstack update --ref<br/>the fix's commit"]:::pr
+    P -->|"merged"| U["nstack update --ref<br/>the merged commit, then the release"]:::pr
+
+    classDef pr fill:#065f46,color:#fff
+    classDef fw fill:#1e3a8a,color:#fff
+```
+
+**Legend** — green: in this project · blue: in the framework's repository · dotted: if the
+project needs the fix before its merge.
+
+```bash
+git clone <the framework's repository> ../framework    # its address: _src_path in .copier-answers.yml
+uv run --project ../framework nstack fitness --root .  # this project, judged by the sources
+```
+
+Any command runs that way, with nothing installed. The rest is the framework's own page:
+its `CONTRIBUTING.md` says how a fix is tested, proposed and reviewed. While it is reviewed,
+`nstack update --ref <commit>` lets this project run on the fix: CI installs that commit, and
+every run says an unpublished framework judged it. Once it is merged, the pin moves — to the
+commit the framework's default branch received, which the squash made, or to the first release
+that carries it. `nstack doctor` says when the pinned commit is on no branch any more.
+
+**A private project stays private.** The framework's repository is public: what is reported
+there describes the defect, never the project — no name, no domain, no content.
+
+## To do once on GitHub — otherwise nothing is guaranteed
+
+Workflows **inform**; it is the rulesets that **block**. Without this step the whole
+edifice rests on goodwill, which the OS forbids (`.nstack/handbook/07-governance.md`).
+
+Settings → Rules → Rulesets → on the main branch (private repository: Team or Pro plan):
+
+- [ ] Pull request required: no direct push to main
+- [ ] At least 1 approving review
+- [ ] Code owner review required
+- [ ] Stale approvals dismissed when new commits are pushed
+- [ ] Required checks: `Fitness functions`, `PR scope and review budget`, `Hooks and secrets`, `Test sheet and cycle`, `Module checks`
+- [ ] Bypass list empty: nobody merges around the rules, administrators included
+- [ ] Main branch cannot be deleted
+- [ ] Main branch history cannot be rewritten: no force push
+- [ ] The most recent push approved by someone other than its pusher (approval: agent)
+- [ ] Branches up to date before merging: the checks judged what will land, main included
+
+GitHub offers a check to require only once it has run: open a first pull request, then
+select them.
+
+Settings → Rules → Rulesets → a second ruleset, on the branches `nstack/hold/**/*` — where
+deliverables are held (`.nstack/handbook/project.md`, *Who holds a deliverable*). Not
+`nstack/hold/**`: in a ruleset, `**` stops at a slash, and a hold is two levels down. A hold's
+branch is its record, kept after its cycle. Nobody on its bypass list:
+
+- [ ] Hold branches `nstack/hold/**/*` cannot be force-pushed nor deleted
+
+Settings → Advanced Security (private repository: the Secret Protection option):
+
+- [ ] Secret Protection and push protection
+- [ ] Private vulnerability reporting, public repository (the `SECURITY.md` channel)
+
+Settings → Actions → General:
+
+- [ ] Allowed actions: GitHub's own, plus `astral-sh/setup-uv`
+- [ ] SHA-pinned actions required
+- [ ] Workflow approval for every outside contributor, public repository — approve a fork's workflows from the pull request's page, which releases all its runs; a run's own page releases that run only
+- [ ] Workflow token read-only; Actions neither creates nor approves pull requests
+
+Settings → General → Default branch:
+
+- [ ] Default branch `main`: the branch every workflow and ruleset here watches
+
+Settings → General → Pull Requests — three that need no paid plan and no Administration
+permission, so they hold on any repository. Auto-merge is armed on each pull request by its
+author, when it is opened:
+
+- [ ] Auto-merge available: a pull request armed for it merges itself once approved and green
+- [ ] Squash the only merge method: one pull request, one commit on main
+- [ ] Head branch deleted on merge: a merged branch is history, not a place to work
+
+Issues → Labels:
+
+- [ ] Labels `cross-module`, `over-budget`, `out-of-cycle`, `request`, `bug`, `architecture`, `debt` and `acceptance` — the first three make the exceptions
+  visible **and countable** (`.nstack/handbook/10-measurement.md` §3); the other five are
+  the ones the issue templates put on an issue, which GitHub drops without a word when the
+  label does not exist
+
+A GitHub App per agent, installed on this repository — **the identity your agents work under**
+(`.nstack/handbook/07-governance.md` §7). One command, in your own terminal beside your browser,
+and two clicks at the forge — *Create GitHub App*, then *Install* on this repository:
+
+```bash
+nstack agent add scout                   # scout: your agent's name on this workstation
+nstack agent run scout -- claude         # then, every time: your agent, in its clone, as the App
+```
+
+It makes the App from a manifest, keeps its key in a folder of the agent's own
+(`~/.config/nstack/agents/scout/`, readable by you alone; on Windows under `%APPDATA%`, as your account's permissions there allow), and clones the project beside this one,
+`<project>-scout`, configured to commit and push as the App, with tokens minted per call for
+this repository alone and valid one hour. `nstack agent run` starts the agent there without
+your tokens, your SSH agent or your git configuration — and refuses to start it while your
+`~/.netrc` holds a login for the forge, which git would hand over whatever its configuration. It is not a sandbox: an agent that
+looks for your files can still read them — a container or a system user of its own closes that.
+It says so as it starts, in a few lines on the error output — the agent's own output is untouched.
+
+**The agent commits as the App, in any repository.** Its identity is written in its own git
+configuration, the one `nstack agent run` hands git, with `user.useConfigOnly`: a second clone
+the agent makes commits as the App too, and a repository with no identity refuses the commit —
+git never makes one up from this machine's user and host name, which a push would publish. In
+the project's clone, the pre-push hook refuses a commit whose author or committer is not the
+agent's. `nstack agent status` says an agent whose configuration lacks it; `nstack agent run`
+writes it for an agent made before.
+
+**Your agent tool's configuration is still yours.** The tool you start — Claude Code, another —
+reads its own configuration from your home (`~/.claude` for Claude Code): your sandbox, your
+hooks, your permissions apply to the agent too. For Claude Code, `nstack agent run <name> -- claude`
+adds `--settings` with a file of the agent's own: when your sandbox is on, it lets the agent reach
+the forge — on github.com, the host of a run's logs too — and write its `gh` folder, and sets `GIT_HTTP_PROXY_AUTHMETHOD=basic` for git behind the
+sandbox's proxy — nothing more; it never turns the sandbox off, and settings your organisation
+manages still win over it. So that the agent builds and tests there, it also opens a cache of the
+agent's own (`~/.config/nstack/agents/scout/cache`, its `XDG_CACHE_HOME`) — uv and pre-commit keep
+your warm caches, `UV_CACHE_DIR` and `PRE_COMMIT_HOME`, since the sandbox opens no package index;
+builds that write elsewhere, such as Cargo's `~/.cargo`, need that folder in your sandbox's
+`allowWrite` — and sets the clone so
+that `git switch -c <branch> origin/main` and a plain `git push` never write `.git/config`, which
+the sandbox protects. The sandbox also protects `.claude/skills/` — an agent never rewrites its own
+instructions —, so git could not write the committed skills there: the clone leaves that folder out
+of its working tree (a sparse checkout: still in every commit), and the agent gets the default
+branch's skills from a folder of its own (`--add-dir`), refreshed at each run. A sandbox outside
+that clone puts mount points over the paths it protects, `.claude/skills/` among them: the tree is
+then not the commit, and `nstack attest` refuses it and names them — a record is made outside the
+sandbox, by the person in a terminal of their own, outside the agent's session, or by the decider. Unix sockets — audio, display, the session bus — stay closed unless the
+project answers `agent_sockets: true` (`.nstack/handbook/07-governance.md` §7 says the risk).
+Given your own `--settings`, it adds none and says so. A hook of yours that refuses `gh` — against your own
+account — lets an agent's session through only when its `gh` is the App's
+(`.nstack/handbook/07-governance.md` §7 has the test). The agent checks who it is with
+`nstack agent status`; in a project, the same command lists that project's agents, and
+`--all` every project's on the workstation — shown only when asked, since one workstation may
+serve several clients.
+When you cannot create an App for this repository's owner, `--mine` makes it on your account and
+asks the owner to approve its installation. What the App gets — set by the command, and read
+by no check afterwards:
+
+- [ ] Permissions: Contents, Pull requests and Issues read and write; Commit statuses write,
+      for the attested record's status; Actions and Checks read; Workflows write only when
+      agents maintain CI (`--workflows`); never Administration
+- [ ] No webhook; private, unless `--mine`
+- [ ] Its private key stored outside any repository; in CI, the CI's secrets
+- [ ] The agent's session reaches no human credential: `nstack agent run` keeps them out of its
+      environment; keeping it out of your files is a sandbox's work
+- [ ] Its commits carry the App's identity, never one git makes up from the machine — `nstack agent status`
+- [ ] On `approval: agent`, one App per agent: an App never approves what it pushed
+
+Rather than click through these pages, print the calls that close the distance and run them
+yourself — the command reads the repository, writes nothing, and never plans to lower a
+setting or to rewrite a ruleset:
+
+```bash
+nstack settings
+```
+
+Or have it make them, in one gesture of yours, under your own credential. Never your agent's: a
+credential that administers a repository can always give itself the right to push, so this
+gesture stays a person's — it refuses a GitHub App's token, an agent's session and CI, shows
+the plan and the account it would act as, and makes nothing until you confirm at the keyboard.
+Run it in your own terminal. The credential, in this order:
+
+- **a token in `GH_TOKEN`** (or `GITHUB_TOKEN`), when one is set — portable, no `gh` needed:
+  fine-grained, limited to the repository, Administration: write and Issues: write, valid one day.
+  Without a credential, the command prints GitHub's form for it, filled in; you pick the repository there.
+- **otherwise your `gh` login**, as `gh` itself would use it — its token, scope `repo`, is
+  enough. With two accounts logged in, `gh` uses the active one: `gh auth switch` first, and
+  check the account the plan names.
+
+```bash
+nstack settings --apply                # your gh login: the plan, your yes, each change, then nstack doctor
+
+read -rs GH_TOKEN && export GH_TOKEN   # or a token: paste it, neither shown nor kept
+nstack settings --apply
+unset GH_TOKEN                         # then revoke the token at the forge
+```
+
+Then check, read-only:
+
+```bash
+nstack doctor
+```
+
+`nstack doctor` exits 0 when everything is read and in place, 1 when a setting is missing,
+and 2 when nothing read is missing but something could not be read.
+
+`nstack doctor` is also where a project learns that a newer version of NapkinStack is
+published: one line, with its notes and the way to take it — information, never a gap. The
+registry is asked one other question: `nstack update` says when the version it lays is not
+on PyPI yet, since the project's CI installs it from there and stays red until it is. Minutes
+after a release, PyPI's index may not list it yet: `install-engine.sh` asks again for about two
+minutes and a half, said, before it fails.
+
+`nstack doctor` reads the token from `GH_TOKEN`, otherwise `GITHUB_TOKEN`: a fine-grained
+token, limited to the repository, with the **Administration: read** permission — and
+**Actions: read**, to be told of a workflow failing run after run on the default branch, which
+no required check shows — and, on a private repository, **Contents: read**, to read GitHub's own
+validation of the code owners file: an owner GitHub does not know, such as an organisation named
+alone, leaves the paths it names with no owner. Without a token, the GitHub part stays "not verified", never compliant.
+It never reads your `gh` login by itself; to have it read with that login, for one run:
+`GH_TOKEN=$(gh auth token) nstack doctor`.
+
+---
+
+## What is in this repository
+
+| Path | Role | Who reads it |
+|---|---|---|
+| `AGENTS.md` | **The kernel**: the rules loaded for every task | Agents, every time |
+| `modules/` | The code — one unit of parallelism per folder | Humans and agents, scoped |
+| `contracts/` | The **only** channel between modules. Created by the first contract, not before | Producers and consumers |
+| `docs/project/` | **The discovery, the charter and the cycles**: who it is for, what is delivered now. Born with the first of them | Everyone, agents first |
+| `.nstack/` | **The framework's one folder.** Everything in it arrives by update; nothing outside it does, but the kernel and what the forge reads at the root | The foundation team |
+| `.nstack/playbooks/` | Rules loaded **by trigger** (security, data, UX…) | Agents, when triggered |
+| `.nstack/forms/` | The forms a command or a playbook copies: charter, cycle, decision, rules | Agents and commands |
+| `.nstack/handbook/` | **The handbook**: the why behind every rule | Humans, once |
+| `docs/adr/`, `docs/pdr/` | The decisions taken, with their success criterion | Everyone, on demand |
+| `.copier-answers.yml` | The NapkinStack version and the creation answers | The `_` lines: `nstack update`, never by hand. The answers: the decider, with `nstack config`, in a pull request |
+| `.github/` | What makes the rules non-bypassable | GitHub |
+
+> **`.nstack/handbook/` is never loaded into an agent's context.** It is the human reference.
+> What an agent loads, and in which order, is said once: the kernel's §4. That is the whole
+> difference between a handbook and an operating system.
+
+---
+
+## The commands
+
+```bash
+nstack --help        # lists the commands
+nstack fitness       # manifests + boundaries + skills + plan + hygiene — before every commit
+nstack discover <idea-file>   # starts a discovery, for your agent
+nstack plan          # what needs a person first; then the discovery, the charter and the cycles (docs/project/), the decisions due at a closure, the project across its cycles, who holds what; --prune removes the empty start branches it names
+nstack claim D<n> --session <s> --person @<you>   # takes a deliverable before its first change; nstack unclaim gives it back
+                                                  # --take-over: a stale hold, or your own from another agent's session or outside nstack agent run; your agent restarted renews without it
+nstack deliver D<n> --held '#<pr>' --session <s>   # records a merged deliverable delivered, and removes its empty start branch; --write-states at the closure
+nstack agent add <name> [--clone <dir>] · nstack agent run <name> -- <command>   # an agent's own App and clone; add is a person's
+nstack agent status  # who this agent is — its App, repository, clone, gh and hooks; for a person, this project's agents
+nstack board [--dry-run]   # the cycles shown on GitHub as milestones and issues — CI runs it on every merge; --dry-run previews a proposed cycle; by hand, Run workflow, never beside it
+nstack skills        # generates the agents' skills from the playbooks
+nstack doctor        # the workstation and the forge's settings, read-only
+nstack settings      # the calls that would bring the forge's settings to the checklist; --apply: yours makes them
+nstack new-module <name> <owner> <criticality> [--user-facing]   # --user-facing: a user sees it, which decides a test sheet
+nstack new-contract <name>   # a contract, and the first time the module that holds them all
+nstack check [module]   # the module's commands.check; default: every module
+nstack test [module]    # commands.test, likewise
+nstack bootstrap [module]   # commands.bootstrap, when declared
+nstack run <module>     # local start, when commands.run is declared
+nstack e2e [module]     # end-to-end scenarios, when commands.e2e is declared — one run at a time on a machine, unless sealed
+nstack clean [module]   # removes a module's build outputs, when commands.clean is declared
+nstack release [module]   # a module's artefacts into dist/<module>, when commands.release is declared
+nstack pr-check --body-file <file> [--labels a,b]   # test sheet and cycle, as CI reads them from the pull request
+                                                    # with a token and one open pull request at the head, its own labels are read
+nstack attest --body-file <file> [--labels a,b]     # the CI's checks run here, recorded on the commit; labels as pr-check takes them
+                                                    # module checks kept while what they read is unchanged, 7 days at most (--again runs them)
+nstack attest --void <commit> --reason "<why>"     # a record known unsound: never kept from again, the head attested again
+                                                    # --accept-identity: a first record under an identity the history does not show yet
+nstack pr-scope --base <base>   # one pull request = one module, within the review budget, as CI reads it
+nstack landed [--span <before>..<after>]   # what reached this branch outside a pull request, recorded
+nstack modules --changed-since <base>   # the modules with a file changed, as CI lists them
+nstack modules --changed-since <base> --with-contract-sides   # ... and both sides of a changed contract
+nstack compat [module] --base <base>    # a contract version consumed or stable: the merged proof
+nstack update [--ref <tag>]   # brings the project to another version of NapkinStack; --forge moves it to another forge
+nstack config [<setting> [<value>]]   # the decider's settings: lists them, reads one, lays a change on a branch for review
+# check, test and run of a module: the `commands` section of its MANIFEST.yaml
+```
+
+Every module exposes the **same verbs**, whatever its technology. That is what lets
+someone move between modules without relearning anything (`.nstack/handbook/09-platform.md` §2).
+
+---
+
+## Agent skills
+
+The playbooks are exposed as skills, so that loading them on demand becomes the runtime's
+job rather than a kernel instruction. One `SKILL.md` per playbook, in the open Agent Skills
+format, written where each tool looks: `.claude/skills/` for Claude Code, `.agents/skills/` for
+Codex and the other tools that read that layout. A tool that reads both may list a skill twice:
+the same bytes, so either one loads the same playbook.
+
+```bash
+nstack skills           # generates .claude/skills/ and .agents/skills/ from .nstack/playbooks/
+nstack skills --check   # checks they are in sync (runs in CI)
+```
+
+**`.nstack/playbooks/` stays the source of truth.** The skills are generated from it, never
+edited by hand — you change the playbook, run `nstack skills`, and commit both. They are
+**committed**, as a lockfile is: an agent starting from a fresh clone — a cloud agent, a new
+contributor's — has them. `nstack init` commits them with the project, `nstack update` in its own
+commit; `.gitattributes` marks them generated, so the forge folds them in a review, and the
+review budget does not count them. A playbook with no entry in `.nstack/skills.yaml`
+fails CI; a skill that drifted from its playbook, or was edited by hand, fails it too (S3).
+Inside an agent's sandbox, `.claude/skills/` cannot be written: an agent that changes a playbook
+regenerates `.agents/skills/` alone, and a person runs `nstack skills` and commits the rest — S3
+says it until then. A change to the agents' instructions passes a person's hands.
+
+This indirection has a reason: a tool is an **adapter**, never a foundation
+(`.nstack/tooling-profile.md`). If the rules existed only as skills, the OS would stop
+working with any other agent — and the trigger table of kernel §4 is there for exactly
+that case.
+
+Enforcement, on the other hand, **never moves down into a plugin**. An agent-side hook is
+fast feedback, not a guarantee: the blocking checks stay in CI
+(`.nstack/handbook/07-governance.md` §4).
+
+---
+
+## The three rules to remember
+
+1. **One PR = one module.** A change touching two goes through an expand/contract
+   sequence on the contract (`.nstack/handbook/03-contracts.md` §4).
+2. **The oracle before the code.** The success criterion is executable and red before the
+   first generated line (`.nstack/handbook/05-workflow.md` §3).
+3. **Convention is the default choice.** It needs no justification; every deviation is
+   justified by an observable user value (`.nstack/handbook/06-decisions.md` §2).
+
+---
+
+## What is not provided — and why
+
+No stack: no language, no application framework, no database. The OS imposes a **selection
+method** and a decision trail, not a list of technologies (`.nstack/handbook/06-decisions.md` §7).
+
+A new module therefore declares no command: it is green while it holds only its
+description, and `nstack fitness` asks for `check` and `test` with its first file of code.
+Wiring them, and `run`, onto your own tooling is your job. The **names** never change, the
+**content** is yours.
+
+## What is left to wire after the installation
+
+- [ ] The `check` and `test` commands of every module, in its `MANIFEST.yaml`
+- [ ] The contract format chosen, and the contract tests and the comparator behind
+      `commands.compat` that go with it
+- [ ] The review budget (400 lines / 15 files are a starting point): `nstack config review_budget_lines <n>`
+      and `review_budget_files <n>`, if yours differs
+- [ ] Re-read the `description` fields in `.nstack/skills.yaml` — they are what triggers
+      the skills, and they must speak your domain's vocabulary
+- [ ] The `e2e` command of every user-facing module, and the tools that drive a browser or
+      an emulator, in `.nstack/tooling-profile.md`

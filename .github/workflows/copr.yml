@@ -1,0 +1,70 @@
+name: Copr
+
+# D78: a release tag on main is built by Copr for each Fedora release it still supports, from a
+# source package made here — the four programs' sources, their crates vendored: Copr's builds run
+# without the network. Then, installed from Copr in clean containers, it holds D80's removal, and
+# the version Copr held before comes up to it with `dnf upgrade`. The project belongs to a Fedora
+# group, so that installing names no person; the token is COPR_CONFIG (cycle 07, *What needs a person*).
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  COPR_PROJECT: "@napkinstack/kitokey"
+
+concurrency:
+  group: copr
+  cancel-in-progress: false
+
+jobs:
+  copr:
+    name: Copr — built, installed, upgraded
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: The tag is on main and names the shell's version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          test "$TAG" = "v$(jq -r .version modules/shell/tauri.conf.json)"
+          # The version Copr builds, upgraded to and installed: the tag's.
+          echo "KITOKEY_VERSION=${TAG#v}" >> "$GITHUB_ENV"
+
+      - name: The source package
+        env:
+          TAG: ${{ github.ref_name }}
+        run: bash modules/install/copr/srpm.sh "$TAG" "$KITOKEY_VERSION" dist/copr
+
+      - name: What the Copr project builds for
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+        run: bash modules/install/copr/project.sh "$COPR_PROJECT"
+
+      - name: The version Copr holds, installed and used
+        run: bash modules/install/copr/upgrade.sh before "$COPR_PROJECT"
+
+      - name: Built by Copr
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+        run: bash modules/install/copr/build.sh "$COPR_PROJECT" dist/copr/kitokey-*.src.rpm dist/copr/releases
+
+      - name: Upgraded to it with dnf
+        run: bash modules/install/copr/upgrade.sh after "$COPR_PROJECT"
+
+      - name: Installed from Copr, each release, then removed (D80)
+        run: |
+          for release in $(cat dist/copr/releases); do
+            echo "::group::fedora-$release"
+            KITOKEY_TARGET=fedora-$release bash modules/install/scripts/e2e.sh "copr:$COPR_PROJECT"
+            echo "::endgroup::"
+          done

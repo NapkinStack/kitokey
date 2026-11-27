@@ -1,0 +1,45 @@
+//! What the shell does that needs no screen: it starts the steps' programs, reads what they
+//! say as their contracts describe it, and turns that into what the user is told. The tray,
+//! the shortcut and the window are built on this, and hold none of it.
+
+pub mod autostart;
+pub mod cancel;
+pub mod confidential;
+pub mod context;
+pub mod correction;
+pub mod dates;
+pub mod desktop;
+pub mod destinations;
+pub mod engines;
+pub mod example;
+pub mod exporting;
+pub mod flac;
+pub mod keys;
+pub mod levels;
+pub mod licence;
+pub mod log;
+pub mod meeting;
+pub mod meeting_models;
+pub mod microphone;
+pub mod migrate;
+pub mod minutes;
+pub mod mix;
+pub mod model;
+pub mod named;
+pub mod peaks;
+pub mod player;
+pub mod providers;
+pub mod recording;
+pub mod registry;
+pub mod sending;
+pub mod sessions;
+pub mod settings;
+pub mod sound_check;
+pub mod speakers;
+pub mod speech;
+pub mod speeds;
+pub mod spoken;
+pub mod summarising;
+pub mod transcription;
+pub mod trial;
+pub mod words;

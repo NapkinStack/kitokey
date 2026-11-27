@@ -1,0 +1,81 @@
+[package]
+name = "kitokey-shell"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[[bin]]
+name = "kitokey"
+path = "src/main.rs"
+
+[dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
+dirs = "6"
+keyring-core = "1.0.1"
+pulldown-cmark = { version = "0.13.4", default-features = false, features = ["html"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.154"
+rubato = "5.0.1"
+# A track kept as FLAC once stopped (session-audio/v3), read as its WAV was (ADR-0016).
+symphonia = { version = "0.6.1", default-features = false, features = ["flac"] }
+hyper = { version = "1.12.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1.21", features = ["tokio"] }
+http-body-util = "0.1.5"
+bytes = "1.12.1"
+futures-util = "0.3.34"
+tokio = { version = "1.53.2", features = ["rt", "net", "time", "fs", "io-util", "sync", "signal"] }
+getrandom = "0.3.4"
+sha2 = "0.10.9"
+sys-locale = "0.3.2"
+tauri = { version = "2.12.3", features = ["tray-icon", "image-png"] }
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2.8.1"
+tauri-plugin-single-instance = "2.5.4"
+http = "1.5.0"
+toml = "0.9"
+toml_edit = "0.25"
+trash = "5.2.9"
+ureq = "3.4.2"
+tracing = "0.1.44"
+tracing-appender = "0.2.5"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "json", "env-filter", "std"] }
+minisign-verify = "0.3.0"
+
+[build-dependencies]
+tauri-build = "2.7.2"
+
+# A transcript ended with whatever it started: its process group (src/transcription.rs).
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.190"
+
+# The global shortcut: the desktop's portal on Linux, the system's own elsewhere (ADR-0002).
+[target.'cfg(target_os = "linux")'.dependencies]
+ashpd = { version = "0.13.13", default-features = false, features = ["async-io", "global_shortcuts"] }
+notify-rust = "4.18.2"
+futures-util = "0.3.34"
+
+# The system's keyring, where a provider's key is kept (src/keys.rs).
+[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies]
+zbus-secret-service-keyring-store = { version = "1.0.1", features = ["crypto-rust"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "1.0.2", features = ["keychain"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-native-keyring-store = "1.1.0"
+# The Store's licence and purchase (D83): the package's identity, the Store, the window given to it.
+windows = { version = "0.62", features = ["ApplicationModel", "Services_Store", "Win32_UI_Shell"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+tauri-plugin-global-shortcut = "2.4.1"
+
+[dev-dependencies]
+# Writes the FLACs the tests read, as capture writes them: libFLAC, the reference (ADR-0016).
+libflac-sys = "0.3.4"
+minisign = "0.10.0"
+oxc_allocator = "0.156"
+oxc_ast = "0.156"
+oxc_ast_visit = "0.156"
+oxc_parser = "0.156"
+oxc_span = "0.156"
+tempfile = "3"

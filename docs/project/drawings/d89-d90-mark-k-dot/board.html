@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, quatrième tour : le K épuré et le point qui se déplace</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes. The name is set in Montserrat 700 (OFL) as
+     installed on the author's workstation; the name kept is outlined before it is published.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Yellow = the author's notes, never the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+  .tiles { display: flex; align-items: flex-end; gap: 14px; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 10px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .tray { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; font-size: 11px; }
+  .tray.darkbar { background: #000; color: #FFF; --rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .wm { font-family: Montserrat, system-ui, sans-serif; font-weight: 700; letter-spacing: -.02em; display: inline-flex; align-items: baseline; line-height: 1; }
+  .wm .ii { position: relative; display: inline-block; }
+  .wm .ii .dot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--wdot, currentColor); }
+  .head { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-weight: 700; font-size: 15px; width: 280px; }
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; padding-left: 4px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .arrow { font-size: 22px; color: var(--soft); }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<!-- The third round's K3, for comparison. -->
+<symbol id="m-old" viewBox="0 0 24 24"><path d="M6.5 11v9M8.2 15.2 17.5 5.5M8.2 15.2 17.5 20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="5.2" r="3.4" fill="currentColor"/><circle cx="6.5" cy="5.2" r="2" fill="#E5483D"/></symbol>
+<!-- The fourth round's K: a short stem and the dot cut above it, as the name's i; the arm meets the
+     stem, the leg leaves the arm; stroke 3.4. At rest the dot has the mark's colour; while recording
+     it turns red and grows from 2.9 to 3.3, so the change is not told by colour alone. -->
+<symbol id="m-k" viewBox="0 0 24 24"><path d="M6.5 10.5v9.5M6.5 15.2 17 4.5M9.9 11.8 17 19.8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="4.6" r="2.9" fill="currentColor"/></symbol>
+<symbol id="m-k-rec" viewBox="0 0 24 24"><path d="M6.5 10.5v9.5M6.5 15.2 17 4.5M9.9 11.8 17 19.8" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="6.5" cy="4.4" r="3.3" style="fill:var(--rec)"/></symbol>
+</defs>
+</svg>
+
+<!-- ═══════════════ 1 · LE K ÉPURÉ ═══════════════ -->
+<section data-board="1">
+  <h2>1 · La marque, quatrième tour — le K3 épuré : sans anneau, le point découpé au-dessus du fût, comme le « i » du nom (D89)</h2>
+  <div class="row" style="gap:28px">
+    <div class="col">
+      <h3>L’icône de l’application — toujours au repos</h3>
+      <div class="tiles" data-tiles></div>
+      <div class="cap">128 · 64 · 48 · 32 · 24 · 16 px — le Store, le .deb, le .rpm, le dock, le lanceur</div>
+      <h3 style="margin-top:12px">Avant — le K3 du troisième tour</h3>
+      <div class="tiles" data-old></div>
+    </div>
+    <div class="col">
+      <h3>Construction — grille de 24</h3>
+      <div class="grid24" style="width:240px;height:240px;color:var(--ink);--rec:var(--red)" data-grid></div>
+      <div class="cap" style="max-width:240px">Fût court et point : le « i ». Le bras rejoint le fût, la jambe part du bras. Trait 3,4, bouts ronds ; point de rayon 2,9, à 1,5 au-dessus du fût.</div>
+    </div>
+  </div>
+  <h3 style="margin-top:24px">La barre système — au repos, puis pendant un enregistrement · 16, 22 et 24 px, puis grossie 3 ×</h3>
+  <div class="row" style="gap:20px" data-trays></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>L’anneau autour du point est retiré ; le point est <b style="display:inline">découpé</b> au-dessus d’un fût raccourci, exactement comme le point du « i » dans « kitokey » : le K se lit comme un « i » qui ouvre les bras.</li>
+      <li>Le K est redessiné : le bras haut part du fût, la jambe part du bras (comme dans les K des caractères classiques), les deux bouts alignés en haut et en bas ; le trait passe de 3 à 3,4 pour tenir à 16 px.</li>
+      <li><b style="display:inline">Au repos, une seule couleur</b> : la marque est blanche sur le carreau, ou de la couleur de la barre système. <b style="display:inline">Pendant un enregistrement</b>, le point devient rouge et grossit un peu (rayon 2,9 → 3,3) : la forme change aussi, la couleur ne parle pas seule (WCAG 1.4.1).</li>
+      <li>L’icône de l’application (Store, dock, lanceur) est une image fixe : elle reste toujours au repos. Le rouge apparaît là où Kitokey montre son état : la barre système, la poignée de la barre, l’en-tête de la fenêtre — la marque y est tracée sans carreau, à l’accent, car un rouge sur le carreau bleu n’atteint pas 3:1 (2,58 pour #FF7A72).</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 2 · LE POINT SE DÉPLACE ═══════════════ -->
+<section data-board="2">
+  <h2>2 · Le point se déplace — sur le K dans la marque, sur le i dans le nom ; rouge pendant un enregistrement (D89, D90)</h2>
+  <div class="col" style="gap:18px">
+    <div class="card" style="display:flex;align-items:center;gap:28px" data-move></div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>Au repos</h3><div data-wm-rest></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement — la page de kitokey.com, une animation</h3><div data-wm-rec></div></div>
+    </div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>L’en-tête de la fenêtre, au repos</h3><div class="head" data-head="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div class="head" data-head="rec"></div></div>
+    </div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>La barre, au repos — la poignée est la marque</h3><div data-bar="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement — la poignée rougit</h3><div data-bar="rec"></div></div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Un seul point, qui change de lettre : sur le K quand la marque est seule, sur le i quand le nom est écrit en entier. Jamais les deux à la fois : à côté du nom, la marque garde son point, et le nom aussi, comme un « i » ordinaire.</li>
+      <li>Au repos, le point a la couleur du texte ; il ne devient rouge que lorsqu’un enregistrement tourne — dans la poignée de la barre et l’en-tête de la fenêtre. Le point rouge battant du premier tour, à gauche du temps, devient inutile : la poignée le remplace et la barre gagne sa place.</li>
+      <li>Sur kitokey.com, le point peut passer du K au i, puis rougir, en une animation courte ; elle ne joue pas si le système demande moins d’animations.</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+  const use = (id, size, style = "") => `<svg width="${size}" height="${size}" style="${style}"><use href="#${id}"/></svg>`;
+  const bare = (id, size) => use(id, size, "color:var(--accent);--rec:var(--red)");
+  const tile = (id, size) => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><use href="#${id}" x="10" y="10" width="44" height="44" style="color:#FFFFFF;--rec:#FF7A72"/></svg>`;
+  document.querySelector("[data-tiles]").innerHTML = [128, 64, 48, 32, 24, 16].map(s => tile("m-k", s)).join("");
+  document.querySelector("[data-old]").innerHTML = [64, 32, 16].map(s => tile("m-old", s)).join("");
+  document.querySelector("[data-grid]").innerHTML = use("m-k", 240);
+  const tray = cls => `<div class="tray ${cls}">${use("m-k", 16)}${use("m-k", 22)}${use("m-k", 24)}${use("m-k", 66)}<span style="opacity:.7">repos</span><span class="sep"></span>${use("m-k-rec", 16)}${use("m-k-rec", 22)}${use("m-k-rec", 24)}${use("m-k-rec", 66)}<span style="opacity:.7">enregistre</span></div>`;
+  document.querySelector("[data-trays]").innerHTML = tray("darkbar") + tray("lightbar");
+
+  // The name: "k", a dotless i under the dot, "tokey"; the dot's colour is --wdot.
+  const wm = (s, dot = "currentColor") => `<span class="wm" style="font-size:${s}px;--wdot:${dot}">k<span class="ii">ı<span class="dot" style="width:${s * 0.19}px;height:${s * 0.19}px;top:${s * 0.12}px"></span></span>tokey</span>`;
+  document.querySelector("[data-move]").innerHTML =
+    `${tile("m-k", 96)}<span class="arrow">⇄</span>${wm(72)}<span class="cap" style="max-width:300px">Le même point : celui du K dans la marque, celui du i dans le nom.</span>`;
+  document.querySelector("[data-wm-rest]").innerHTML = `<div class="card">${wm(48)}</div>`;
+  document.querySelector("[data-wm-rec]").innerHTML = `<div class="card">${wm(48, "var(--red)")}</div>`;
+  for (const el of document.querySelectorAll("[data-head]")) {
+    const rec = el.dataset.head === "rec";
+    el.innerHTML = `${bare(rec ? "m-k-rec" : "m-k", 24)}Kitokey${rec ? `<span style="margin-left:auto;font-size:12px;font-weight:600;color:var(--red)">00:16:42</span>` : ""}`;
+  }
+
+  const I = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+  const tools = `<span class="ib">${I("chevron-down")}</span><span class="ib">${I("maximize-2")}</span><span class="ib">${I("minus")}</span>`;
+  const draw = {
+    rest: () => `<div class="strip"><span class="handle">${bare("m-k", 22)}</span><span class="gap"></span><span class="fld"><span class="ph">Contexte de la réunion</span></span><span class="gap"></span><span class="rb"><i></i></span><span class="gap"></span>${tools}</div>`,
+    rec: () => `<div class="strip"><span class="handle">${bare("m-k-rec", 22)}</span><span class="time">00:16:42</span><span class="meters"><span class="mt">${I("mic")}<span class="track"><i class="fill" style="width:62%"></i></span></span><span class="mt far">${I("volume-2")}<span class="track"><i class="fill" style="width:38%"></i></span></span></span><span class="sq"><i></i></span><span class="gap"></span>${tools}</div>`,
+  };
+  for (const host of document.querySelectorAll("[data-bar]")) {
+    const bar = document.createElement("div"); bar.className = "bar"; bar.innerHTML = draw[host.dataset.bar](); host.append(bar);
+  }
+
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>

@@ -1,0 +1,411 @@
+# shell
+
+Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
+
+- **Owner**: NapkinStack/maintainers
+- **Criticality**: standard
+- **Manifest**: [MANIFEST.yaml](./MANIFEST.yaml)
+
+```mermaid
+flowchart TB
+    U(["The user"]):::user -->|"start · stop · make the minutes"| S["shell<br/>tray · shortcut · notifications · one window"]:::mod
+    S -->|"starts, stops, reads what they print"| P["kitokey-capture · kitokey-transcription<br/>kitokey-summary · export"]:::step
+    P --> F["The session's folder"]:::file
+    F -->|"read"| S
+    S -->|"what happened, what failed"| U
+
+    classDef user fill:#92400e,color:#fff
+    classDef mod fill:#065f46,color:#fff
+    classDef step fill:#1e3a8a,color:#fff
+    classDef file fill:#374151,color:#fff
+```
+
+**Legend** — orange: whoever uses Kitokey · green: this module · blue: the four steps, programs
+it starts and never reads the code of · grey: files, the only thing it shares with them.
+
+**It holds no step** (ADR-0002): closed or crashed, a recording goes on, and every step still
+runs from a terminal.
+
+**A recording found again** (#773, Linux): while one runs, `recording.json` beside the settings keeps
+capture's process number, when the system started it (`/proc/<id>/stat`) and the session's folder,
+written whole once capture says `started`, removed once it has ended. A Kitokey started again after
+its shell was ended reads it: the same number and start — no other program can be that one — is the
+recording in progress, its tray and bar at ■, its length counted from `session.json`'s `started`,
+stopped by a termination signal (`recording/v1`), its transcript following as usual; a `stopped`
+already written is a recording ending. Its levels, devices and silences went with the output of the
+shell that read them: none are shown. A program gone, another under its number or a file that does
+not read finds nothing, and the file is removed; one that cannot be read — a file, or a folder in
+its place — is set aside as `recording.json.unreadable-<seconds>`, never deleted. The session left is
+listed as it is. Not found: a
+recording whose shell was ended before capture said `started`, and on macOS and Windows, which have
+no `/proc`.
+
+**Today**: an icon in the tray whose menu starts and stops a recording, the same from a
+global shortcut — Super+Alt+M under a Linux desktop — and a notification for what matters:
+the reminder to announce the recording, with the microphone recorded named in it — one
+other than the call's shows at once — a source that is silent, a device switched while it
+records, named, or none left for a side (D31), the stop, a failure. In
+French where the system is, in English anywhere else.
+
+**A call offered** (D30, Linux): when another application takes a microphone — a call in
+Discord, a browser tab —, a notification names it and offers *Record*, *Not this time* and
+*Never offer*: once while it holds one, never while recording. The shell watches PipeWire's graph
+with `pw-dump --monitor`; what it sees is shown in the notification and kept nowhere.
+`offer = false` in the settings file turns the offers off.
+
+**Started with the session** (D32, Linux), so that a call is offered after a restart: at its
+first start, Kitokey writes `~/.config/autostart/com.napkinstack.Kitokey.desktop`
+([XDG Autostart](https://specifications.freedesktop.org/autostart-spec/latest/)) — the tray
+alone, no window; `TryExec`, so a removed package starts nothing. The entry is the setting:
+Settings' *Lancer Kitokey à l'ouverture de session* writes or removes it, and reads it as the
+desktop's tools leave it (`Hidden`, `X-GNOME-Autostart-enabled`). `autostart` in the settings
+file says Kitokey wrote it once: turned off, it is never written again by itself.
+
+**On Windows** (D84), the package declares a startup task, `KitokeyStartupTask` (`install`'s
+manifest), off until the user turns it on with Settings' switch (#1085); nothing is written under
+`AppData\Roaming\autostart`. The same switch reads and changes the task through `StartupTask`
+(`src/autostart.rs`): turned off by the user in Windows' Startup settings, or set by a policy, it is
+shown as Windows holds it, disabled, with the sentence saying why. The zip has no task: the switch
+is not offered. Each start says the task's state in the log, `shell.startup_task`, for the Windows
+trial to record.
+
+**What the user held under an earlier name** — Wholeheard until D86, Summit until D28 — is carried
+over at the start, before anything is read (`src/migrate.rs`, `keys`, `autostart`), the latest name
+first, each step doing what is left of it so that an interrupted one is done at the next start:
+
+| Held | Becomes |
+|---|---|
+| The settings' and the data's folders (`wholeheard/`, the Whisper model in it) | Moved to `kitokey/`, never copied: the model is not fetched again; a `kitokey/` folder holding something is never overwritten |
+| The meetings in `Documents/Wholeheard`, the settings naming no folder | Named in the settings, where they are: never moved |
+| A key filed under `dev.wholeheard.Wholeheard` | Filed under `com.napkinstack.Kitokey` as it is read, then forgotten there |
+| `~/.config/autostart/dev.wholeheard.Wholeheard.desktop` | Kitokey's entry, on if it was on, off if it was turned off; the old one taken away |
+
+Said once, in the user's language: *Wholeheard is now Kitokey*.
+
+**One Kitokey** per session (D35): a second start hands its arguments to the running one and
+leaves ([tauri-plugin-single-instance](https://v2.tauri.app/plugin/single-instance/)). The
+applications' menu runs `kitokey --window`, so its window opens, running or not; started again
+with the session, nothing opens. `kitokey --version` prints its version, the package's (D78), and
+starts nothing.
+
+**The window** (cycle 03, from D11's drawings) is opened by *Open Kitokey* in the menu — or at
+once by `kitokey --window` — and never without a gesture: the meetings in the sessions'
+folder by week, newest first, each with its day, its length, what it holds and what its
+audio weighs, and above them what all the audio weighs against the transcripts and minutes.
+A session being recorded, or one left without its end, says so. It reads `session.json` of
+each of its three forms (`contracts/session-audio`) and writes nothing; it speaks the language chosen in Settings, the system's by default (D64),
+follows its light or dark theme and font, in the colours of D11's boards, and reads the
+folder again whenever it comes forward. A folder that cannot be read is said, with a way to try again, never drawn as an empty list (D67). In two panes since D61 (its board,
+[`d61-the-window-in-two-panes`](../../docs/project/drawings/d61-the-window-in-two-panes/README.md)): the
+meetings in a sidebar of 280 px with the recording, a search over what each row says, the weights and
+*Réglages*; the meeting chosen — the last one at first, ↑ and ↓ on the list for the others — and Settings,
+freeing space and the agreements in the pane beside it, as wide as the window leaves it; under 840 px,
+one at a time, the pane with a way back. A meeting opens from the list: its minutes as written, with
+who wrote them and where; its transcript in the meeting's order, each line with its side and
+voice, searched over what was said, the word found marked (#1078) — the two side by side once the pane is 1000 px wide, their text
+75 characters at most; who spoke over the meeting, each segment a bar on its side's lane (#1077); its folder, opened in the
+system's file manager. *Réglages* sets what follows a recording, the transcription's model among
+those on this computer, the reminder and how long the audio is kept — each choice saved at once
+in the settings file; one Kitokey could not read is said, and not written over. Audio kept
+longer than the settings say goes to the system's trash — at start, then every hour, said once —
+from sessions whose transcript is whole; their transcript and minutes stay.
+
+**The recording bar** (D90, in place of D35's small window) opens first: one row, 440 × 44 — the
+mark, ● to record, its options, the way to the full window, each an icon named by its words, the
+shortcut in ●'s tooltip; its options open under the row, the window as tall as it shows. A recording
+shows in it (D33) — the time and ■ in the row, the mark's dot red —, above the other windows until
+the stop; then it comes back to rest. While recording, the row holds a thin meter for each side
+(D49, D90), named by what it records from; a side silent two minutes is said in a grey line under
+the row — the recording goes on —, a microphone that sends nothing or a side with no device at
+once, and ■ stays where it is as they come. « Plus d’options » opens, under the row ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
+at rest the microphone, « Vérifier le son » and « Avancé »; recording, the context, the microphone —
+the one recorded, a change being for the next recording —, « Confidentielle » and what follows the
+stop, then « Avancé ». « Avancé » is closed by default and says, until D91 offers a meeting's own
+models, that each meeting takes Settings', with a way to them. Escape closes the options. One window at a time: going from one
+to the other replaces it, and the one left — `window` in the settings, `small` or `full` — is the
+one reopened. A settings file that cannot be read opens the full window, where it is said.
+
+On Linux, its name of the microphone opens *Auto* and what capture lists (D74, `recording/v1`), by keyboard
+alone, inside the window: the choice is kept (`microphone` in the settings) and applies to the next
+recording; a device arriving opens nothing, and is there when the name is opened. Where capture lists none
+— macOS, Windows — no list is offered, and the options hold the rest. A name gone: capture says so and Auto stands in, the window and a
+notification say it, until capture says it is back.
+
+**« Vérifier le son »** (D88, [board 7](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/7-check-the-sound-light.png)),
+from *Settings* or the bar at rest, opens a panel over the page — in the bar, in place of its row and
+options, the bar as tall as the panel; it is not offered while recording, the row's meters being there: capture listens (`recording/v1`, *Listening*) only while
+it shows — each side's device and an 8 px meter; the microphone's stream active, so that a Bluetooth
+headset switches to its call profile, said in one sentence when capture says `headset`. « Jouer un son
+de test » plays two short notes on the system's output, drawn by the page — no file, no library —, and
+says whether the meeting's side rose above silence; never while an application holds a microphone (the
+graph D30 already reads): a call would hear it. « Démarrer un enregistrement » closes it, capture having
+stopped listening first; ×, Escape, its window hidden or a recording started from anywhere end it too. A
+panel that stops asking — it asks ten times a second — is taken for gone within about two seconds.
+
+**The first start** (D58, [its board](../../docs/project/drawings/d58-the-first-run/)) opens the
+full window on a short assistant, once — with `--window` or not, started with the session too: one
+question, are the meetings confidential; a second, who writes the minutes, only for « Rarement ou
+jamais »; then the setting said plainly, the model fetched on a click. *Passer*, « Je ne sais pas »
+and no answer keep everything on this computer. It opens by itself only while `welcomed` in the
+settings is not true and the sessions' folder holds no meeting, and `welcomed = true` is written as
+soon as it shows; *Settings → Refaire le réglage* opens it again, nothing changed before its last
+screen. The window left (`window`) is not changed by it.
+
+**A meeting's context** (D59, [its board](../../docs/project/drawings/d59-the-context/)) — what it
+is about, who takes part — is written in the window: while recording, the small window's *Ajouter
+le contexte*, closed by default, and the meeting's page, the one being recorded too — there, the
+first of the meeting's settings row (D89), opened from it beside the spoken language and
+*Confidentielle*. Before the start, the bar's row at rest holds the next meeting's (D91, [board 5](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/5-bar-light.png)):
+kept by the shell for the next recording until the user clears it — its ✕, or emptied —, said under
+the row while one is kept, never closed by another meeting being made; Enter in it starts the
+recording. Whichever gesture starts it, the shell writes it as the new meeting's own once its folder
+holds `session.json`, and takes none for the next while a recording runs. It waits in
+`next-context.txt` beside the settings, Kitokey started again too. It is kept as
+it is typed as the meeting's `context.txt` (`contracts/session-audio/v2`), written whole through a
+file beside it and only once the folder holds `session.json`; 400 characters at most, counted as
+characters; another script than Latin or Cyrillic is said, Whisper keeping only the last 224
+tokens. The transcript and the minutes read it as they start: the field is closed while either is
+made, or a transcript is left unfinished. Changed after they were made, its button — *Refaire la
+transcription*, *et le compte rendu* where minutes follow, the meeting having some or the settings
+making them (D113) — makes the transcript again with whoever the settings name to hear, then the
+minutes with whoever they name to write — each kept in place until the new one is whole, put back if
+it is not. Changed, the context starts nothing by itself.
+
+**A meeting's name** (D70): its heading clicked, a name typed, Enter — shown first in the list, its page and *Libérer de l'espace*, as text. It is kept as the meeting's `title.txt` (`contracts/session-audio/v2`), written whole through a file beside it, before the minutes' title (D48), which comes back when the name is emptied; made again, the minutes leave it. A folder is never renamed.
+
+**A meeting's own models** (D91): chosen for it alone, kept as its `models.json`
+(`contracts/session-audio/v3`, for a meeting of any version), written whole through a file beside
+it once the folder holds `session.json`, removed when none is left (`meeting_models_chosen`).
+`src/meeting_models.rs` lays them over Settings each time the meeting is made or made again — its
+transcript, its minutes, *Réessayer*, *Refaire la transcription et le compte rendu* —; Settings are never written. A
+Whisper model is found by its file's name among the models this computer lists
+(`settings::whisper_models`), never joined to a folder; a service to hear only if it is the one
+Settings set; a provider to write only Settings' own — another of its models — or one on this
+computer, which sends nothing away: the agreement to send a meeting is never asked for a host
+Settings do not name. One gone — removed, a service no longer set, another host — gives way to
+Settings' choice and is said (`meeting_models_shown`'s `gone`), as a microphone chosen and absent
+gives way to Auto (D74). A part the contract refuses reads as absent, and is never written. `confidential` is read after: whatever the file names, a
+confidential meeting is heard and written on this computer alone.
+
+They are chosen in **« Avancé »** ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
+closed by default, in each *Refaire…* — the compact bar chooses no engine (D122, D125) —: two lists, the transcription's
+model and the minutes', under « Pour cette réunion seule ; les Réglages ne changent pas. », each
+« Réglages : … » first — Settings' model never offered a second time —, then the Whisper models listed,
+SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
+(`models_offered`). A native list never wraps: a chosen name wider than its list is said whole under
+it, at 12 px, measured again whenever the list's width changes (a `ResizeObserver`) or a choice is made. A confidential meeting is offered no service: Settings' entry says who makes it here
+— Whisper, Ollama on this computer —, a service it chose is said unused, never shown chosen, and
+`meeting_models_chosen` refuses one. Settings unreadable, it is offered from those last read, and said. In *Refaire…* it is kept once
+*Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
+(`transcript_redo_own`) or the minutes. The transcript made again is made alone: where the meeting
+has minutes, its panel says they are kept, to make again after (the decider, 2026-11-18, D113). A model gone is said on the meeting's page and in « Avancé ».
+Minutes its own model failed to write name that model, and *Refaire… › Avancé* to choose another,
+on the page and in the notification alike (`words::cause_said`, the model said by `words::model_said`,
+the page's `modelSaid` rule); Settings' model failing, Settings are named as before.
+
+**A meeting said confidential** (D60, [its board](../../docs/project/drawings/d60-confidential/)) is
+made on this computer alone, whatever the settings name — its own models too.
+
+```mermaid
+flowchart LR
+    S["« Réunion confidentielle »<br/>small window · meeting's page"]:::user --> F["confidential<br/>empty file, written whole"]:::file
+    F --> H{"Who hears"}:::shell
+    H -->|SpeechAnalyzer chosen| A["SpeechAnalyzer"]:::here
+    H -->|else| W["Whisper<br/>the settings' model"]:::here
+    F --> M{"Who writes"}:::shell
+    M -->|settings name this computer's| O1["that model"]:::here
+    M -->|else| O2["Ollama: qwen3:8b,<br/>else its first model"]:::here
+    M -->|Ollama silent or empty| X["the minutes wait, said"]:::wait
+    classDef user fill:#1e3a8a,color:#fff
+    classDef file fill:#374151,color:#fff
+    classDef shell fill:#5b21b6,color:#fff
+    classDef here fill:#065f46,color:#fff
+    classDef wait fill:#92400e,color:#fff
+```
+
+**Legend** — blue: the user's gesture · grey: the meeting's file · violet: the shell's choice ·
+green: made here · amber: waiting.
+
+The switch writes the meeting's `confidential` (`contracts/session-audio/v2`), turned off removes
+it; the list and the page show a lock and its word. The shell reads it where it chooses, before it
+starts either step (`hearer_now`, `write_minutes_from`): no key is read, no agreement asked, the
+agreement's page refused. Turned on while a service makes the transcript or the minutes, that
+making is ended and made again here first in line; while an agreement is asked, it is no longer;
+after a service wrote the minutes, they are written again here. What had left — the sound to the
+host that heard it, the transcript to the one that wrote — is said on the page, from what the
+shell saw of the makings and what the transcript's header and the minutes' front matter name; it
+is kept in memory, until Kitokey quits. A Whisper model missing is offered as for any meeting;
+Ollama silent or holding no model, the minutes wait, said, its recommended model offered, made
+once it is there. Turned off, the settings choose again for what is made next.
+
+**The transcript follows the stop.** Once a recording is stopped, its transcript is made
+without another gesture, on this machine, with the model the settings name; a notification
+says when it is there, and a click on it opens the session's folder under a Linux desktop.
+A meeting's page plays it (D26) as one sound: its tracks placed where the session's clock puts
+them, gaps included (D71), and mixed by the shell as they are read, never written (ADR-0009). A track kept as FLAC once
+stopped (`session-audio/v3`, D87) is read with Symphonia (ADR-0016) and plays byte for byte as its WAV did, even when
+the WAV goes while the meeting is open; a FLAC damaged on the disk is said, never played shorter. The line being said is
+marked, the page left where the user put it; the drawing of who spoke — a slider — and each line are the controls,
+by mouse or keyboard, and the space bar plays and pauses. The sound comes from a server on the
+loopback interface that answers the run's token and the opened meeting alone (ADR-0008), nothing
+else of the disk; a meeting whose audio was freed has no player and says why.
+
+A transcript that failed is said in one sentence, the recording untouched: *Transcribe the
+last recording*, in the menu, makes it again from where it stopped; it is greyed while a
+recording runs, whose transcript follows its stop. One transcript at a time: a stop during
+another waits for it. Quitting Kitokey ends a transcript being made; it goes on the same way. **The model, on the user's word.** The first transcript needs the Whisper model. Kitokey says
+so, and puts one entry in its menu: *Download the model (874 MB, huggingface.co)*. Nothing is
+fetched before it is chosen. The model comes into a part file beside its place. A cut is
+taken up where it stopped, and the model is used only whole and with the SHA-256 its authors
+publish. Then the waiting transcripts are made, none other. The window offers the same fetch where it says
+the model is missing: in *Réglages*, and on a meeting waiting for it (D36). *Réglages* also list the models to download, each with its size, its host and what it is good for —
+the Whisper models of [`registry/models.json`](registry/models.json), the list shipped (D40,
+ADR-0010), and for the minutes `qwen3:8b` fetched by Ollama's own pull (`POST /api/pull`) —,
+one fetch at a time. The Whisper models are read again from `main` only on *Mettre à jour la
+liste (raw.githubusercontent.com)*, and offered then until Kitokey quits, only when the
+decider's minisign key signed them (D56): its public key, `28AD0E835D7AF31E`, is built in
+(`registry::PUBLIC_KEY`). A list that cannot be read, unsigned, signed by another key or changed since leaves the one offered, and says so; a model fetched joins those to choose, the choice staying the
+user's. With no Ollama answering, the row says where to get it: Kitokey never installs it (D37). A model the settings name, and which is not
+there, is said with where it was looked for: it is the user's own, never fetched.
+
+```bash
+nstack bootstrap shell && nstack bootstrap capture
+(cd modules/capture && cargo build --locked --release)
+(cd modules/transcription && cargo build --locked --release)
+KITOKEY_CAPTURE=$PWD/modules/capture/target/release/kitokey-capture \
+  KITOKEY_TRANSCRIPTION=$PWD/modules/transcription/target/release/kitokey-transcription nstack run shell
+```
+
+| On a Linux desktop | What it takes |
+|---|---|
+| The icon | Under GNOME, an extension that shows tray icons — *AppIndicator and KStatusNotifierItem Support*. Without it Kitokey runs, unseen |
+| The shortcut | The desktop grants it to an application it can find: a desktop entry of Kitokey's name in the user's `applications` folder, **whose `Exec` line is the program's whole path** — the desktop reads no entry whose program it cannot find, and says so as "App info not found". The line under the table installs it. Then start Kitokey again and accept the desktop's question. Refused, Kitokey says so once; the menu still does the same |
+
+```bash
+sed "s#^Exec=kitokey#Exec=$PWD/modules/shell/target/release/kitokey#" modules/shell/linux/com.napkinstack.Kitokey.desktop \
+  > "${XDG_DATA_HOME:-$HOME/.local/share}/applications/com.napkinstack.Kitokey.desktop"
+```
+
+**Settings** — `kitokey/settings.toml` in the user's configuration folder, a few lines a person
+reads and writes without Kitokey: `reminder = false` to stop the reminder; `sessions = "…"` for
+where sessions go; `after = "nothing"`, `"transcript"` or `"minutes"` for what follows a
+recording (`transcript = false`, from before, still means nothing); `model = "…"` for the
+Whisper model; `minutes_provider` — a provider's address, `"http://localhost:11434/v1"` for Ollama
+on this computer — and `minutes_model`
+for who writes the minutes (of this computer's models, Settings offer `qwen3:8b` first, as
+recommended: it holds the minutes' form where Mistral 7B and models for code do not, #261); `minutes_agreed = "…"`, the host the user agreed to send a meeting to
+the first time — another host asks again, one on this computer never asks; `keep_audio = "always"` or a number of days; `developer = true` for the developer mode (*Settings → Advanced*); `log = "debug"` for detailed logs from the next start, the shell's and its programs' (`KITOKEY_LOG`, when set, wins). Out of the box,
+sessions go to a folder `Kitokey` in the user's documents, the transcript follows alone, and the
+model is `kitokey/models/ggml-large-v3-turbo-q8_0.bin` in the user's data folder — fetched there
+on the user's word, or placed by hand. When Kitokey writes the file it touches only what changed:
+a line it changes keeps its comment, and every other line, comment and key stays as written; a
+file it cannot read as settings it never writes over.
+
+What it does is logged — its start, each recording, transcript, minutes and test of a model with
+how it ended, a failure with its detail; never a word of a meeting, a key, nor a session's path
+beyond its folder's name (ADR-0007): one JSON line per step in
+`$XDG_STATE_HOME/kitokey/logs/shell.<date>.jsonl` (UTC), beside the programs' own; day files
+kept fourteen days and the folder under 50 MB. Each making has an id, logged here and passed to
+its program as `KITOKEY_TRACE`: one id finds both sides. A failure of the window's page — an
+error it throws or a rejection it leaves — is logged as `shell.page_failed`, its kind and where in
+the page's code, never its sentence. `KITOKEY_LOG` and
+`KITOKEY_LOG_DIR` (an absolute path) are passed on as they are set.
+
+A failure reaches the user in plain words — what failed, what still holds, what to do — in a
+notification and on the window's page; what its program or the system said of it is never there
+but in the log. With the developer mode on, the page shows it under the sentence; a notification
+never does. It also offers the logs' level and folder in the settings, and on a meeting's page,
+under *More actions* beside *Rename this meeting*, *Copy a diagnostic*: every program's lines of that meeting's makings, read together by their id
+from the days kept — nothing of the meeting, which no line holds (D29).
+
+**The trial** (PDR-0005, D83) is judged when a recording starts, whatever started it — the window,
+the small one, the tray, the shortcut, a call's offer —, never during one: on a trial licence whose
+trial is over (`src/trial.rs`), nothing is recorded and the full window says so, as information, with « Acheter Kitokey »;
+every meeting is still read, played, corrected and exported. The licence is read anew at each start
+(`src/licence.rs`): bought while Kitokey is open, the next recording records. On Windows it is the
+Store's (`StoreContext.GetAppLicenseAsync`), the Store first given Kitokey's window — the full one,
+hidden or not, else the small one — as Microsoft requires of a desktop application; Kitokey not
+started from a package (the zip) is not from the Store, nothing asked. Elsewhere nothing is limited.
+A licence that cannot be read, or that the Store does not give within 5 s, records, said once in the
+log. At each start, what the licence read is — `Bought`, `Trial`, `Inactive`, `NotFromStore`, `unread` —
+and whether a recording would be refused are said in the log, `shell.licence_read`: what the Store
+answered, for whoever reads after it. « Acheter Kitokey » asks the Store for the purchase (`RequestPurchaseAsync`) by Kitokey's own
+Store ID, which the Store's licence names — never written in the code —, from the window's thread
+as the Store requires; failing, the Store's page for Kitokey opens in its place
+(`ms-windows-store://pdp/?ProductId=…`). Then the licence is read again.
+On a trial licence, Settings say first what is left of the trial, in days — a day begun is a day
+left — and in meetings; the days alone once 10 meetings are made, the meetings alone once the days
+have passed; nothing once it is over, nor when what is left cannot be told (the e2e's AW).
+In a build for trying Kitokey only, `KITOKEY_LICENCE` names a file whose word — `trial`, `bought`,
+`inactive`, `none` — stands in for the licence: the e2e's AV holds the gate with it.
+
+## Getting started
+
+The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in the `commands`
+section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
+`.nstack/handbook/09-platform.md` §2.
+
+`e2e` drives Kitokey on the desktop: the tray's menu over the session bus, then the window over
+WebDriver — WebKitGTK's own (`WebKitWebDriver`, in Fedora's `webkit2gtk4.1-devel`) behind
+`tauri-driver`, which the script installs when it is missing (`scripts/e2e_window.py`). Its run's logs
+are read after it, and kept in `$NSTACK_EVIDENCE` (`.evidence/e2e/`), in `logs/` with the pages'
+screenshots in `shots/`: every warning and error must be one a scenario provokes, declared with it
+in the manifest's `evidence.provoked`, and each one declared must be logged — any other fails the
+run, quoted. `nstack e2e shell` audits the same logs after the run. A screenshot whose name says its
+theme is in that theme — the one the scenario asks of GTK (`GTK_THEME`), else its colours put on the
+page — and its mean lightness is checked, a dark one dark (D89).
+
+The manifest's `e2e` runs it in a GNOME of its own, never shown (`scripts/headless.sh`): the
+user's desktop is never reached, so a run holds nobody's screen, microphone nor notifications.
+
+```mermaid
+flowchart LR
+    W["scripts/headless.sh"]:::run --> B["session bus<br/>system bus, empty"]:::own
+    B --> G["gnome-shell --headless<br/>AppIndicator · notifications · portal"]:::own
+    B --> P["PipeWire, no hardware"]:::own
+    G --> E["scripts/e2e.sh<br/>Kitokey, tray, window"]:::run
+    P --> E
+    U["the user's desktop<br/>screen · bus · sound · logind"]:::user -.-x|never reached| W
+    classDef run fill:#065f46,color:#fff
+    classDef own fill:#1e3a8a,color:#fff
+    classDef user fill:#92400e,color:#fff
+```
+
+**Legend** — green: the run's scripts · blue: the session made for the run, in its own runtime
+folder under `~/.cache/kitokey-headless/`, ended with it · orange: the user's, never reached.
+
+Its own dconf turns the AppIndicator extension on, grants the shortcut as the user's desktop
+once did, and keeps the lock off; a small extension of the session's shows the desktop rather
+than the overview and gives a window shown the focus; a remote-desktop session lends it a
+keyboard, without which GTK is never told it has the focus. Missing GNOME Shell, its AppIndicator
+extension or PipeWire, it says `NOT RUN`. `bash scripts/e2e.sh` alone still runs on the desktop
+itself — the tray, the notifications and the window shown, the run's microphone made the
+system's default meanwhile — for whoever wants to watch it: quit Kitokey first.
+
+## What it owes its crates' authors
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links under its licence's text, then what the window draws that is no crate —
+Lucide's icons (`ui/LUCIDE-LICENSE`) and Montserrat's outlines in its name (`ui/MONTSERRAT-OFL.txt`).
+It is made with cargo-about from `about.toml`, whose `accepted` list refuses any other licence, GPL
+among them, and `about.hbs`, which holds the two files' texts; it is committed, and
+`tests/notices.rs` is red once it no longer names the crates the program links, or no longer holds
+either file as written. `about.toml`'s header gives the two commands that make it again.
+
+## Contracts
+
+- Provided: none
+- Consumed: [`recording/v1`](../../contracts/recording/v1/README.md) — what `kitokey-capture` says while it records
+  (`src/recording.rs`); [`transcript/v1`](../../contracts/transcript/v1/README.md) — only that a session's
+  `transcript.jsonl` is there once `kitokey-transcription` ended well (`src/transcription.rs`);
+  [`session-audio`](../../contracts/session-audio/v3/README.md), v1 to v3 — a session's `session.json`, for the
+  window's list (`src/sessions.rs`), its tracks, WAV or FLAC, for the player and the diagnostic (`src/meeting.rs`,
+  `src/mix.rs`, `src/levels.rs`, `src/flac.rs`) and the trial's count of the meetings made here (`src/trial.rs`, PDR-0005); the transcript's segments and [`minutes`](../../contracts/minutes/v3/README.md), v1 to v3
+  — one meeting's, as the window will open it (`src/meeting.rs`, `src/minutes.rs`);
+  [`summarising/v1`](../../contracts/summarising/v1/README.md) — what `kitokey-summary` says while it writes the
+  minutes (`src/summarising.rs`). The contracts of the files it will read are declared with the slice that reads
+  them
+
+## Decisions
+
+[ADR-0002](../../docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md).

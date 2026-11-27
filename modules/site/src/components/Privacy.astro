@@ -1,0 +1,19 @@
+---
+// /<lang>/privacy/: its half of docs/privacy.md, the one source (D114, criterion 2), under the page's
+// h1 and the day it last changed.
+import { readFile } from "node:fs/promises";
+import Page from "../layouts/Page.astro";
+import { privacySource } from "../../site.config.mjs";
+import { changed, half } from "../lib/privacy.mjs";
+import { say } from "../lib/words.mjs";
+const { lang } = Astro.props;
+const source = await readFile(privacySource, "utf8");
+const html = await half(source, lang);
+const day = changed(source);
+const shown = new Intl.DateTimeFormat(lang === "en" ? "en-GB" : "fr-FR", { dateStyle: "long", timeZone: "UTC" }).format(new Date(day));
+---
+<Page lang={lang} title={`${say("privacy", lang)} · Kitokey`} description={say("local", lang)} path="privacy/" kind="wrap prose">
+  <h1>{say("privacy", lang)}</h1>
+  <p class="changed">{say("changed", lang)} <time datetime={day}>{shown}</time></p>
+  <article class="policy"><Fragment set:html={html} /></article>
+</Page>

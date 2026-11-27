@@ -1,0 +1,81 @@
+# Mapping from playbooks to the agents' skills.
+#
+# The playbooks in `.nstack/playbooks/` are the SOURCE OF TRUTH: plain markdown, portable,
+# usable by any agent. The skills are derived from them.
+# This file holds nothing but the frontmatter to add — never any content.
+#
+# Rules for `description` (with the playbook's trigger, it is what loads the skill):
+#   - says WHAT, in the third person; WHEN is the playbook's trigger — the kernel's words —
+#     which `nstack skills` appends
+#   - no behavioural instruction: those go in the body of the playbook
+#   - uses the keywords an agent will actually meet in a task
+#
+# A playbook with no entry here fails `nstack skills --check`.
+
+skills:
+  security:
+    source: .nstack/playbooks/security.md
+    description: >
+      The project's security rules: authentication, authorisation, secrets, input
+      validation, personal data, dependencies and high-risk actions.
+
+  tests:
+    source: .nstack/playbooks/tests.md
+    description: >
+      The project's test strategy: choosing the test level, writing the oracle, edge
+      cases, doubles and handling flaky tests.
+
+  data-migration:
+    source: .nstack/playbooks/data-migration.md
+    description: >
+      The project's rules on data and migrations: schema expand/contract, backfill,
+      data deletion, data ownership by module.
+
+  ux:
+    source: .nstack/playbooks/ux.md
+    description: >
+      The project's UX/UI rules: the primacy of convention and of the design system,
+      the eight states of an interface, error messages, accessibility, perceived
+      performance and mobile behaviour.
+
+  operations:
+    source: .nstack/playbooks/operations.md
+    description: >
+      The project's operations and reliability rules: timeouts, retries, structured
+      logs, metrics, alerts, health checks, rollback and controlled degradation.
+
+  discovery:
+    source: .nstack/playbooks/discovery.md
+    description: >
+      The project's discovery rules: turning an idea into a decision — intake, sourced
+      market research, definition, the value hypothesis and no-gos, a challenge by another
+      session (pre-mortem, four risks), then go, clarify or kill.
+
+  framing:
+    source: .nstack/playbooks/framing.md
+    description: >
+      The project's framing rules: interviewing the decider, writing the charter, planning
+      a bounded cycle with its deliverables, acceptance criteria and appetite, handling new
+      ideas, and closing a cycle at its end or at its circuit breaker.
+
+  documentation:
+    source: .nstack/playbooks/documentation.md
+    description: >
+      The project's rules for writing a document: a diagram with its legend first, a few
+      lines after it, a source for every outside claim, a date on every decision, and
+      documents kept current or deleted.
+
+  verification:
+    source: .nstack/playbooks/verification.md
+    description: >
+      The project's rules for verifying a change: the verifier's posture, running a test
+      sheet against the running change, the evidence expected for each result, and what
+      to report.
+
+  pause-and-resume:
+    source: .nstack/playbooks/pause-and-resume.md
+    description: >
+      The project's rules for ending and resuming a session: work committed and pushed
+      before stopping, nothing left running, holds kept, a short resume note in
+      .nstack/local/, and a restart that reads the note, renews its holds and runs
+      nstack plan once.

@@ -1,0 +1,395 @@
+//! A transcript made, tried with a program played here: a script given the same arguments as
+//! `kitokey-transcription`. No sound, no model, nobody heard.
+#![cfg(unix)]
+
+use std::{fs, os::unix::fs::PermissionsExt, path::Path, sync::Mutex, time::Duration};
+
+use kitokey_shell::transcription::{Hearer, Made, Transcription};
+
+/// The end of a transcript made by a script — a test that waits ten seconds has failed. One
+/// at a time: a script still open for writing while another starts cannot be run.
+fn made(folder: &Path, script: &str) -> (Transcription, std::sync::mpsc::Receiver<Made>) {
+    made_by(folder, script, &Hearer::Model(Path::new("/models/ggml.bin").to_path_buf()))
+}
+
+/// The same, heard by `hearer` (#459: every script of this file is written and started here).
+fn made_by(folder: &Path, script: &str, hearer: &Hearer) -> (Transcription, std::sync::mpsc::Receiver<Made>) {
+    made_with(folder, script, hearer, None)
+}
+
+/// The same, a service's key handed to the program (D43).
+fn made_with(folder: &Path, script: &str, hearer: &Hearer, key: Option<&str>) -> (Transcription, std::sync::mpsc::Receiver<Made>) {
+    made_spoken(folder, script, hearer, key, None)
+}
+
+/// The same, the meeting's language told (D65).
+fn made_spoken(
+    folder: &Path,
+    script: &str,
+    hearer: &Hearer,
+    key: Option<&str>,
+    spoken: Option<&str>,
+) -> (Transcription, std::sync::mpsc::Receiver<Made>) {
+    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
+    let _held = ONE_AT_A_TIME.lock().unwrap();
+    let path = folder.join("kitokey-transcription");
+    fs::write(&path, format!("#!/bin/sh\n{script}\n")).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    Transcription::start_with(&path, &folder.join("session"), hearer, key, spoken).unwrap()
+}
+
+fn end(made: &std::sync::mpsc::Receiver<Made>) -> Made {
+    made.recv_timeout(Duration::from_secs(10)).expect("the transcript never ended")
+}
+
+#[test]
+fn a_transcript_is_written_when_the_program_ends_well_and_the_file_is_there() {
+    let folder = tempfile::tempdir().unwrap();
+    let session = folder.path().join("session");
+    fs::create_dir(&session).unwrap();
+    let (_, said) = made(
+        folder.path(),
+        r#"[ "$2" = --model ] && [ "$3" = /models/ggml.bin ] || exit 9
+echo '{"event":"hearing"}'
+echo '{}' > "$1/transcript.jsonl"
+echo '{"event":"written"}'"#,
+    );
+    assert_eq!(end(&said), Made::Written(session));
+}
+
+#[test]
+fn a_transcript_that_failed_says_the_programs_last_sentence() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let (_, said) = made(
+        folder.path(),
+        "echo 'loading' >&2\necho 'kitokey-transcription: the model cannot be loaded' >&2\necho '' >&2\nexit 1",
+    );
+    assert_eq!(end(&said), Made::Failed("kitokey-transcription: the model cannot be loaded".into()));
+    // A transcript only grows: one that failed halfway is there, and is not whole.
+    let (_, said) = made(
+        folder.path(),
+        "echo '{}' > \"$1/transcript.jsonl\"\necho 'the engine stopped' >&2\nexit 1",
+    );
+    assert_eq!(end(&said), Made::Failed("the engine stopped".into()));
+    // Ended well without the file is no transcript either.
+    fs::remove_file(folder.path().join("session/transcript.jsonl")).unwrap();
+    let (_, said) = made(folder.path(), "exit 0");
+    assert_eq!(end(&said), Made::Failed(String::new()));
+}
+
+/// Whether a process of this number is still there.
+fn alive(pid: &str) -> bool {
+    std::process::Command::new("kill")
+        .args(["-0", pid.trim()])
+        .status()
+        .unwrap()
+        .success()
+}
+
+#[test]
+fn a_transcript_ended_by_kitokey_ends_with_what_it_started_and_is_not_written() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let started = folder.path().join("started");
+    let script = format!(
+        "sleep 30 &\necho $! > {}\nwait\necho '{{}}' > \"$1/transcript.jsonl\"",
+        started.display()
+    );
+    let (transcription, said) = made(folder.path(), &script);
+    std::thread::sleep(Duration::from_millis(300));
+    let child = fs::read_to_string(&started).unwrap();
+    assert!(alive(&child));
+    transcription.end();
+    assert_eq!(end(&said), Made::Failed(String::new()));
+    // Its group killed, the child is gone once the KILL is delivered and it is reaped — by the
+    // system, its parent gone: a moment after the answer on a loaded machine, a zombie meanwhile,
+    // which `kill -0` still finds (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(
+        gone(&child),
+        "what the program started is left running half a second after the answer"
+    );
+    assert!(!folder.path().join("session/transcript.jsonl").exists());
+}
+
+#[test]
+fn what_the_program_said_last_is_kept_when_what_it_started_holds_its_error_stream() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let started = folder.path().join("started");
+    let script = format!("echo 'the engine stopped' >&2\nsleep 30 &\necho $! > {}\nexit 1", started.display());
+    let (_, said) = made(folder.path(), &script);
+    let begun = std::time::Instant::now();
+    assert_eq!(end(&said), Made::Failed("the engine stopped".into()));
+    assert!(begun.elapsed() < Duration::from_secs(3), "{:?}", begun.elapsed());
+    let child = fs::read_to_string(&started).unwrap();
+    std::process::Command::new("kill").arg(child.trim()).status().unwrap();
+}
+
+#[test]
+fn the_last_recording_is_the_latest_session_of_the_folder() {
+    let sessions = tempfile::tempdir().unwrap();
+    assert_eq!(kitokey_shell::transcription::latest(sessions.path()), None);
+    for name in ["2026-10-13_14-05", "2026-10-16_09-30", "2026-10-14_11-00"] {
+        fs::create_dir(sessions.path().join(name)).unwrap();
+        fs::write(sessions.path().join(name).join("session.json"), "{}").unwrap();
+    }
+    // A folder that is no session, however its name sorts, is not one.
+    fs::create_dir(sessions.path().join("2027-notes")).unwrap();
+    fs::write(sessions.path().join("zz.txt"), "").unwrap();
+    assert_eq!(
+        kitokey_shell::transcription::latest(sessions.path()),
+        Some(sessions.path().join("2026-10-16_09-30"))
+    );
+    assert_eq!(kitokey_shell::transcription::latest(Path::new("/nowhere")), None);
+}
+
+#[test]
+fn apple_s_speechanalyzer_is_asked_for_by_name_in_the_language_of_the_interface() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let asked = folder.path().join("asked");
+    let hearer = Hearer::SpeechAnalyzer { language: "fr".into() };
+    let (_running, made) = made_by(
+        folder.path(),
+        &format!("echo \"$@\" > '{}'\ntouch \"$1/transcript.jsonl\"", asked.display()),
+        &hearer,
+    );
+    assert!(matches!(end(&made), Made::Written(_)));
+    let said = fs::read_to_string(&asked).unwrap();
+    assert!(said.trim().ends_with("--engine speechanalyzer --language fr"), "{said}");
+}
+
+#[test]
+fn speechanalyzer_hears_only_while_this_mac_offers_it_with_its_model() {
+    use kitokey_shell::settings::Engine;
+    let model = Path::new("/models/ggml.bin");
+    let whisper = Hearer::Model(model.to_path_buf());
+    assert_eq!(
+        Hearer::chosen(Engine::SpeechAnalyzer, model, "fr", || true),
+        Hearer::SpeechAnalyzer { language: "fr".into() }
+    );
+    assert_eq!(
+        Hearer::chosen(Engine::SpeechAnalyzer, model, "fr", || false),
+        whisper,
+        "no longer offered: Whisper hears"
+    );
+    let mut asked = false;
+    assert_eq!(
+        Hearer::chosen(Engine::Whisper, model, "fr", || {
+            asked = true;
+            true
+        }),
+        whisper
+    );
+    assert!(!asked, "the Mac is asked nothing while Whisper is chosen");
+    assert_eq!(Hearer::SpeechAnalyzer { language: "en".into() }.name(), "SpeechAnalyzer");
+    assert_eq!(whisper.name(), "ggml.bin");
+}
+
+fn with_service(provider: &str, agreed: Option<&str>) -> kitokey_shell::settings::Settings {
+    kitokey_shell::settings::Settings {
+        engine: kitokey_shell::settings::Engine::Service,
+        transcription_provider: Some(provider.into()),
+        transcription_model: Some("whisper-large-v3".into()),
+        transcription_agreed: agreed.map(str::to_string),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn a_service_hears_only_once_the_user_agreed_to_its_host_or_it_is_this_computer() {
+    let service = |provider: &str| Hearer::Service {
+        provider: provider.into(),
+        model: "whisper-large-v3".into(),
+    };
+    let agreed = with_service("https://api.groq.com/openai/v1", Some("api.groq.com"));
+    assert_eq!(Hearer::of(&agreed, "fr", || false), service("https://api.groq.com/openai/v1"));
+    let not_agreed = with_service("https://api.groq.com/openai/v1", None);
+    assert_eq!(
+        Hearer::of(&not_agreed, "fr", || false),
+        Hearer::Model(not_agreed.model.clone()),
+        "nothing sent before the user agreed"
+    );
+    let another = with_service("https://elsewhere.example/v1", Some("api.groq.com"));
+    assert!(
+        matches!(Hearer::of(&another, "fr", || false), Hearer::Model(_)),
+        "another host asks again"
+    );
+    let here = with_service("http://localhost:8000/v1", None);
+    assert_eq!(
+        Hearer::of(&here, "fr", || false),
+        service("http://localhost:8000/v1"),
+        "a host on this computer never asks"
+    );
+}
+
+#[test]
+fn a_service_is_asked_for_with_its_address_and_model_its_key_in_the_environment() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let asked = folder.path().join("asked");
+    let hearer = Hearer::Service {
+        provider: "http://localhost:8000/v1".into(),
+        model: "whisper-1".into(),
+    };
+    let (_running, made) = made_with(
+        folder.path(),
+        &format!(
+            "echo \"$@ key=$KITOKEY_PROVIDER_KEY\" > '{}'\ntouch \"$1/transcript.jsonl\"",
+            asked.display()
+        ),
+        &hearer,
+        Some("a-key-of-the-test"),
+    );
+    assert!(matches!(end(&made), Made::Written(_)));
+    let said = fs::read_to_string(&asked).unwrap();
+    assert!(
+        said.contains("--provider http://localhost:8000/v1 --model whisper-1 key=a-key-of-the-test"),
+        "{said}"
+    );
+    // The key in the environment alone: the arguments never hold it.
+    let (arguments, _) = said.split_once(" key=").unwrap();
+    assert!(!arguments.contains("a-key-of-the-test"), "{said}");
+}
+
+#[test]
+fn a_service_is_saved_only_once_its_host_elsewhere_is_agreed_to() {
+    use kitokey_shell::transcription::{Refused, key_account, service_named};
+    // Elsewhere: refused without the agreement, its host named; agreed, that host kept.
+    assert_eq!(
+        service_named("https://api.groq.com/openai/v1", "whisper-large-v3", false),
+        Err(Refused::NotAgreed("api.groq.com".into()))
+    );
+    assert_eq!(
+        service_named(" https://api.groq.com/openai/v1 ", "whisper-large-v3", true),
+        Ok(("api.groq.com".into(), Some("api.groq.com".into())))
+    );
+    // This computer needs no agreement, and none is kept.
+    assert_eq!(
+        service_named("http://localhost:8000/v1", "whisper-1", false),
+        Ok(("localhost:8000".into(), None))
+    );
+    assert_eq!(
+        service_named("http://127.0.0.1:8000/v1", "whisper-1", false),
+        Ok(("127.0.0.1:8000".into(), None))
+    );
+    // A name that only starts as this computer's is elsewhere.
+    for elsewhere in [
+        "https://localhost.evil.example/v1",
+        "https://127.evil.example/v1",
+        "https://127.0.0.1.nip.io/v1",
+    ] {
+        assert!(
+            matches!(service_named(elsewhere, "whisper-1", false), Err(Refused::NotAgreed(_))),
+            "{elsewhere}"
+        );
+    }
+    assert_eq!(service_named("api.groq.com/openai/v1", "whisper-1", true), Err(Refused::Address));
+    assert_eq!(service_named("https://api.groq.com/openai/v1", " ", true), Err(Refused::Model));
+    // One host may write the minutes and hear with two keys: never one account.
+    assert_ne!(key_account("api.groq.com"), "api.groq.com");
+}
+
+#[test]
+fn the_meetings_language_is_told_to_each_engine_speechanalyzer_only_in_the_two_it_hears() {
+    let folder = tempfile::tempdir().unwrap();
+    let session = folder.path().join("session");
+    fs::create_dir(&session).unwrap();
+    // The arguments as the program got them, then a transcript, so that it ends well.
+    let script = r#"printf '%s ' "$@" > "$1/args"; echo '{}' > "$1/transcript.jsonl""#;
+    let args = || fs::read_to_string(session.join("args")).unwrap();
+    let model = Hearer::Model(Path::new("/models/ggml.bin").to_path_buf());
+    let service = Hearer::Service {
+        provider: "https://hears.example/v1".into(),
+        model: "whisper-1".into(),
+    };
+    let apple = Hearer::SpeechAnalyzer { language: "fr".into() };
+    for (hearer, spoken, wanted) in [
+        (&model, None, "--model /models/ggml.bin "),
+        (&model, Some("en"), "--model /models/ggml.bin --language en "),
+        (&service, None, "--model whisper-1 "),
+        (&service, Some("de"), "--language de "),
+        (&apple, Some("en"), "--language en "),
+        (&apple, Some("de"), "--language fr "),
+    ] {
+        let (_, said) = made_spoken(folder.path(), script, hearer, None, spoken);
+        assert_eq!(end(&said), Made::Written(session.clone()));
+        assert!(args().ends_with(wanted), "{hearer:?} {spoken:?}: {}", args());
+    }
+}
+
+/// Whether a process has ended: none by that number, or one ended and not yet waited for.
+fn gone(pid: &str) -> bool {
+    fs::read_to_string(format!("/proc/{}/stat", pid.trim())).map_or(true, |stat| {
+        stat.rsplit_once(')').and_then(|(_, rest)| rest.split_whitespace().next()) == Some("Z")
+    })
+}
+
+#[test]
+fn cancelled_it_ends_within_two_seconds_with_what_it_started_even_deaf_to_term() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    let (transcription, said) = made(
+        folder.path(),
+        r#"echo '{"type":"header"}' > "$1/transcript.jsonl"
+( trap '' TERM; exec sleep 60 ) & echo $! > "$1/child"
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let child = fs::read_to_string(&child).expect("the program never started its child");
+    let pressed = std::time::Instant::now();
+    transcription.cancel();
+    let ended = said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    let answered = pressed.elapsed();
+    assert!(matches!(ended, Made::Failed(_)), "{ended:?}");
+    assert!(answered <= Duration::from_secs(2), "{answered:?}");
+    // The KILL sent, the child is gone once the kernel has delivered it and the process is reaped:
+    // a moment after the answer on a loaded machine (#845). Waited for as a state, within half a second.
+    let killed = std::time::Instant::now();
+    while !gone(&child) && killed.elapsed() < Duration::from_millis(500) {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert!(gone(&child), "its child, deaf to TERM, still runs half a second after the answer");
+}
+
+#[test]
+fn cancelled_its_group_is_told_term_first_and_given_the_grace_to_end_by_it() {
+    let folder = tempfile::tempdir().unwrap();
+    fs::create_dir(folder.path().join("session")).unwrap();
+    // A child of the program, in its group, that ends on TERM saying so: TERM sent to the leader
+    // alone, or KILL at once, and it never says it.
+    let (transcription, said) = made(
+        folder.path(),
+        r#"( trap 'echo TERM > "$1/told"; exit 0' TERM; echo $$ > "$1/child"; sleep 60 & wait ) &
+sleep 60"#,
+    );
+    let child = folder.path().join("session/child");
+    for _ in 0..50 {
+        if fs::read_to_string(&child).is_ok_and(|pid| !pid.trim().is_empty()) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    assert!(child.exists(), "the program never started its child");
+    transcription.cancel();
+    said.recv_timeout(Duration::from_secs(2)).expect("not ended within two seconds");
+    assert_eq!(
+        fs::read_to_string(folder.path().join("session/told"))
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("TERM"),
+        "its child was not told TERM within the grace"
+    );
+}

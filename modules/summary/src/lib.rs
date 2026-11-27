@@ -1,0 +1,837 @@
+//! What `summary` reads and writes, with no provider in sight: the transcript of a session as
+//! `contracts/transcript/v1` describes it, and its minutes as `contracts/minutes/v4` does.
+//!
+//! The minutes exist whole or not at all: an answer that is not minutes is refused before a
+//! byte is written, and the file takes its name only once it is complete.
+
+use std::{fs, io, path::Path};
+
+pub mod log;
+pub mod provider;
+
+/// The contract this module reads, as the transcript's first line names it.
+pub const TRANSCRIPT: &str = "transcript/v1";
+/// The contract this module provides, as the minutes' front matter names it.
+pub const MINUTES: &str = "minutes/v4";
+
+/// A stretch of speech, as the transcript holds it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Segment {
+    pub speaker: String,
+    pub start: f64,
+    pub end: f64,
+    pub text: String,
+}
+
+/// Why something a file or a provider gave was refused: one sentence, for the user — and,
+/// when a person acts on the cause differently, its code as `summarising/v1` lists it.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Refused(pub String, pub Option<&'static str>);
+
+fn refused<T>(code: &'static str, why: impl Into<String>) -> Result<T, Refused> {
+    Err(Refused(why.into(), Some(code)))
+}
+
+/// The segments of a transcript, in the order of the meeting. A line still being written —
+/// no line feed yet — is left out; a type or a field this version does not know is skipped.
+pub fn read_transcript(text: &str) -> Result<Vec<Segment>, Refused> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let Some(end) = text.rfind('\n') else {
+        return refused(
+            "transcript.unusable",
+            "the transcript holds no whole line yet: it is only being started, or it is empty",
+        );
+    };
+    let whole = &text[..end];
+    let mut lines = whole.lines();
+    let header: serde_json::Value = lines.next().and_then(|line| serde_json::from_str(line).ok()).unwrap_or_default();
+    if header["type"] != "header" || header["contract"] != TRANSCRIPT {
+        return refused(
+            "transcript.unusable",
+            format!("this file is not a transcript this version reads: its first line does not name {TRANSCRIPT}"),
+        );
+    }
+    let mut segments = Vec::new();
+    let mut known = std::collections::HashSet::new();
+    for line in lines.filter(|line| !line.trim().is_empty()) {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            return refused("transcript.unusable", "the transcript holds a line that is not JSON");
+        };
+        if value["type"] != "segment" {
+            continue;
+        }
+        let (Some(speaker), Some(start), Some(end), Some(text)) = (
+            value["speaker"].as_str(),
+            value["start"].as_f64(),
+            value["end"].as_f64(),
+            value["text"].as_str(),
+        ) else {
+            return refused(
+                "transcript.unusable",
+                "the transcript holds a segment without its speaker, its times or its text",
+            );
+        };
+        if text.contains(['\n', '\r']) {
+            return refused(
+                "transcript.unusable",
+                format!("the transcript holds a segment whose text is on more than one line, at {start}"),
+            );
+        }
+        // What the transcript holds is never said back: a failure's sentence is logged (ADR-0007).
+        if !matches!(speaker, "me" | "others") {
+            return refused(
+                "transcript.unusable",
+                format!("the transcript holds a segment of a speaker other than me or others, at {start}"),
+            );
+        }
+        if end < start || start < 0.0 {
+            return refused(
+                "transcript.unusable",
+                format!("the transcript holds a segment this version refuses: {start} to {end}"),
+            );
+        }
+        // A segment is known by its speaker and its start: said twice, it is read once.
+        // Adding zero makes the two zeros one: -0.0 and 0.0 are the same start.
+        if known.insert((speaker == "me", (start + 0.0).to_bits())) {
+            segments.push(Segment {
+                speaker: speaker.into(),
+                start,
+                end,
+                text: text.into(),
+            });
+        }
+    }
+    if segments.is_empty() {
+        return refused(
+            "transcript.no_speech",
+            "the transcript holds no speech: there is nothing to write minutes of",
+        );
+    }
+    segments.sort_by(|a, b| a.start.total_cmp(&b.start));
+    Ok(segments)
+}
+
+/// What a test of a provider sends: one sentence of the program's own, nothing of a meeting.
+pub const TEST: &str = "Answer with the single word OK.";
+
+/// The contract of the minutes written in a structure (D111).
+pub const MINUTES_IN_A_STRUCTURE: &str = "minutes/v5";
+
+/// A section of a structure (`minutes/v5`): its id, what goes in it said in one line for the
+/// front matter, and how the model is asked for it.
+#[derive(Debug)]
+pub struct Section {
+    pub id: &'static str,
+    pub about: &'static str,
+    pub ask: &'static str,
+}
+
+/// A kind of meeting and its sections, in their order (`minutes/v5`, D111).
+#[derive(Debug)]
+pub struct Structure {
+    pub name: &'static str,
+    pub sections: &'static [Section],
+    /// The id of the section that holds the meeting's actions.
+    pub actions: Option<&'static str>,
+}
+
+/// How the actions' section is asked, whatever the structure: v4's Actions.
+const ASK_ACTIONS: &str = "Every task the meeting agreed on or asked for, one bullet each, even when nobody took it and \
+     no date was set: what is to be done — who does it — by when. Go through the whole transcript before writing this \
+     section: a task said once counts, and so does one said as a need — something that must be done, prepared, sent \
+     again or kept in reserve. A task belongs here, not in another section.";
+const ABOUT_ACTIONS: &str = "Every task agreed on or asked for: what — who — by when.";
+
+const fn section(id: &'static str, about: &'static str, ask: &'static str) -> Section {
+    Section { id, about, ask }
+}
+
+/// The six structures `minutes/v5` names, `general` first: v4's three sections.
+pub const STRUCTURES: [Structure; 6] = [
+    Structure {
+        name: "general",
+        sections: &[
+            section(
+                "summary",
+                "What the meeting was for and what came out of it.",
+                "What the meeting was for and what came out of it, in a few sentences.",
+            ),
+            section("actions", ABOUT_ACTIONS, ASK_ACTIONS),
+            section(
+                "key_points",
+                "What was decided, the figures, the dates, what stays open.",
+                "What was decided, the figures, the dates, what stays open, one bullet each.",
+            ),
+        ],
+        actions: Some("actions"),
+    },
+    Structure {
+        name: "one_to_one",
+        sections: &[
+            section(
+                "updates",
+                "What each person said of their work since last time.",
+                "What each person said of their work since last time, one bullet each.",
+            ),
+            section(
+                "feedback",
+                "Feedback given or asked for, either way.",
+                "Feedback given or asked for, either way, one bullet each, as said.",
+            ),
+            section("actions", ABOUT_ACTIONS, ASK_ACTIONS),
+        ],
+        actions: Some("actions"),
+    },
+    Structure {
+        name: "stand_up",
+        sections: &[
+            section(
+                "progress",
+                "What each person did and will do next.",
+                "What each person did and will do next, one bullet each.",
+            ),
+            section(
+                "blockers",
+                "What stops someone, and who can help.",
+                "What stops someone, and who can help, one bullet each.",
+            ),
+            section("actions", ABOUT_ACTIONS, ASK_ACTIONS),
+        ],
+        actions: Some("actions"),
+    },
+    Structure {
+        name: "client_call",
+        sections: &[
+            section(
+                "needs",
+                "The client's situation and what they need.",
+                "The client's situation and what they need, in a few sentences.",
+            ),
+            section(
+                "questions",
+                "The client's questions and objections, and the answers given.",
+                "The client's questions and objections, and the answers given, one bullet each.",
+            ),
+            section("next_steps", ABOUT_ACTIONS, ASK_ACTIONS),
+        ],
+        actions: Some("next_steps"),
+    },
+    Structure {
+        name: "interview",
+        sections: &[
+            section(
+                "background",
+                "The candidate's background, as said in the meeting.",
+                "The candidate's background as said in the meeting, in a few sentences. Never judge the candidate.",
+            ),
+            section(
+                "answers",
+                "What the candidate answered, question by question.",
+                "What the candidate answered, question by question, one bullet each, as said: never a judgement of the \
+                 answer or of the candidate.",
+            ),
+            section(
+                "questions",
+                "What the candidate asked, and the answers given.",
+                "What the candidate asked, and the answers given, one bullet each.",
+            ),
+            section("next_steps", ABOUT_ACTIONS, ASK_ACTIONS),
+        ],
+        actions: Some("next_steps"),
+    },
+    Structure {
+        name: "project_review",
+        sections: &[
+            section(
+                "status",
+                "Where the project stands against its plan.",
+                "Where the project stands against its plan, in a few sentences.",
+            ),
+            section("risks", "Each risk or issue raised.", "Each risk or issue raised, one bullet each."),
+            section("decisions", "What was decided.", "What was decided, one bullet each."),
+            section("actions", ABOUT_ACTIONS, ASK_ACTIONS),
+        ],
+        actions: Some("actions"),
+    },
+];
+
+/// The structure of that name, when it is one of the six.
+pub fn structure(name: &str) -> Option<&'static Structure> {
+    STRUCTURES.iter().find(|structure| structure.name == name)
+}
+
+/// The names a person gave the meeting's two sides (#1205), as `speakers.json` of `session-audio/v3` holds them;
+/// none, the side keeps the transcript's word alone. No producer tells voices apart yet: their names are not read.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Names {
+    pub me: Option<String>,
+    pub others: Option<String>,
+}
+
+/// The rule said with the names, after the one on the transcript's two words (#1205).
+const NAMED: &str = "A name in brackets after \"me\" or \"others\" is the one the user gave that side: write it for them.\n";
+/// Where it goes: the end of the rule on "me" and "others".
+const AFTER_SIDES: &str = "or the names the meeting or the context gives.\n";
+
+/// A name as `session-audio/v3` allows it: one line, 1 to 60 characters, not blank.
+fn allowed(name: &str) -> bool {
+    !name.trim().is_empty() && name.chars().count() <= 60 && !name.contains(['\n', '\r'])
+}
+
+/// The names a meeting's folder holds: each the contract allows, else none; a `speakers.json` absent, unreadable or
+/// that is no JSON object, none at all — the meeting read as before.
+pub fn speakers(folder: &Path) -> Names {
+    let Some(object) = fs::read(folder.join("speakers.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Map<String, serde_json::Value>>(&bytes).ok())
+    else {
+        return Names::default();
+    };
+    let name = |key: &str| {
+        object
+            .get(key)
+            .and_then(serde_json::Value::as_str)
+            .filter(|name| allowed(name))
+            .map(str::to_string)
+    };
+    Names {
+        me: name("me"),
+        others: name("others"),
+    }
+}
+
+/// What a provider is asked for `minutes/v4`: [`request_in`] without a structure.
+pub fn request(segments: &[Segment], context: Option<&str>) -> String {
+    request_in(segments, context, None)
+}
+
+/// What a provider is asked: the rules, the structure's sections when there is one (`minutes/v5`),
+/// v4's three otherwise, the context the user attached, the meeting.
+pub fn request_in(segments: &[Segment], context: Option<&str>, structure: Option<&Structure>) -> String {
+    request_named(segments, context, structure, &Names::default())
+}
+
+/// [`request_in`], each line saying its side's name beside the transcript's word, « me (Sarah) », and one rule saying
+/// what that name is (#1205). Without a name, the request is [`request_in`]'s, byte for byte.
+pub fn request_named(segments: &[Segment], context: Option<&str>, structure: Option<&Structure>, names: &Names) -> String {
+    let mut asked = String::from(
+        "You write the minutes of a meeting from its transcript.\n\
+         Write everything in the language the meeting is held in, the three titles included: \
+         never use an English word of these instructions as a title.\n\
+         Write only what the transcript says: invent no name, no date, no decision.\n\
+         When the meeting did not settle who does a task or by when, say so in the meeting's \
+         language — \"not specified\", or that it was proposed and not accepted. Never guess.\n\
+         A person the meeting talks about is not a participant: never give them an action.\n\
+         In the transcript, \"me\" is what the recording machine's microphone heard — the \
+         person who recorded and whoever sat beside them — and \"others\" is everyone heard \
+         through the machine. These two are the transcript's words, not the meeting's: never \
+         write the words \"me\" or \"others\" in the minutes — write, in the meeting's language, \
+         the person who recorded and the other participants, or the names the meeting or the \
+         context gives.\n\n\
+         The transcript was written by a speech recogniser, and holds its errors: a word heard \
+         as another that sounds alike, a name or a figure misheard, a sentence written twice or \
+         several times in a row, a sentence of \"others\" written again under \"me\" as an echo, \
+         a reply missing. Read the meeting through them: where what was meant is certain from \
+         the rest of the meeting, write what was meant; where a name, a figure, a date or who \
+         does a task is uncertain, write it as heard and say it is uncertain. A sentence written \
+         twice counts once. The user's context, when there is one, names who was there and the \
+         words of the trade: read the names, the words and who speaks on which side through \
+         it. A task said as \"I\" names nobody, and each side may hold several people: give it \
+         an owner without doubt only when the meeting names them; otherwise write the likely \
+         owner with \"probably\", or none.\n\n\
+         Open your answer on one line that names the meeting: a title of first level — a line \
+         starting with one number sign and a space, in plain text —, a few words in the \
+         meeting's language saying what it was about, at most 80 characters, never a date, without a slash.\n\
+         Then answer with exactly three sections and nothing between or after them. Each \
+         opens on a title of second level — a line starting with two number signs and a space, \
+         in plain text — in this order:\n",
+    );
+    match structure {
+        None => asked.push_str(
+            "1. What the meeting was for and what came out of it, in a few sentences.\n\
+             2. Every task the meeting agreed on or asked for, one bullet each, even when nobody \
+             took it and no date was set: what is to be done — who does it — by when. Go through \
+             the whole transcript before writing this section: a task said once counts, and so \
+             does one said as a need — something that must be done, prepared, sent again or kept \
+             in reserve. A task belongs here, not in the third section.\n\
+             3. What was decided, the figures, the dates, what stays open, one bullet each.\n\
+             A section with nothing to say says that there is none.\n\
+             End each bullet of the second and third sections with one time, as [mm:ss] copied from \
+             the transcript, of the passage it came from: never a list, nothing after it, and never \
+             make one up.\n\n",
+        ),
+        Some(structure) => {
+            // D111's second spike: a small model copies a skeleton where it misses an order said in words.
+            let three = "Then answer with exactly three sections";
+            let at = asked.rfind(three).expect("the request names its sections' number");
+            let mut skeleton = format!(
+                "Then exactly {} sections, nothing between or after them. Your answer is this skeleton, copied line \
+                 for line, each <…> replaced:\n\n# <the meeting's title>\n\n",
+                structure.sections.len()
+            );
+            for n in 1..=structure.sections.len() {
+                skeleton.push_str(&format!("## <section {n}'s title>\n<section {n}'s content>\n\n"));
+            }
+            skeleton.push_str(
+                "Each title is a few words in the meeting's language naming the section, never its content; the \
+                 content goes on the lines below it. What each section holds:\n",
+            );
+            asked.replace_range(at.., &skeleton);
+            // v4's three titles are not the structure's number.
+            let titles = "the three titles included";
+            let at = asked.find(titles).expect("the request names its titles");
+            asked.replace_range(at..at + titles.len(), "the titles included");
+            for (n, section) in structure.sections.iter().enumerate() {
+                asked.push_str(&format!("{}. {}\n", n + 1, section.ask));
+            }
+            asked.push_str(
+                "A section with nothing to say says that there is none, in a sentence: it is never left \
+                 empty, and never filled with what the transcript does not say.\n\
+                 End each bullet with one time, as [mm:ss] copied from the transcript, of the passage it \
+                 came from: never a list, nothing after it, and never make one up.\n\n",
+            );
+        }
+    }
+    if let Some(context) = context.map(str::trim).filter(|context| !context.is_empty()) {
+        asked.push_str(&format!("Context given by the user:\n{context}\n\n"));
+    }
+    if (names.me.is_some() || names.others.is_some())
+        && let Some(at) = asked.find(AFTER_SIDES)
+    {
+        asked.insert_str(at + AFTER_SIDES.len(), NAMED);
+    }
+    asked.push_str("Transcript:\n");
+    for segment in segments {
+        let seconds = segment.start as u64;
+        let name = if segment.speaker == "me" { &names.me } else { &names.others };
+        let who = match name {
+            Some(name) => format!("{} ({name})", segment.speaker),
+            None => segment.speaker.clone(),
+        };
+        asked.push_str(&format!("[{:02}:{:02}] {}: {}\n", seconds / 60, seconds % 60, who, segment.text));
+    }
+    asked
+}
+
+/// What made the minutes, as their front matter says it.
+pub struct Made<'a> {
+    /// When: written to the second, with its offset.
+    pub at: chrono::DateTime<chrono::FixedOffset>,
+    /// The host that answered, or `local` — never a key, never a path.
+    pub provider: &'a str,
+    pub model: &'a str,
+    pub context: Option<&'a str>,
+    /// What the call cost, when the provider reported it (`reported`).
+    pub cost: Option<Cost>,
+    /// How long the making took, in seconds, from its start (`minutes/v4`, D97): written to the
+    /// hundredth when it is a number at least zero, else not at all.
+    pub made_in: Option<f64>,
+    /// The transcript the times of the answer are checked against.
+    pub segments: &'a [Segment],
+}
+
+/// A price as a provider reported it, its number's text untouched: made by [`reported`] alone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cost {
+    amount: String,
+    currency: &'static str,
+}
+
+/// The one host whose cost is read, and the currency its documentation names: "a credit system
+/// where the base currency is US dollars" (openrouter.ai/docs/faq, read 2026-11-01).
+const PRICED: (&str, &str) = ("openrouter.ai", "USD");
+
+/// The cost in the `usage` of an answer from `host`, as reported (`minutes/v3`, D51): `Err` says
+/// why one that was there is not written, for the log. Never estimated.
+pub fn reported(host: &str, usage: &serde_json::Value) -> Result<Option<Cost>, &'static str> {
+    let cost = &usage["cost"];
+    // The user's own key at the model's provider: what was charged here is not what the call cost.
+    let upstream = &usage["cost_details"]["upstream_inference_cost"];
+    let own_key = usage["is_byok"] == true || !(upstream.is_null() || upstream.as_f64() == Some(0.0));
+    if cost.is_null() || host == "local" || own_key {
+        return Ok(None);
+    }
+    if host != PRICED.0 {
+        return Err("a provider whose currency no documentation read here names");
+    }
+    match cost
+        .as_number()
+        .filter(|number| number.as_f64().is_some_and(|amount| amount >= 0.0))
+    {
+        Some(number) => Ok(Some(Cost {
+            amount: number.to_string(),
+            currency: PRICED.1,
+        })),
+        None => Err("not a number at least zero"),
+    }
+}
+
+/// Minutes this module accepted: the only thing [`write_minutes`] writes.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Minutes(String, usize);
+
+impl Minutes {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    /// How many times the answer held that were not written.
+    pub fn removed(&self) -> usize {
+        self.1
+    }
+}
+
+/// Why an answer is not three sections of second level and nothing else — `None` when it is.
+/// Read by a CommonMark reader, as whoever opens the file will read it: a title is a title
+/// however it is written, and wherever it hides.
+fn not_minutes(body: &str, sections: usize) -> Option<String> {
+    use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
+
+    // Letters to Unicode, and nothing to a reader: the fillers a text is padded with.
+    let shows = |c: char| c.is_alphanumeric() && !matches!(c, '\u{3164}' | '\u{115f}' | '\u{1160}' | '\u{ffa0}');
+    let says = |text: &str| text.chars().any(shows);
+    let mut opened = false;
+    let (mut inside, mut title, mut sub_title) = (0, None, false);
+    let mut said: Vec<bool> = Vec::new();
+    for event in Parser::new(body) {
+        // Whatever comes before the first section — a sentence, a sub-title, a list, a
+        // picture, a mark — is not minutes; what has a reason of its own keeps it.
+        let opens = matches!(
+            event,
+            Event::Start(
+                Tag::Heading {
+                    level: HeadingLevel::H1 | HeadingLevel::H2,
+                    ..
+                } | Tag::CodeBlock(_)
+                    | Tag::HtmlBlock
+            ) | Event::Html(_)
+        );
+        if !std::mem::replace(&mut opened, true) && !opens {
+            return Some("it does not open on its first section".into());
+        }
+        match event {
+            Event::Start(Tag::BlockQuote(_) | Tag::List(_) | Tag::Item) => inside += 1,
+            Event::End(TagEnd::BlockQuote(_) | TagEnd::List(_) | TagEnd::Item) => inside -= 1,
+            Event::Start(Tag::CodeBlock(_)) => return Some("it holds a block of code".into()),
+            Event::Start(Tag::HtmlBlock) | Event::Html(_) | Event::InlineHtml(_) => return Some("it holds HTML".into()),
+            Event::Start(Tag::Heading { .. }) if inside > 0 => return Some("it holds a title inside a quotation or a list".into()),
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H1, ..
+            }) => return Some("it holds a title above its sections".into()),
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H2, ..
+            }) => {
+                said.push(false);
+                title = Some(false);
+            }
+            Event::Start(Tag::Heading { .. }) => sub_title = true,
+            Event::End(TagEnd::Heading(_)) => {
+                if title.take() == Some(false) {
+                    return Some("a section has no title".into());
+                }
+                sub_title = false;
+            }
+            Event::Text(text) | Event::Code(text) if says(&text) => match (&mut title, said.last_mut()) {
+                (Some(named), _) => *named = true,
+                (None, _) if sub_title => {}
+                (None, Some(section)) => *section = true,
+                (None, None) => return Some("it does not open on its first section".into()),
+            },
+            _ => {}
+        }
+    }
+    if said.len() != sections {
+        return Some(match sections {
+            3 => format!("{} section(s) of second level where three are expected", said.len()),
+            _ => format!("{} section(s) of second level where {sections} are expected", said.len()),
+        });
+    }
+    said.contains(&false).then(|| "a section is empty".into())
+}
+
+/// An answer without the one title of first level it opens on (#353, D48): never judged as a
+/// section; said apart, the meeting's name when `minutes/v3` lets it be one. Any other title
+/// stays, and is judged.
+fn without_title(body: &str) -> (Option<String>, &str) {
+    use pulldown_cmark::{Event, HeadingLevel, Parser, Tag};
+
+    match Parser::new(body).into_offset_iter().next() {
+        Some((
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H1, ..
+            }),
+            range,
+        )) if body[range.clone()].chars().any(char::is_alphanumeric) => (title(&body[range.clone()]), body[range.end..].trim_start()),
+        _ => (None, body),
+    }
+}
+
+/// The most a title holds, in characters (`minutes/v3`).
+const TITLE_MOST: usize = 80;
+
+/// The words of a title of first level, its marks left out, when `minutes/v3` lets them name a
+/// meeting: on one line, at most 80 characters, no path. Otherwise none: the minutes are written
+/// without it, never refused for it. A key is the program's to refuse, in the whole answer.
+fn title(written: &str) -> Option<String> {
+    use pulldown_cmark::{Event, Parser};
+
+    let mut words = String::new();
+    for event in Parser::new(written) {
+        match event {
+            Event::Text(text) | Event::Code(text) | Event::Html(text) | Event::InlineHtml(text) => words.push_str(&text),
+            Event::SoftBreak | Event::HardBreak => return None,
+            _ => {}
+        }
+    }
+    let words = words.trim();
+    // Whether words name a path no rule can tell: a slash of any kind leaves the date to name it,
+    // « Q3/Q4 » too — a meeting loses a name, never shows a path (`minutes/v3`).
+    let path = words.contains(['/', '\\']);
+    let one_line = !words.chars().any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'));
+    let says = words
+        .chars()
+        .any(|c| c.is_alphanumeric() && !matches!(c, '\u{3164}' | '\u{115f}' | '\u{1160}' | '\u{ffa0}'));
+    (one_line && !path && says && words.chars().count() <= TITLE_MOST).then(|| words.to_string())
+}
+
+/// The seconds of a time as `minutes/v3` writes one: minutes in two digits or more, seconds from
+/// 00 to 59. Anything else, or a time no number can hold, is text.
+fn seconds(time: &str) -> Option<u64> {
+    let (minutes, seconds) = time.split_once(':')?;
+    let digits = |text: &str| text.bytes().all(|b| b.is_ascii_digit());
+    if minutes.len() < 2 || seconds.len() != 2 || !digits(minutes) || !digits(seconds) {
+        return None;
+    }
+    let seconds: u64 = seconds.parse().ok().filter(|seconds| *seconds < 60)?;
+    minutes.parse::<u64>().ok()?.checked_mul(60)?.checked_add(seconds)
+}
+
+/// The times these square brackets hold: `[12:31]`, or a list of them — `[12:31, 14:02]`,
+/// `[12:31 et 14:02]`, one word at most between two. Any other words make them text.
+fn times_in(inside: &str) -> Vec<u64> {
+    if let Some(time) = seconds(inside) {
+        return vec![time];
+    }
+    let read: Vec<Option<u64>> = inside
+        .split(|c: char| !c.is_alphanumeric() && c != ':')
+        .filter(|word| !word.is_empty())
+        .map(seconds)
+        .collect();
+    let list = read.first().is_some_and(Option::is_some)
+        && read.last().is_some_and(Option::is_some)
+        && read.len() > 1
+        && read.windows(2).all(|pair| pair[0].is_some() || pair[1].is_some());
+    if list { read.into_iter().flatten().collect() } else { Vec::new() }
+}
+
+/// Where the tail of an item opens, and its times: at the end of the text, past its spaces and one
+/// full stop, square brackets holding times, one group or several separated by spaces, `,` or `;`.
+fn tail(text: &str) -> Option<(usize, Vec<u64>)> {
+    let trimmed = text.trim_end();
+    let mut left = trimmed.strip_suffix('.').unwrap_or(trimmed);
+    let (mut first, mut times) = (None, Vec::new());
+    while let Some(open) = left.strip_suffix(']').and_then(|inner| inner.rfind('[')) {
+        let found = times_in(&left[open + 1..left.len() - 1]);
+        if found.is_empty() {
+            break;
+        }
+        times.extend(found);
+        first = Some(open);
+        left = left[..open].trim_end_matches(|c: char| c.is_whitespace() || matches!(c, ',' | ';'));
+    }
+    first.map(|first| (first, times))
+}
+
+/// Whether square brackets somewhere in `text` hold a time.
+fn holds_a_time(text: &str) -> bool {
+    text.match_indices('[').any(|(open, _)| {
+        text[open + 1..]
+            .split_once(']')
+            .is_some_and(|(inside, _)| !times_in(inside).is_empty())
+    })
+}
+
+/// What `minutes/v3` lets an item of Actions or Key points write of its tail: its one time, when it
+/// lies in a segment and the item holds no other; otherwise nothing, the line kept. Nothing before
+/// the tail ever changes, and an item without one is left as it is: anything else in square
+/// brackets is its text. `text` is the item's last text of its own, `earlier` whether what it said
+/// before held a time: the answer is where the end to replace starts, with what, and how many times
+/// went.
+fn item_end(text: &str, earlier: bool, segments: &[Segment]) -> Option<(usize, String, usize)> {
+    let (first, times) = tail(text)?;
+    let before = &text[..first];
+    if let [time] = times[..]
+        && !earlier
+        && !holds_a_time(before)
+        && segments
+            .iter()
+            .any(|segment| segment.start as u64 <= time && time <= segment.end as u64)
+    {
+        let trimmed = text.trim_end();
+        let bracket = trimmed.strip_suffix('.').unwrap_or(trimmed);
+        // Alone on its line, after a sub-list, it stays where it is: joined up, it would be the sub-list's.
+        if before.trim().is_empty() {
+            return Some((first, bracket[first..].to_string(), 0));
+        }
+        return Some((before.trim_end().len(), format!(" {}", &bracket[first..]), 0));
+    }
+    let kept = before.trim_end();
+    let kept = kept.strip_suffix([',', ';']).unwrap_or(kept).trim_end();
+    Some((kept.len(), String::new(), times.len()))
+}
+
+/// The body with only the times `minutes/v3` lets it write, and how many went. Read by the
+/// CommonMark reader: only the items under the `first` title and those after it hold one, each its
+/// own — v4's second and third, every section of a structure's (`minutes/v5`).
+fn with_times_checked(body: &str, segments: &[Segment], first: usize) -> (String, usize) {
+    use pulldown_cmark::{Event, HeadingLevel, Parser, Tag, TagEnd};
+
+    let (mut section, mut open, mut edits, mut removed) = (0, Vec::<(usize, Vec<std::ops::Range<usize>>)>::new(), Vec::new(), 0);
+    for (event, range) in Parser::new(body).into_offset_iter() {
+        match event {
+            Event::Start(Tag::Heading {
+                level: HeadingLevel::H2, ..
+            }) => section += 1,
+            Event::Start(Tag::Item) => open.push((range.start, Vec::new())),
+            // An item's own text is all of it but the lists inside it, as the minutes' reader has it.
+            Event::Start(Tag::List(_)) => {
+                if let Some((_, lists)) = open.last_mut() {
+                    lists.push(range);
+                }
+            }
+            Event::End(TagEnd::Item) => {
+                let Some((start, lists)) = open.pop() else { continue };
+                let mut own = Vec::new();
+                let mut from = start;
+                for list in lists {
+                    own.push(from..list.start);
+                    from = list.end;
+                }
+                own.push(from..range.end);
+                let Some(last) = own.iter().rposition(|text| !body[text.clone()].trim().is_empty()) else {
+                    continue;
+                };
+                let earlier = own[..last].iter().any(|text| holds_a_time(&body[text.clone()]));
+                let text = &body[own[last].clone()];
+                if section >= first
+                    && let Some((from, written, went)) = item_end(text, earlier, segments)
+                {
+                    // To the end of its text, and the spaces that follow on its line.
+                    let start = own[last].start;
+                    let end = start + text.trim_end().len();
+                    let spaces = body[end..].trim_start_matches(|c: char| c.is_whitespace() && c != '\n');
+                    removed += went;
+                    edits.push((start + from..body.len() - spaces.len(), written));
+                }
+            }
+            _ => {}
+        }
+    }
+    edits.sort_by_key(|(range, _): &(std::ops::Range<usize>, String)| std::cmp::Reverse(range.start));
+    let mut checked = body.to_string();
+    for (range, written) in edits {
+        checked.replace_range(range, &written);
+    }
+    (checked, removed)
+}
+
+/// A text as one YAML string: quoted, on one line, with every character a YAML reader
+/// refuses or reads otherwise written as its escape.
+fn quoted(text: &str) -> String {
+    let mut out = String::from("\"");
+    for character in text.chars() {
+        match character {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() || matches!(c, '\u{2028}' | '\u{2029}' | '\u{feff}' | '\u{fffe}' | '\u{ffff}') => {
+                out.push_str(&format!("\\u{:04X}", c as u32))
+            }
+            c => out.push(c),
+        }
+    }
+    out + "\""
+}
+
+/// The minutes file for a provider's answer, `minutes/v4` — or the reason the answer is not minutes.
+pub fn minutes(answer: &str, made: &Made) -> Result<Minutes, Refused> {
+    minutes_in(answer, made, None)
+}
+
+/// The minutes file for a provider's answer — `minutes/v5` in a structure, `minutes/v4` without
+/// one — or the reason the answer is not minutes.
+pub fn minutes_in(answer: &str, made: &Made, structure: Option<&Structure>) -> Result<Minutes, Refused> {
+    // One way to end a line, before anything reads it: readers do not agree on a lone
+    // carriage return, and the file is written with the line ends it was judged with.
+    let unified = answer.replace("\r\n", "\n").replace('\r', "\n");
+    let (title, body) = without_title(unified.trim().trim_start_matches('\u{feff}').trim());
+    // Judged as it will be written: a section that held only a time it may not keep is empty.
+    // v4's times are its second and third sections'; in a structure, every section's (`minutes/v5`).
+    let (body, removed) = with_times_checked(body, made.segments, if structure.is_some() { 1 } else { 2 });
+    if let Some(why) = not_minutes(&body, structure.map_or(3, |structure| structure.sections.len())) {
+        return refused("answer.not_minutes", format!("the provider's answer is not minutes: {why}"));
+    }
+    let context = made
+        .context
+        .map(str::trim)
+        .filter(|context| !context.is_empty())
+        .map_or("null".into(), quoted);
+    let named = title.map_or(String::new(), |title| format!("title: {}\n", quoted(&title)));
+    let priced = made.cost.as_ref().map_or(String::new(), |cost| {
+        format!("cost: {}\ncurrency: {}\n", cost.amount, cost.currency)
+    });
+    let took = made
+        .made_in
+        .filter(|seconds| seconds.is_finite() && *seconds >= 0.0)
+        .map_or(String::new(), |seconds| {
+            format!("made_in: {:?}\n", (seconds * 100.0).round() / 100.0)
+        });
+    // The structure, its sections in their order, each its id and its line, and where the actions are.
+    let structured = structure.map_or(String::new(), |structure| {
+        let sections: Vec<_> = structure
+            .sections
+            .iter()
+            .map(|section| serde_json::json!({ "id": section.id, "about": section.about }))
+            .collect();
+        let actions = structure.actions.map_or(String::new(), |actions| format!("actions: {actions}\n"));
+        format!(
+            "structure: {}\nsections: {}\n{actions}",
+            structure.name,
+            serde_json::Value::Array(sections)
+        )
+    });
+    let contract = if structure.is_some() { MINUTES_IN_A_STRUCTURE } else { MINUTES };
+    Ok(Minutes(
+        format!(
+            "---\ncontract: {contract}\nmade: {}\nprovider: {}\nmodel: {}\ncontext: {context}\n{named}{priced}{took}{structured}---\n\n{body}\n",
+            made.at.to_rfc3339_opts(chrono::SecondsFormat::Secs, false),
+            quoted(made.provider),
+            quoted(made.model),
+        ),
+        removed,
+    ))
+}
+
+/// Puts the minutes in the session's folder: under their name only once they are whole. The
+/// minutes that were there are replaced; a failure before the last step leaves them as they were.
+pub fn write_minutes(folder: &Path, minutes: &Minutes) -> io::Result<()> {
+    use std::io::Write;
+    let draft = folder.join("minutes.md.part");
+    // What sits at the draft's name — one left by a crash, or a link — goes first: the draft is
+    // made new, never written through a link into another file.
+    match fs::remove_file(&draft) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => return Err(error),
+        _ => {}
+    }
+    // Whatever fails, the draft goes: written in part or not renamed, it is no minutes.
+    fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&draft)
+        .and_then(|mut file| file.write_all(minutes.as_str().as_bytes()))
+        .and_then(|()| fs::rename(&draft, folder.join("minutes.md")))
+        .inspect_err(|_| {
+            let _ = fs::remove_file(&draft);
+        })
+}

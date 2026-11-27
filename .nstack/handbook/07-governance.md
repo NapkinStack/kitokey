@@ -1,0 +1,546 @@
+# 07 — Governance
+
+## 1. The principle
+
+> If a rule can be checked automatically, it must **not** depend on the vigilance of the
+> AI or of the developer.
+
+This is the move from *governance by inspection* — somebody reviews and spots things — to
+*governance by rule*: the system refuses the invalid state.
+
+Corollary: **an important rule checked only by human memory will drift.** Not maybe, not
+if the team is careless. It will drift.
+
+---
+
+## 2. Where does this rule live?
+
+This is the central arbitration of the OS and it must be made explicitly, for every new
+rule.
+
+```mermaid
+flowchart TD
+    A["New rule<br/>or convention"] --> B{"Mechanically<br/>checkable?"}
+
+    B -->|Yes| C{"Cost of setting<br/>it up?"}
+    B -->|No| G{"Structural<br/>or situational?"}
+
+    C -->|Low| D["CI: blocking check<br/>+ local hook for feedback"]
+    C -->|High| E{"Risk if<br/>violated?"}
+
+    E -->|High| D
+    E -->|Low| F["Automation backlog<br/>+ a temporary rule in a playbook"]
+
+    G -->|Structural| H["A boundary: repo, package,<br/>ownership, CODEOWNERS"]
+    G -->|Situational| I{"Does it apply to<br/>EVERY task?"}
+
+    I -->|Yes| J["KERNEL<br/>strictly limited budget"]
+    I -->|No| K["PLAYBOOK<br/>loaded by trigger"]
+
+    D --> L["REMOVE the rule from the prompt"]
+    H --> L
+
+    style D fill:#065f46,color:#fff
+    style H fill:#065f46,color:#fff
+    style J fill:#1f2937,color:#fff
+    style L fill:#7c2d12,color:#fff
+```
+
+**Legend** — green: the deterministic destinations · dark grey: the expensive,
+probabilistic one · red: the step everyone forgets.
+
+Node `L` is the most important and the most forgotten: **once automated, the rule leaves
+the prompt**. Otherwise the kernel grows indefinitely and ends up costing, on every task,
+more context than it protects.
+
+Node `H` also deserves attention: a rule that is not checkable but is structural is often
+solved by **structure** rather than by text. "Do not import the other module's code" is a
+weak rule; putting the two modules in distinct packages with declared dependencies makes
+it unnecessary.
+
+**The tree says what kind of place; the level says whose.** Nodes `J` and `K` are the
+framework's. A rule that is the project's alone takes the same path and lands one level
+nearer (`00-overview.md` §5):
+
+| The tree ends on… | A rule every project shares | A rule of this project | A rule of one module |
+|---|---|---|---|
+| `J` — every task | The kernel | `docs/project/rules/always.md` | The module's `AGENTS.md` |
+| `K` — by trigger | `.nstack/playbooks/<subject>.md` | `docs/project/rules/<subject>.md` | The module's `AGENTS.md` |
+| `D` — a check | The framework's checks | The project's own CI | The module's `check` and `test` |
+
+Node `L` holds at every level: a project rule that a check now enforces leaves
+`docs/project/rules/`. That is what the last column of that folder's form is for.
+
+---
+
+## 3. Fitness functions
+
+> An important rule must not stay in the prompt; it must become an automated test that
+> fails when the architecture drifts.
+
+This is the mechanism that turns this OS's principles into real constraints.
+
+```mermaid
+flowchart LR
+    subgraph SRC["Sources — already present"]
+        S1["The modules'<br/>MANIFESTs"]
+        S2["The real graph extracted<br/>from the code"]
+        S3["Versioned<br/>contracts"]
+        S4["Build & runtime<br/>metrics"]
+    end
+
+    subgraph FF["Fitness functions"]
+        F1["Dependencies:<br/>declared = real"]
+        F2["No cycles"]
+        F3["Layering respected"]
+        F4["No access to another<br/>module's database"]
+        F5["Contracts: compatibility<br/>and consumers"]
+        F6["Budgets: performance,<br/>size, time"]
+        F7["Lifecycle:<br/>statuses and dates"]
+    end
+
+    S1 --> F1
+    S2 --> F1
+    S2 --> F2
+    S2 --> F3
+    S2 --> F4
+    S3 --> F5
+    S1 --> F7
+    S4 --> F6
+
+    FF --> CI["CI — blocking"]
+
+    style CI fill:#065f46,color:#fff
+    style FF fill:#1f2937,color:#fff
+```
+
+**Legend** — dark grey: the checks themselves · green: the blocking verdict. Layering (F3) and
+budgets (F6) are the project's to build: the framework ships no check for them.
+
+### The basic fitness functions
+
+To put in place from the second module onwards, in order of return:
+
+| # | Function | Detects |
+|---|---|---|
+| 1 | Declared graph (manifest) = real graph (code) | A hidden dependency, a stray import |
+| 2 | No circular dependency | Modules that have become inseparable |
+| 3 | No direct access to another module's data | Coupling through the database |
+| 4 | Backward compatibility of contracts | An unintentional breakage |
+| 5 | Consumers of a deprecated version = 0 before removal | A deliberate breakage, badly sequenced |
+| 6 | Consistency of lifecycle statuses | A frozen contract changed, a deprecated module reused |
+| 7 | Deprecation dates not passed | Permanent intermediate states |
+| 8 | One PR = one module | Boundary erosion |
+| 9 | Complete module envelope (manifest, owner, tests) | An orphan module |
+| 10 | Performance and size budgets | A silent regression — the project's to build: no check ships with the framework |
+
+The first six are cheap: they are computed from data already present (manifests, imports,
+contract schemas). There is **no semantic analysis** — these are comparisons of graphs
+and schemas.
+
+Beside them, the engine checks what a shared repository must not carry: a path rooted in one
+person's home directory, in any tracked file (H1). It exists on no other machine and
+publishes the layout of the one it was written on; an image's or a runner's home, a
+folder software keeps its own files in — `~/.config`, or `~/Library` on a Mac — a
+placeholder or a variable is the same everywhere.
+
+### Writing a fitness function
+
+A good fitness function is fast (it runs on every pull request), deterministic (no random
+false positives), and **explanatory when it fails**. One that says only "architecture
+violation" will be worked around; one that says "module A imports `B/internal/x.ts`, but
+A's manifest does not declare B; use contract `b-api@v2`" will be respected.
+
+---
+
+## 4. What to automate
+
+In decreasing order of return:
+
+```
+Immediately, at almost no cost
+  format · lint · type checking · secret detection · commit conventions
+
+From the 2nd module
+  unit tests · build · fitness functions 1 to 3 · one PR = one module
+
+From the 1st inter-team contract
+  schema validation · contract tests · compatibility · consumers
+
+From going to production
+  security analysis · dependencies/CVE · smoke tests · post-deployment verification
+
+When the volume justifies it
+  integration tests · targeted E2E · performance budgets · merge queue
+```
+
+**The critical checks run in CI.** Local hooks give fast feedback but are **never** the
+only barrier: they are bypassable, disableable, and absent on a newcomer's machine.
+
+---
+
+## 5. Quality gates
+
+A quality gate must be: **objective · understandable · reproducible · automated where
+possible · useful**.
+
+The last criterion is the most often forgotten, and it is the one that kills buy-in.
+
+| Situation | Response |
+|---|---|
+| A gate blocks often without ever improving quality | Re-evaluate it or remove it |
+| An important rule never respected | Automate it, remove it, or explicitly reconsider |
+| A gate systematically bypassed by label | The problem is the gate, not the people |
+| A gate so slow that people skip it | Make it fast, or move it later in the pipeline |
+
+> Avoid bureaucratic gates with no value. Every gate has a permanent cost paid by every
+> pull request; it must earn its keep.
+
+**Never a silent bypass.** No `skip`, no `--no-verify`, no test disabled "temporarily",
+no threshold lowered to make things pass. A necessary bypass goes through a visible label
+and leaves a counted trace.
+
+---
+
+## 6. Proportionate governance
+
+**Two things are read before any rule fires, and neither is declared by whoever is judged.**
+The project's *stage* — unframed until its charter is accepted, framed after — decides
+whether the rules that bound work inside a cycle — K1 to K3 and K5 — apply at all
+(`.nstack/handbook/project.md`). The module's *criticality* decides which checks a change pays
+for, in either stage. One never stands in for the other.
+
+The level of requirement depends on the **criticality declared in the manifest**, not on
+a uniform rule. Never impose the ceremony of a critical system on a small module; never
+treat a critical system like a prototype.
+
+**What each of the four values requires is written in exactly one place: the table of
+`05-workflow.md` §7.** This section says why the axis exists and how a module changes value;
+it does not repeat the requirements, because a second copy of a table is a second answer
+waiting to contradict the first.
+
+```mermaid
+flowchart LR
+    A["Module"] --> B{"Declared<br/>criticality"}
+    B --> P["prototype"]:::light
+    B --> S["standard"]
+    B --> H["high"]
+    B --> C["critical"]:::heavy
+    P --> T["05-workflow.md §7<br/>what each one requires"]
+    S --> T
+    H --> T
+    C --> T
+
+    classDef light fill:#1f2937,color:#fff
+    classDef heavy fill:#7c2d12,color:#fff
+```
+
+**Legend** — dark grey: the lightest value · red: the heaviest · the table is the single
+source of what they require.
+
+**The value answers one question**, and it is a question about consequence, not about effort:
+*what does a failure of this module cost?* Nothing, because it is thrown away — a user's
+patience — a day of work — or a key, an order, money, someone's personal data. That is a
+product decision, so **the decider settles it**; an agent proposes it with its price and does
+not choose alone.
+
+Criticality is declared in the manifest, so CI knows which checks to apply to which
+module. It is not decided pull request by pull request, which would trigger the
+discussion at the worst possible moment.
+
+**It is revisable**, by ADR: a module going to production changes value. Raising it takes
+effect on the next run, with no migration; the checks the new value requires apply to the next
+pull request that changes the module.
+
+---
+
+## 7. The repository as an organ of governance
+
+The repository is not storage space: it is where rules become non-bypassable. Mechanisms
+to use (GitHub wording, transposable elsewhere):
+
+| Mechanism | What it guarantees |
+|---|---|
+| Pull requests required | No direct change on the protected branch |
+| Required checks | A red CI blocks the merge, without exception |
+| CODEOWNERS | The right owner is asked automatically — a user, or a team written organisation/team; GitHub reads an organisation named alone as no owner at all |
+| Rulesets / branch protection | The rules do not depend on goodwill |
+| Issue forms | What nobody planned arrives with what is needed to judge it |
+| PR template | The DoD is visible at review time |
+| Labels | Exceptions are visible and counted |
+| Protected environments | Deployment goes through an approval |
+| Dependency / security automation | CVEs do not depend on manual watching |
+| Branches up to date before merging (G22) — or a merge queue, where the forge offers one (organisation repositories) and the checks run on it | Two changes each green on its own base never turn main red together: what was checked is what lands. Updating a branch costs the cheap checks — attested, `nstack attest` on the updated head; a module's are kept while nothing they read moved. How to keep it cheap: `05-workflow.md`, *Up to date before merging* |
+| A dedicated identity for agents | An agent never merges around the approval the project asks for |
+| Rulesets with an empty bypass list | Nobody, administrators included, merges around a rule |
+| Stale approvals dismissed on push | An approval covers the commits its approver read — where the plan has no ruleset, `pr-check` says each approval the head moved past (R1) |
+| A default code owner — on `approval: agent`, a human owner where one must approve | The code owner review covers every path a human must approve |
+| A record of what landed | Nothing reaches the protected branch in silence — it records, it never refuses |
+
+> **Critical rules must not be bypassable by an instruction given to the AI.** That is
+> the ultimate test of governance: if asking an agent nicely is enough to get around it,
+> the rule does not exist.
+
+**And when the forge cannot enforce any of it.** Every mechanism above depends on what the
+repository's plan allows; on some, none of them is available, and nothing refuses a merge at
+all. The diagnosis says so in one word — *unguarded* — and what remains is the last row: a
+run that fails when a commit reached the protected branch outside a pull request. That is a
+record, not a barrier, and it is worth exactly what a record is worth: the thing nobody would
+otherwise have been told. Reading it as a guarantee is the mistake it exists to prevent.
+
+**Off GitHub**, this version reads none of the forge's settings and ships no CI there: `doctor`
+lists what the forge should refuse, never reports it in place, and says the repository
+*unguarded*; each change's checks are attested; the record of commits on main does not run. The
+forge's own protections still hold — set them as `INSTALL.md` lists them — but nothing here
+vouches for them. With no forge at all, nothing refuses a change but the team.
+
+**And when the forge cannot run the checks.** A runner down, the hosted minutes spent, a team
+that works off the forge: the checks still run, where the team works. `nstack attest` runs the
+CI's own checks — one list, bound to the workflows by a test — on a clean head, and records the
+run on the commit in git (`refs/notes/nstack/checks`, pushed with the branch), shown — on GitHub only —
+as `nstack / local checks`, a name no CI job has. Such a change is **attested**, never
+*checked*: the record makes a claim traceable — who ran it, on which commit, with what output
+— not true. Whether a record stands in for the forge's CI is the decider's word, the project's
+answer `checks: attested` in `.copier-answers.yml`, changed in a pull request (`nstack config checks
+attested` lays it on a branch); `pr-check` then
+requires a complete, passed record of the head (A1, A2) — on the workstation and in the forge's
+CI alike, which reads the record from the remote's notes with the job's token: an unattested head
+is red there too. A record CI cannot read — no token, a remote that refuses — is said as a
+warning, never called compliant in silence. Attesting again once the test sheet is filled keeps the
+module checks the commit's record passed — they read the tree and the base, never the description —
+when the base commit, the engine and the person are the same, and the engine is published or named
+by a commit with no change of its own — tracked or not. The record says which run they come from
+(`kept_from`), with that run's evidence; what the tree's ignored files, the environment or the tools
+outside it hold is not compared: `nstack attest --again` runs them. They are also kept
+across commits — a merge of the default branch that touched nothing they read: their modules,
+those they consume from or assemble, `contracts/`, `platform/` and the files outside the modules but the
+project's records (`docs/project/`, `docs/adr/`, `docs/pdr/`) and the Markdown files at the
+repository's root — while the
+digest of what they read is unchanged, for 7 days and 20 default-branch commits at most. A record
+known to be unsound — two runs that shared what a run must not share, a tool found lying — is
+voided: `nstack attest --void <commit> --reason "<why>"` adds a line naming who, why and every
+run the commit's note holds. None of them is a record afterwards, nor kept from — on its commit, or
+through another commit's record that kept from it —, and `pr-check` refuses a head whose record
+is voided or keeps a check from a voided run, until it is attested again. The runs stay in the
+note: evidence is never rewritten. A void travels as a record does, under the same identity
+rule; the status on the forge turns to *voided* only with a token that may write it. Where the answer is `forge`, a record is
+information, and on a guarded repository the forge's required checks stay the barrier — a
+decider who wants the record to gate a protected branch requires its name at the forge.
+Where the answer is `attested`, requiring it is what keeps a pull request moving: the record
+holds the description's sheet, so it is made after its last edit, and notes start no run — the
+pull request's last run, from before the record, would stay red. The status is the record's own
+event: when the base branch's ruleset requires `nstack / local checks`, the pull request's run
+leaves A1 and A2 to it, and says so — and T4 too, for an automated row that waits only for the
+head's record: attest's own run keeps the row or fails it with the head's inputs digest. Posting it needs a token that may write commit statuses
+(an agent's App made by `nstack agent add` has it; an older App gets Commit statuses: write in
+its settings, accepted on its installation); without one, the record is said *not shown*, and
+the merge waits. A required name is matched by any check of that name: where every record is an
+agent's, the ruleset can pin the status's source to the agent's App.
+
+The record names who ran it, as git would sign a commit made in that checkout, and travels to the
+remote with the notes: it never publishes an address the project's history does not already show.
+A checkout whose identity is unknown there — a fresh clone falls back on the workstation's own,
+often personal — is refused before any check runs; set the checkout's identity, or, for a first
+record of a new contributor, `nstack attest --accept-identity`. GitHub's noreply address is always
+accepted, and enough. A repository with no remote is never refused: nothing travels.
+
+**A dependency bot's pull request, where checks are attested.** Dependabot's — or Renovate's —
+pull requests carry no record, and the bot takes commands only from people with push access: an
+agent's App asking it to rebase is refused. Nothing is re-applied by hand. When the branch is
+behind and the ruleset asks it to be up to date, a person's `@dependabot rebase` keeps the bot
+maintaining it; otherwise the agent updates it on the forge
+(`gh api --method PUT repos/<owner>/<repo>/pulls/<number>/update-branch`, which the App's pull
+requests and contents write permissions allow, both given by `nstack agent add` — where the
+update touches workflow files, the App also needs the workflows permission, `nstack agent add
+--workflows`). The bot then stops maintaining that pull request: a conflict or a newer version is
+a person's `@dependabot recreate`. The agent fetches the base and the head together and checks
+the head out as it stands (`git fetch origin main pull/<number>/head:refs/remotes/origin/pr/<number>
+&& git checkout --detach origin/pr/<number>`), then runs `nstack attest`: the record names who ran
+the checks, never who wrote the commit, and each new head is attested again. The route covers
+updates outside the modules; a bot's update inside one is delivery work like any other, with its
+deliverable or the out-of-cycle label.
+
+**A record is published with the repository**: the notes are pushed, and every step's output
+travels in them. `nstack attest` writes the checkout's root as `<root>` and the home folder as `~`,
+whole folders only. Anything else a step prints travels as printed, and is the step's to keep out:
+a host name, a token a test echoes, a user name in a path outside the home — `/tmp/pytest-of-<user>/`
+in a failed test's output. The SHA-256 of each step is of its output as it ran, so it is not
+recomputed from the record. A record an earlier
+version pushed keeps its paths: notes are history, and rewriting them rewrites the evidence
+`pr-check` reads.
+
+**A failed check says what failed, and keeps its output on the workstation.** Under the check's
+FAIL line, `nstack attest` shows the last lines a module's own command wrote before it exited — a
+test runner's summary names the test that failed — and the path of the check's whole output, in
+the clone's git folder (`.git/nstack/attest/<commit>-<check>.log`, a worktree's own git folder in a
+worktree), never in the tree and never pushed. A test that fails once and passes again is named there: quarantine it by that name
+(`.nstack/playbooks/tests.md`).
+
+### Agents and approval
+
+A pull request's author cannot approve it. An agent working with a human's credentials
+*is* that human: it can approve a colleague's pull request in their name, then merge. Four
+settings close that door, and they only hold together:
+
+1. **The agent has its own identity** — on GitHub, an App installed on the repository (`nstack agent add <name>`: made and
+   installed in two clicks, with a clone that works as it and runs the project's hooks): tokens
+   that expire within the hour, never the Administration permission; elsewhere, a bot account
+   with the same limits. Its session reaches no human credential — no SSH key, token or
+   command-line login of a human: `nstack agent run` keeps the person's tokens, SSH agent and
+   git configuration out of its environment; a sandbox, a container or a dedicated system user
+   keeps it out of their files. The agent's tool still reads the person's own configuration — its
+   sandbox, hooks and permissions: for Claude Code, the command adds settings of the agent's own
+   that open the forge to its sandbox, nothing else. A person's hook that refuses `gh`, against
+   their own account, lets an agent's session through on one test only — its `gh` is the App's:
+   `[[ -n "${NSTACK_AGENT:-}" && "$(command -v gh)" == "$(dirname "$GH_CONFIG_DIR")/bin/gh" ]] && exit 0`
+   — the agent's `gh` folder sits beside its shim, wherever the agents' folder is.
+   Inside that sandbox the agent writes its clone, `.git/config` excepted, and a cache of its own
+   (`XDG_CACHE_HOME`; uv and pre-commit keep the person's); a build writing elsewhere, such as
+   Cargo's `~/.cargo`, needs the person to add that folder to their sandbox's `allowWrite`. It
+   branches without tracking and pushes plainly — `git switch -c d4-export origin/main`, then
+   `git push` — and needs no worktree, its clone being its own. Unix sockets
+   stay closed unless the project answers `agent_sockets: true` in `.copier-answers.yml`, read from
+   the default branch: an end-to-end test of audio or a display needs them, and a socket such as
+   `docker.sock` hands the agent the host.
+   Dispatching a workflow run needs Actions: write, which its App never has; changing a file under
+   `.github/workflows/` needs Workflows, which only `nstack agent add --workflows` grants. Both are
+   otherwise the person's gestures. The agent hands over the literal command (`gh workflow run <file> --ref <branch>`) and
+   never asks another session to make it — that would be one identity borrowing another's rights.
+2. **The merge requires a human code owner's approval**, and `CODEOWNERS` starts with a
+   default owner: an App can approve, but it is never a code owner. On `approval: agent`, below,
+   the code owners file names a human only where one must approve.
+3. **Nobody is on the rulesets' bypass list**, administrators included.
+4. **An approval is dismissed when new commits are pushed**: otherwise a force-push after
+   the approval merges content its approver never read. Where the plan has no ruleset to
+   dismiss it, the forge still shows *approved*: `pr-check` says each approval the head moved
+   past (R1), and nobody merges on it until its approver has approved the head.
+
+The human who drove the agent may approve its pull request. A team that wants four eyes
+adds "require approval of the most recent reviewable push", or a second reviewer.
+
+**Where another agent approves.** A project whose agents each work under an identity of
+their own may answer `approval: agent` in `.copier-answers.yml` — the
+decider's word, changed in a pull request a human approves: `nstack config approval agent` lays it on
+a branch, the code owners file following it. A change to a `prototype` or `standard`
+module is then approved by a human **or** by another agent — under an identity that is neither its
+author's nor its last pusher's, whoever runs it; everything else still waits for a human code owner.
+The forge does the sorting, path by path:
+
+- **The code owners file names a human** for the project's rules (`AGENTS.md`, `CONTRIBUTING.md`,
+  `SECURITY.md`, `.nstack/`, the forge's folder, the code owners file itself, the hooks'
+  configuration, `.copier-answers.yml`), its records (`docs/`) and every module neither
+  `prototype` nor `standard` — and **no default owner**: a path it does not name needs one
+  approval, an agent's counting. The code owners review stays required: nothing is lowered.
+  `nstack new-module` writes no line for a `prototype` or `standard` module; a module whose
+  criticality rises gets its line in the same pull request (`doctor`, L6).
+- **The last pusher's approval does not count** (G21): an agent that pushed a fix to the change
+  it reviews no longer approves it.
+- **The approving agent says, in its approval**, the session it ran in and what it is expert in
+  for the module. Where the module asks for a test sheet, it is the verifier who ran it; where
+  it asks none, it reviews the change on its oracle and its checks.
+- **Independence is the identity's, not the person's.** Two agents one contributor runs —
+  each under its own App, in its own session, best on another model — approve each other's
+  changes as two contributors' agents would. What a second agent cannot do, nobody's can: approve
+  what a human must, or what it pushed. So the answer changes nothing until a second agent works
+  under an identity of its own; `doctor` says so while the history shows a single one.
+- **Two agents never loop.** The reviewing agent approves or comments — never *request
+  changes*, a block only it can lift — and never pushes to the change it reviews: it names what
+  is wrong, the author fixes. One round (`05-workflow.md`): its findings once; then it confirms
+  the fixes and approves, or, still disagreeing, hands the change to a human. A second pass
+  raises nothing new but what the fixes broke.
+
+**Copilot's code review is not that agent.** GitHub lets its approval count toward the required
+ones — generally available since 2026-10-28, off by default: *Settings › Copilot › Code review*,
+*Allow Copilot approvals to count toward merge requirements*, which an organization may also
+enforce for every repository. It runs no test sheet and names no session, so leave that toggle
+off, and ask the organization's owner where it is enforced; where an approval of it is the only
+one, `pr-check` says so (R2). Copilot is named in no code owners file, so on every path the file
+names a code owner still approves — GitHub's documentation says nothing otherwise.
+
+**Where the forge cannot guard** — a private repository on a plan that enforces no ruleset —
+neither answer is enforced: the code owners file only asks for reviews, and `doctor` says
+*unguarded*. Who approves is then the team's rule, kept by the people, as every rule there is.
+
+Whether the answer holds is read on what escapes: a defect found within 30 days of a merge,
+which the bug form ties to its pull request (`10-measurement.md`). GitHub counts an App's approval
+toward the required ones once the App may write contents, never on a pull request it opened — as
+reported in practice; a project's first cross-approved pull request is its own proof.
+
+### The approval is one gesture, not three
+
+Approving and merging are two different acts, and only the first is a judgement. With
+**auto-merge** allowed on the repository, the author arms it on the pull request when opening
+it (`gh pr merge <number> --auto --squash`), and the pull request merges itself the moment it
+is approved and its required checks go green: nobody waits on the reviewer to come back and
+press a button, and no agent is told to merge on their behalf. The barrier is untouched — the approval is still
+required, still a human's or, under `approval: agent`, another agent's (above), still dismissed
+when new commits are pushed, a merge of the default branch included (`05-workflow.md`).
+
+What it removes is the round trip: **the approval message that carries no judgement at
+all**, and exists only to tell an agent that a merge could now happen.
+
+The approval itself can also be given from wherever the decision was made, under the
+approver's own identity, rather than by walking to the browser:
+
+```
+gh pr review <number> --approve
+```
+
+One gesture. An approval given in the terminal and an approval given in the web interface
+are the same act, recorded the same way, and dismissed the same way on the next push.
+
+---
+
+## 8. The CI pipeline
+
+Conceptual order, from the fastest to the most expensive — useful feedback arrives early.
+
+```mermaid
+flowchart TD
+    CH["Change"] --> F1["Format · Lint"]
+    F1 --> F2["Types"]
+    F2 --> F3["Unit tests"]
+    F3 --> F4["Build"]
+    F4 --> F5["Architecture<br/>fitness functions"]
+    F5 --> F6["Contracts:<br/>schema · compatibility"]
+    F6 --> F7["Security:<br/>secrets · dependencies · SAST"]
+    F7 --> F8["Integration tests"]
+    F8 --> F9["E2E · visual · accessibility<br/>per criticality"]
+    F9 --> AR["Artefact"]
+    AR --> DE["Deployment"]
+    DE --> SM["Smoke tests"]
+    SM --> OB["Verification through<br/>observability"]
+
+    F1 -.->|"failure = immediate stop"| STOP["Feedback under 2 min"]
+    F5 -.->|"failure = architectural<br/>violation"| STOP2["A precise explanation<br/>+ the rule broken"]
+
+    style F5 fill:#065f46,color:#fff
+    style F6 fill:#065f46,color:#fff
+    style STOP fill:#1f2937,color:#fff
+    style STOP2 fill:#1f2937,color:#fff
+```
+
+**Legend** — green: the architecture gates · dark grey: what a failure must give back.
+
+**Do not apply every step mechanically to every module.** The level of validation is
+proportionate to the risk (§6).
+
+**Feedback time is a quality property.** A thirty-minute CI is a CI people work around,
+launch at the end of the day, and whose results they ignore. Feedback time is a tracked
+indicator (`10-measurement.md`).
+
+---
+
+## 9. The automation backlog
+
+Every rule that *should* be automated but is not yet is identified debt, not a fact of
+life. It sits in a dedicated backlog, with:
+
+- the rule and where it lives temporarily (a playbook, a local AGENTS.md);
+- the risk if it is violated;
+- the estimated cost of automating it;
+- the trigger that will make it a priority.
+
+That backlog is reviewed on the same rhythm as the decision review (`06-decisions.md`
+§6). It is the mechanism that stops the kernel growing: every rule added to the prompt
+arrives with its planned exit date.

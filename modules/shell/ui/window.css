@@ -1,0 +1,750 @@
+/* The window: the system's font; its colours, sizes and theme read from tokens.css (D120). */
+* { box-sizing: border-box; }
+::placeholder { color: var(--soft); opacity: 1; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 15px/1.45 system-ui, sans-serif;
+}
+/* An icon drawn (D69): Lucide's, 16 px (D89). */
+.glyph { flex: none; width: 16px; height: 16px; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+/* The name (D89), alone, in the ink as its board draws it; while recording, its dot red and larger. */
+.brand svg { flex: none; display: block; color: var(--ink); }
+#name-dot { fill: currentColor; }
+.brand.live #name-dot { fill: var(--red); }
+nav { display: flex; gap: 4px; }
+nav a {
+  display: inline-block; padding: 8px 14px; border-radius: 9px; color: var(--ink);
+  font-weight: 600; text-decoration: none;
+}
+nav a[aria-current="page"] { background: var(--raised); }
+a:focus-visible, button:focus-visible, .drawing:focus-visible, .lines li:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+.weight { padding: 20px 24px; display: flex; flex-direction: column; gap: 10px; }
+.total strong { font-size: 26px; letter-spacing: -0.02em; }
+.total span, .legend { color: var(--soft); }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
+.legend li { display: flex; align-items: center; gap: 7px; }
+.none { color: var(--soft); }
+.group { display: flex; flex-direction: column; gap: 10px; }
+.group h2 {
+  margin: 0 0 2px 4px; font-size: 13px; font-weight: 600; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--soft);
+}
+.group ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.session { color: inherit; text-decoration: none; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 16px 20px; }
+.session .when { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.session .day { font-size: 16.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session .on, .named .on { color: var(--soft); font-size: 13.5px; }
+.session .length { font-variant-numeric: tabular-nums; color: var(--soft); font-size: 13.5px; }
+.holds { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.chip { padding: 5px 10px; border-radius: 8px; background: var(--raised); }
+.chip.gone { background: transparent; border: 1px dashed var(--line); color: var(--soft); }
+.chip.live { color: var(--red); font-weight: 600; }
+.chip.cut { color: var(--soft); font-style: italic; }
+.session:hover { border-color: var(--accent); }
+.meeting-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.meeting-top .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+/* « Plus d’actions » (D89): its menu under the button, at its right edge. */
+.more { position: relative; }
+.menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
+.menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
+.menu-item:hover, .menu-item:focus { background: var(--raised); }
+/* D121: a deletion last in its menu, after a line, in the destructive role's colour (PDR-0008). */
+.menu-item.destructive { color: var(--color-destructive); }
+.menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--color-divider); }
+/* A meeting refused the trash (D100): said under its bar, nothing when nothing is said. */
+#trash-said:empty { display: none; }
+/* D121: the meeting's bar of actions, each its words beside its icon; « Agenda »'s count after its words. */
+.bar-action .count { font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
+.back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
+/* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
+.open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }
+/* A secondary action (#1094): on the raised ground, on the line, its bottom edged at 3:1 as Windows 11's
+   controls are — a signifier at rest —, a step darker under the pointer, another pressed; the one
+   primary of a view stays the filled accent. */
+.open { padding: 0 12px; font-weight: 600; cursor: pointer; border-color: var(--line); border-bottom-color: var(--edge); background: var(--raised); }
+.open:hover { background: var(--hover); }
+.open:active { background: var(--pressed); }
+/* A field is drawn on the surface (board 2's after); a secondary button on the raised ground. */
+.search { padding: 0 12px; min-width: 200px; background: var(--surface); border-color: var(--line); border-bottom-color: var(--edge); }
+/* A field (#1094, Fluent 2's): on the line at rest, its bottom edge at 3:1; edged all round when reached. */
+.search:hover, .search:focus { border-color: var(--edge); }
+/* In the transcript's head, the search takes the room the title leaves, Refaire… at its right
+   (D89, board 4). */
+.top > .finding { flex: 1 1 200px; max-width: 320px; margin-left: auto; }
+.top > .finding .search { width: 100%; }
+.made { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.made > .redo { flex-basis: 100%; }
+.meeting-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+/* The meeting's header (D89): its title at 18 px, its actions at its right. */
+#meeting { padding-top: 0; }
+.meeting-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.lasts { color: var(--soft); font-size: 13px; white-space: nowrap; }
+.lasts .length + .weighs::before { content: " · "; }
+/* D121: the name keeps 280 px at least; where the bar does not fit beside it, the bar goes under it, never squeezing it. */
+.meeting-head .meeting-title { flex: 1 1 280px; min-width: 0; }
+.meeting-head .meeting-top { flex: none; }
+.meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
+.meeting-title h1 .rename { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
+.meeting-title h1 .rename:hover { background: var(--raised); box-shadow: 0 0 0 4px var(--raised); }
+.meeting-title:has(.naming) h1 { flex: 1 1 100%; }
+.meeting-title h1 .naming { display: block; box-sizing: border-box; width: calc(100% + 9px); margin: -3px 0 -3px -9px; padding: 2px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; letter-spacing: inherit; }
+.meeting-title h1 .naming::placeholder { color: var(--soft); }
+.freeable .name { overflow-wrap: anywhere; }
+.named { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* In the meeting's header, the date on a line of its own above, the name and its length and weight on
+   one line, on one baseline, just after the name however short (board 4, D48). */
+.meeting-head .named { display: contents; }
+.meeting-head .named .on { flex: 1 1 100%; }
+.meeting-head .named h1 { min-width: 0; }
+.drawn { padding: 14px 18px 10px; display: flex; flex-direction: column; gap: 8px; }
+.relief { width: 100%; height: 88px; }
+.relief rect { rx: 2px; }
+/* The word a search found (#1078). */
+mark { background: var(--mark); color: var(--mark-ink); box-shadow: inset 0 -2px 0 var(--mark-edge); border-radius: 2px; }
+.relief .local { fill: var(--accent); }
+.relief .remote { fill: var(--ok); }
+.relief.quiet line { stroke-width: 2px; stroke-dasharray: 2 6; stroke-linecap: round; }
+.relief.quiet .local { stroke: var(--accent); }
+.relief.quiet .remote { stroke: var(--ok); }
+.drawn .legend .here { color: var(--accent); }
+.drawn .legend .remote { color: var(--ok); }
+/* The minutes, then the transcript; side by side once the pane is 1000 px wide, together as wide as
+   the audio above them, their text kept to a reading width (D61). */
+.columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
+@container pane (min-width: 1000px) { .columns { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.minutes .body, .transcript .lines { max-width: 75ch; }
+.minutes, .transcript { flex: 1 1 380px; min-width: 0; padding: 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+.label { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--soft); }
+.maker, .make-with, .note { margin: 0; color: var(--soft); font-size: 13px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.minutes-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.minutes-actions:has(> .redo) { flex-basis: 100%; }
+.minutes-actions > .redo { flex-basis: 100%; }
+/* The summary sent to a destination (D110): its panel, one button a destination; what leaves said first; the
+   outcome as a status; each send listed, quiet. */
+.send-panel { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.send-panel .send-notice { flex-basis: 100%; margin: 0; }
+.send-choices { display: flex; gap: 8px; }
+/* The speakers named (#1205): Settings' fields (.fields, .field), one per side; the hint, what is said and the
+   buttons below them, whole. */
+.speakers-panel { margin: 8px 0 12px; }
+.speakers-panel > .note, .speakers-choices { flex-basis: 100%; margin: 0; }
+.speakers-choices { display: flex; gap: 8px; }
+.send-said:empty { display: none; }
+.sends { list-style: none; margin: 4px 0 0; padding: 0; color: var(--soft); font-size: 13px; }
+.sends:empty { display: none; }
+.top > .redo { flex-basis: 100%; }
+.lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.lines li { display: flex; gap: 12px; align-items: baseline; }
+.lines .at { flex: 0 0 52px; color: var(--soft); font-size: 13px; font-variant-numeric: tabular-nums; }
+.said { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.who { font-size: 13px; font-weight: 600; }
+.who.local { color: var(--accent); }
+.who.remote { color: var(--ok); }
+.minutes .body h2 { margin: 12px 0 6px; font-size: 17px; }
+.minutes .body p { margin: 0 0 8px; }
+.minutes .body ul, .minutes .body ol { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+/* A line's time (D75): small and quiet, a link by its underline as much as by its colour. */
+.minutes .body time, .line-time { font: 12.5px ui-monospace, monospace; color: var(--soft); white-space: nowrap; }
+.line-time { min-height: 24px; padding: 0 2px; border: 0; border-radius: 4px; background: transparent; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.line-time:hover { color: var(--ink); }
+.minutes .body table.actions { width: 100%; margin: 0 0 8px; border-collapse: collapse; }
+.minutes .body table.actions th { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.minutes .body table.actions td { padding: 6px 16px 6px 0; vertical-align: baseline; border-top: 1px solid var(--line); }
+.minutes .body table.actions tr:first-child td { border-top: 0; }
+.minutes .body table.actions .who { width: 1%; color: var(--accent); font-weight: 600; white-space: nowrap; }
+.minutes .body table.actions .when { width: 1%; font: 13px ui-monospace, monospace; white-space: nowrap; padding-right: 0; text-align: right; }
+/* A long name or date comes back to the line, between words, in a column of its own width. */
+.minutes .body table.actions .long { min-width: 14ch; white-space: normal; overflow-wrap: break-word; }
+.minutes .body table.actions .unsettled { color: var(--soft); font-weight: 400; }
+/* The settings (D11's fourth board): cards, each titled inside; a step per model, on a raised ground. */
+/* Settings: one column centred at a maximum width, as GNOME's adaptive preferences (D95); nothing
+   wider than its card — a choice narrows to it, and what holds an unbreakable string breaks
+   anywhere: a folder's path, a model's id, a host; never a label's words (#782). */
+#settings { max-width: 720px; width: 100%; margin-inline: auto; }
+#settings code, #offered .name { overflow-wrap: anywhere; }
+/* A list's choice longer than its room — « … pas encore sur cet ordinateur » at 420 px — cut inside the list:
+   WebKitGTK lays a menulist's whole text out past its box, and the page scrolled sideways; paint containment
+   keeps that overflow in the list (#868). The whole choice stays its tooltip, and the state is said under it. */
+#settings select { max-width: 100%; min-width: 0; contain: paint; }
+#settings .picks { flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.general-advanced { display: flex; flex-direction: column; gap: 12px; }
+#settings .choices { display: flex; flex-direction: column; gap: 10px; }
+#settings .group { margin: 0; padding: 22px 24px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); }
+#settings .group h2 { font-size: 17px; font-weight: 700; letter-spacing: 0; text-transform: none; color: var(--ink); margin: 0; }
+.step { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--raised); }
+.step select, .step .open, .step input { background: var(--surface); }
+.step .open:hover { background: var(--hover); }
+.step .open:active { background: var(--pressed); }
+.status { margin: 0; font-size: 13.5px; color: var(--soft); display: flex; align-items: center; gap: 8px; }
+.status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--soft); flex: none; }
+.status.here::before { background: var(--ok); }
+.status:empty { display: none; }
+.status.online::before { background: var(--accent); }
+#settings .group > .row + .row, .general-advanced > .row + .row { border-top: 1px solid var(--line); padding-top: 14px; }
+.picks { display: flex; gap: 8px; align-items: center; }
+.picks input { width: 96px; min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
+#settings .state { flex-direction: row; align-items: center; justify-content: space-between; }
+.ready { color: var(--ok); font-weight: 700; white-space: nowrap; }
+/* The models to download (D37): a row each, its state at its end. */
+.step h3 { margin: 6px 0 0; font-size: 14px; font-weight: 700; }
+.offered { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.choice { display: flex; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--edge); cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--raised); }
+.choice input, .row input[type="checkbox"] { width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
+.said { display: flex; flex-direction: column; gap: 2px; flex: 1 1 320px; min-width: 0; }
+.said .name, .row > .name { font-weight: 600; }
+.says { color: var(--soft); font-size: 14px; margin: 0; }
+.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+select { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--surface); color: var(--ink); font: inherit; }
+select:hover, select:focus { border-color: var(--edge); }
+.warn { padding: 12px 16px; color: var(--ink); }
+/* The settings unreadable (#770): a strip above the page, its sentence and the way to Settings, as GNOME's banner. */
+.banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; margin: 16px 24px 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); color: var(--ink); }
+.banner p { margin: 0; }
+/* In developer mode, a command's raw failure on the line under its sentence (D47). */
+.warn, #language-said, #context-said, #correction-said, #minutes-tested, #transcription-said, #free-said, #welcome-said { white-space: pre-line; }
+.fields { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 5px; flex: 1 1 200px; }
+.keys { padding: 6px 10px; border-radius: 8px; background: var(--raised); font: 13.5px ui-monospace, monospace; }
+.folder input { flex: 1 1 240px; min-width: 0; min-height: 32px; padding: 0 10px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--soft); font: 13.5px ui-monospace, monospace; }
+.folder input:hover, .folder input:focus { border-color: var(--edge); background: var(--ground); color: var(--ink); }
+.field input { min-height: 32px; padding: 0 12px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--ground); color: var(--ink); font: inherit; }
+
+/* The agreement before a meeting first leaves (D11's fifth board). */
+#agree { align-items: center; }
+.agreement { width: min(560px, 100%); padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.agreement h1 { margin: 0; font-size: 22px; line-height: 1.25; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--soft); }
+.goes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.goes li { display: flex; gap: 14px; align-items: baseline; }
+.goes li > div { display: flex; flex-direction: column; gap: 2px; }
+.goes .sign { flex: 0 0 18px; color: var(--soft); }
+.goes .leaves .sign { color: var(--accent); }
+.goes .stays .sign { color: var(--ink); }
+.recipient { margin: 0; padding: 12px 16px; border-radius: 12px; background: var(--raised); display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
+.recipient dt { color: var(--soft); }
+.recipient dd { margin: 0; text-align: right; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.remember { display: flex; gap: 12px; align-items: center; cursor: pointer; }
+.remember input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.choices { display: flex; flex-wrap: wrap; gap: 10px; }
+.choices .primary { flex: 1 1 240px; }
+.choices .open { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.primary { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--accent); color: var(--surface); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: transform 120ms ease, filter 120ms ease; }
+.primary:hover { filter: brightness(1.08); }
+.primary:active { transform: translateY(1px); }
+.link { align-self: flex-start; padding: 6px 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; }
+.link:hover { text-decoration: underline; }
+
+/* The meetings by week (D11's first board): each week's title, then its meetings, a breath between weeks. */
+#groups { display: flex; flex-direction: column; gap: 24px; }
+.fields:empty { display: none; }
+/* The summary's guided steps (D95): a step's sentence, its « Avancé » and its fields each on a line. */
+.fields > .fields, .fields > .says, .fields > .disclose-advanced { flex-basis: 100%; }
+.fields > .disclose-advanced { justify-content: flex-start; }
+/* The destinations' add form (D110): apart from the list above it, the address on its own line. */
+.fields.adding { padding-top: 14px; border-top: 1px solid var(--line); }
+/* …a part of « Après un enregistrement » (D95's three groups), its heading as the redo panel's, its
+   disclosure on a line of its own. */
+.sending { display: flex; flex-direction: column; gap: 10px; border-top: 1px solid var(--line); padding-top: 14px; }
+.sending h3 { margin: 0; font-size: 15px; }
+.sending > .disclose-advanced { align-self: flex-start; }
+.fields > .field.whole { flex-basis: 100%; }
+.tag { margin-left: 6px; font: 12.5px ui-monospace, monospace; color: var(--soft); white-space: nowrap; flex: none; }
+.path { flex: 1 1 240px; min-width: 0; display: flex; align-items: center; text-align: left; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: text; }
+/* Its folders before its own cut in their middle by the page (#1232, `pathShown`): the name the user chose stays whole. */
+.path .drawn-path { display: flex; align-items: center; min-width: 0; }
+.path .lead { min-width: 0; white-space: pre; }
+/* Its own name whole; a name longer than the line breaks rather than hides (D95). */
+.path .last { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; color: var(--ink); }
+.path svg { flex: none; width: 16px; height: 16px; margin-right: 6px; }
+.path .sep { flex: none; white-space: pre; }
+.path:hover { border-color: var(--edge); color: var(--ink); }
+
+/* The sidebar's gesture and the list's rows (D11's first board). */
+.act { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.act .primary { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 12px; }
+.act .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+.act .primary.live { background: var(--red); }
+.act .primary.live .dot { animation: beat 1.2s ease-in-out infinite; }
+@keyframes beat { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .act .primary.live .dot { animation: none; } }
+.session { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px 22px; }
+.session .length { font-size: 13px; font-variant-numeric: tabular-nums; }
+.chevron { color: var(--soft); font-size: 22px; line-height: 1; transition: transform 120ms ease; }
+.session:hover .chevron { transform: translateX(3px); color: var(--accent); }
+@media (max-width: 640px) { .session { grid-template-columns: 1fr auto; } .session .chevron { display: none; } }
+
+/* One meeting (D11's second board): where each step ran, the relief's span, makers in monospace. */
+.drawn .legend .range { margin-left: auto; font: 12.5px ui-monospace, monospace; color: var(--soft); }
+/* The player (D26): the drawing is its control, a line marks where the playback is. */
+.drawn .drawing { position: relative; cursor: pointer; }
+/* Nothing drawn yet (#1134): the player's slider a bare track, as a scrubber; with no player, no track. */
+/* Its target 24 px high (WCAG 2.2, 2.5.8), taking the 14 px the 6 px rail took before; the rail drawn 6 px at its
+   centre, its own box; the playhead on the rail alone. */
+.drawn .drawing.bare { height: 24px; margin: -5px 0; }
+.drawn .drawing.bare::before { content: ""; position: absolute; left: 0; right: 0; top: 9px; height: 6px; border-radius: 3px; background: var(--edge); }
+.drawn .drawing.bare .playhead { top: 9px; bottom: 9px; }
+.drawn .drawing.bare:not([role="slider"]) { display: none; }
+/* A meeting's waveform per voice (#1201, #1179 B, ines's m1179b): yours above the line, the meeting's below, bars of
+   4 px at most; what was played whole, what remains at 0.7 — still 3:1 on the card in both themes (WCAG 2.2 1.4.11),
+   where the mock-up's 0.38 fell to 1.75:1. Its height that of the turns it replaces: nothing moves when it comes. */
+.drawn .wave { position: relative; display: flex; align-items: stretch; gap: 2px; height: 88px; padding: 8px 0; }
+.wave .col { flex: 1 1 0; min-width: 0; display: grid; grid-template-rows: 1fr 1fr; justify-items: center; row-gap: 2px; }
+.wave .col i { width: 100%; max-width: 4px; border-radius: 2px; opacity: 0.7; }
+.wave .col i.up { align-self: end; background: var(--accent); }
+.wave .col i.down { align-self: start; background: var(--ok); }
+.wave .col.played i { opacity: 1; }
+/* The time the pointer is over, as SoundCloud's and Descript's players say it; for the pointer alone: the slider says
+   its own time to a screen reader. */
+.wave .tip { position: absolute; bottom: calc(100% + 4px); transform: translateX(-50%); padding: 2px 6px; border-radius: 6px; background: var(--ink); color: var(--surface); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+.drawn .playhead { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.7; pointer-events: none; }
+.drawn .player { display: flex; align-items: center; gap: 12px; }
+.drawn .player .at { font: 12.5px ui-monospace, monospace; color: var(--soft); font-variant-numeric: tabular-nums; }
+.lines li { cursor: pointer; border-radius: 8px; }
+.lines li.now { background: var(--raised); box-shadow: 0 0 0 6px var(--raised); }
+/* A line corrected by whoever listens (D62): its pencil quiet until the line is pointed or reached. */
+.lines .edit { margin-left: auto; flex: 0 0 auto; min-width: 32px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--soft); font: inherit; cursor: pointer; opacity: 0.35; }
+.lines li:hover .edit, .lines li:focus-within .edit, .lines .edit:focus-visible { opacity: 1; }
+.lines .edit:hover { background: var(--raised); color: var(--ink); }
+.lines .edited { margin-left: 8px; font-size: 12px; color: var(--soft); }
+.lines .correcting { width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--accent); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.corrected-since { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 4px 0 8px; }
+.corrected-since .note { margin: 0; }
+.maker, .make-with { font-size: 13px; color: var(--soft); overflow-wrap: anywhere; }
+.minutes > .primary, .transcript > .primary { align-self: flex-start; }
+/* A version's model, a list in its line (D93): the line's own size, a long name cut at the card's width,
+   said whole in its tooltip; under the line, which model made the version, then the button that makes it again. */
+.maker .page-model, .make-with .page-model { min-height: 0; max-width: 100%; padding: 0 4px; border-radius: 6px; font: inherit; text-overflow: ellipsis; vertical-align: baseline; appearance: none; -webkit-appearance: none; border-color: transparent; background: transparent; color: var(--ink); font-weight: 600; cursor: pointer; }
+/* A step's model on its line (#1094): a quiet list, its value and Lucide's chevron, a ground under the pointer. */
+.maker .page-model:hover, .make-with .page-model:hover { background: var(--raised); }
+.maker .chevron, .make-with .chevron { margin-left: -4px; color: var(--soft); pointer-events: none; }
+.made > .maker { min-width: 0; }
+.made > .note { flex-basis: 100%; }
+.page-redo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.page-redo .says { margin: 0; }
+.made > .page-redo { flex-basis: 100%; }
+.page-redo .primary { max-width: 100%; padding-block: 6px; overflow-wrap: anywhere; text-align: start; }
+
+/* Refaire… (D11's sixth board): the model, a choice each, the note, the gesture. */
+.minutes { position: relative; }
+.redo { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 12px; background: var(--raised); }
+.redo h3 { margin: 0; font-size: 15px; }
+.redo .choice { align-items: center; background: var(--surface); }
+.redo .choice .said { flex: 1 1 auto; }
+
+/* Freeing space (D11's third board). */
+#free { max-width: 960px; }
+.weight .total { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ways { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.free-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.freeable { display: flex; align-items: center; gap: 16px; padding: 14px 18px; cursor: pointer; }
+.freeable:has(input:checked) { border-color: var(--accent); }
+.freeable input { width: 20px; height: 20px; accent-color: var(--accent); }
+.freeable .length { font: 13px ui-monospace, monospace; color: var(--soft); }
+.freeable .weighs { margin-left: auto; font: 600 15px ui-monospace, monospace; }
+.freeable.busy { cursor: default; opacity: 0.6; }
+.free-total { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 20px 24px; background: var(--raised); }
+/* Arrêter in the small window: red, as the recording it stops. */
+.danger { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
+.danger:disabled, .primary:disabled, .open:disabled, [aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.page-top { display: flex; align-items: baseline; gap: 18px; }
+.page-top h1 { margin: 0; font-size: 20px; }
+.free-total .total { display: flex; align-items: baseline; gap: 8px; }
+.free-total .total strong { font-size: 24px; }
+
+/* The recording bar (D90's boards): one row of 44 px on the surface, its controls 28 px; under it,
+   its options once opened, and the recording's view. */
+body.small-window { background: var(--surface); }
+body.small-window .frame { display: none; }
+#small { max-width: none; padding: 0; gap: 0; }
+#small .bar-row { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px 0 12px; }
+#small .bar-space { flex: 1 1 auto; }
+/* Said confidential while it records (#1204): the lock in the meeting's green, as « Confidentielle »'s chip (3:1 on the
+   surface at least, tests/look.rs). */
+#small .bar-locked { display: inline-flex; flex: none; margin-left: 8px; color: var(--ok); }
+#small .bar-locked .lock { color: inherit; }
+#small .bar-row .icon-button { width: 28px; min-height: 28px; }
+/* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
+#small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }
+.mark { display: block; width: 20px; height: 20px; fill: currentColor; }
+.mark .arms { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+.mark .live, .handle.live .mark .rest { display: none; }
+.handle.live .mark .live { display: inline; }
+#small .handle.live .dot { fill: var(--red); }
+#small .time { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+/* ● to record, a red ring holding a red dot that grows under the pointer; ■ to stop, red. */
+#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; border: 2px solid var(--red); border-radius: 50%; background: transparent; cursor: pointer; }
+#small .record .record-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--red); transition: transform 90ms ease-out; }
+#small .record:hover .record-dot { transform: scale(1.15); }
+#small .record:disabled { opacity: 0.45; cursor: default; }
+#small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
+#small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
+#small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
+/* A thin meter for each side in the row (D90, board 5): its icon, its trace 14 px high; a side silent two
+   minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
+#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+/* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
+   Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
+.live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
+.live-time { font-size: 26px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.2; }
+/* Two columns, each its meter over its label: the meter a block of its column's width and 24 px — never a flex item
+   of the column, whose basis would take its height (#1112, 3600377's shots). */
+.page-levels { display: flex; gap: 16px; width: min(100%, 480px); }
+.page-meter { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; gap: 6px; }
+.page-meter > .page-level { display: flex; flex: none; width: 100%; height: 24px; gap: 3px; }
+.page-meter > .page-level > i { flex-basis: 4px; }
+.page-meter > .here, .page-meter > .remote { font-size: 14px; overflow-wrap: anywhere; }
+.page-meter > .here { color: var(--accent); }
+.page-meter > .remote { color: var(--ok); }
+#small .meter { display: flex; align-items: center; gap: 6px; color: var(--soft); }
+#small .meter .track { flex: 1 1 auto; height: 14px; }
+#small .meter.quiet .track { height: 0; border-top: 2px dashed var(--edge); }
+#small .meter.quiet .track > i { display: none; }
+/* A level (#1179, the decider's « B · Trace »): its last readings as rounded bars, the newest at the right, each its
+   reading's height and never less than a dot — a trace that says « it records » even in a silence. The bars of a
+   fixed width, the oldest cut at the left: the bar's 120 px show its last two seconds, a wider track more. Drawn
+   at each reading, with no transition: less motion is the page's to draw (tests/meter.rs). Each side in its colour,
+   as board 5 draws it, on the surface or the ground (3:1, tests/look.rs). */
+.trace { display: flex; align-items: center; justify-content: flex-end; gap: 2px; overflow: hidden; }
+.trace > i { flex: none; flex-basis: 3px; min-height: 4px; height: 0; border-radius: 2px; background: var(--accent); }
+#level-others > i, .page-level.others > i, .check-source.far .check-track > i { background: var(--ok); }
+#small .bar-lines { display: flex; flex-direction: column; gap: 4px; padding: 0 16px; }
+#small .bar-lines > :last-child:not([hidden]) { margin-bottom: 8px; }
+#small .check-says { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; font-size: 12px; line-height: 1.3; color: var(--soft); }
+#small .small-announce.gone { display: none; }
+#small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
+#small #small-note { font-size: 12px; line-height: 1.25; }
+#small .bar-lines .small-said { margin: 0; }
+/* D92: the meeting last stopped, one line under the row at rest — cut by an ellipsis, the whole its tooltip —,
+   « Ouvrir » beside it; its live region unseen, at the window's top, never past its edge. */
+#small .small-last { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 12px; line-height: 1.3; }
+#small #small-last-said { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#small .small-last .link { flex: none; font-size: 12px; line-height: 1.3; }
+#small-last-live { top: 0; left: 0; }
+.small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
+#small .link { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+/* The microphone's name, and its list under it, the bar growing to hold it (D74, D90). */
+.small-microphone { position: relative; }
+.small-microphone[hidden] { display: none; }
+#small .small-microphone .disclose { min-height: 28px; gap: 8px; }
+.small-microphone .named { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.small-microphones { margin-top: 4px; max-height: 240px; display: flex; flex-direction: column; gap: 4px; padding: 6px; overflow: hidden auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.small-microphones[hidden] { display: none; }
+.small-microphones .choice { flex: none; padding: 6px 10px; gap: 10px; }
+.small-microphones .said { min-width: 0; }
+.small-microphones .name, .small-microphones .says { display: block; overflow-wrap: anywhere; }
+/* The bar opened (D90, board 6): recording, the microphone recorded under its name; at rest « Vérifier le
+   son » and its line; « Avancé » under a divider, closed, its chevron before its word. */
+#small #small-microphone-next { margin: -8px 0 0; font-size: 12px; line-height: 1.3; }
+#small #small-microphone-next[hidden] { display: none; }
+/* The context before the start, in the row at rest (D91, board 5): the room the row leaves, 28 px high, its
+   ✕ inside it; under the row while one is kept, that it waits for the next recording. */
+#small .next-context { position: relative; flex: 1 1 auto; min-width: 0; margin-right: 4px; }
+#small .next-context-text { width: 100%; height: 28px; padding: 0 30px 0 8px; border: 1px solid var(--edge); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
+#small .next-context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+#small .bar-row .next-context .icon-button { position: absolute; top: 2px; right: 2px; width: 24px; min-height: 24px; }
+#small #small-context-kept { margin: 0; font-size: 12px; line-height: 1.3; }
+.small-check { display: flex; align-items: center; gap: 10px; }
+#small .small-check .open { flex: none; min-height: 28px; padding: 0 10px; font-size: 13px; white-space: nowrap; }
+.small-check .says { min-width: 0; font-size: 12px; line-height: 1.3; }
+.disclose-advanced { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px 0 0; border: 0; border-radius: 6px; background: none; color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
+.models-advanced-panel { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.models-advanced-panel .says, .models-advanced-panel .note { margin: 0; font-size: 12px; line-height: 1.3; }
+/* Each model on its line, its name above its list, as board 6 draws them; the list as wide as the panel. */
+.models-row { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.models-row .name { font-size: 12.5px; font-weight: 600; }
+.models-row select { width: 100%; min-width: 0; font-size: 14px; text-overflow: ellipsis; }
+.models-row .whole { font-size: 12px; line-height: 1.3; overflow-wrap: anywhere; }
+.models-row .whole[hidden] { display: none; }
+.redo .models-advanced { margin: 4px 0 8px; }
+/* D88's panel in the bar: in place of its row and options, as wide as it, the bar as tall as the panel. */
+body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 100%; max-height: none; margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.small-microphones .says { font-size: 12px; line-height: 1.25; }
+.small-microphones .says:empty { display: none; }
+.small-microphones > .says { margin: 4px 10px; }
+
+/* What is made in the background (D25): said on the meeting's page, and on a list's row. */
+.chip.making { color: var(--accent); font-weight: 600; }
+.chip.making.failed { color: var(--ink); }
+.making-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raised); }
+.making-state .what { font-weight: 600; }
+.making-state .by { color: var(--soft); font-size: 14px; }
+.making-state.failed { background: transparent; border: 1px solid var(--edge); }
+.making-state .detail { flex-basis: 100%; color: var(--soft); font-size: 13px; overflow-wrap: anywhere; }
+.making-state.failed .what { color: var(--ink); font-weight: 600; }
+@keyframes travel { from { background-position: -40% 0, 0 0; } to { background-position: 140% 0, 0 0; } }
+/* D92: a meeting's making, one bar across both steps under its head: the step, what makes it, « Annuler »,
+   then a part per step — full once done, the one running moving, the next one empty —, never back. */
+.card.making { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.card.making .what { font-weight: 600; }
+.card.making .by { flex: 1 1 auto; color: var(--soft); font-size: 14px; }
+.card.making .left { color: var(--ink); font-size: 14px; white-space: nowrap; }
+.card.making .segments { display: flex; gap: 4px; flex-basis: 100%; }
+/* Each part at 3:1 at least against the card, the step to come too (WCAG 2.2 SC 1.4.11, #954): --edge, as the controls' border. */
+.card.making .segment { flex: 1; height: 4px; border-radius: 2px; background: var(--edge); }
+.card.making .segment[data-state="done"] { background: var(--accent); }
+.card.making .segment[data-state="running"] { background: linear-gradient(90deg, transparent, var(--accent), transparent) 0 0 / 40% 100% no-repeat, var(--edge); animation: travel 1.4s ease-in-out infinite; }
+/* Still, never dimmed, never a partial fill, which reads as progress: the whole part striped --accent on --edge, a
+   pattern a part done (solid --accent) does not have, each colour at 3:1 (WCAG 2.2 SC 2.3.3, 1.4.1, 1.4.11; #954). */
+@media (prefers-reduced-motion: reduce) { .card.making .segment[data-state="running"] { animation: none; background: repeating-linear-gradient(90deg, var(--accent) 0 6px, var(--edge) 6px 10px); } }
+
+/* The first run's assistant (D58's board): one card, centred, alone in the window; its answers
+   are radio cards, the setting said in a tinted band, then plain rows. */
+#welcome { min-height: 100vh; justify-content: center; align-items: center; padding: 24px 16px; }
+/* Wider as the window widens, never a narrow card lost in it: two thirds of it, 560 to 760 px. */
+.welcome { width: min(100%, clamp(560px, 64vw, 760px)); padding: 20px; display: flex; flex-direction: column; gap: 14px; animation: arrive 180ms ease-out; }
+@keyframes arrive { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .welcome { animation: none; } }
+.welcome-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.welcome h1 { margin: 0; font-size: 22px; line-height: 1.3; letter-spacing: -0.01em; }
+.welcome h1:focus { outline: none; }
+.welcome-eyebrow { margin: 0 0 -8px; font-size: 15px; }
+.welcome > .says { margin-top: -6px; }
+.welcome-choices { display: flex; flex-direction: column; gap: 10px; }
+.welcome .choice { padding: 10px 14px; gap: 10px; border-width: 1.5px; transition: border-color 120ms ease, box-shadow 120ms ease; }
+.welcome .choice:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--edge)); }
+.welcome .choice:has(input:checked) { background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.choice:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.welcome-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 4px; }
+.welcome-actions .link { align-self: center; color: var(--soft); }
+.welcome-actions .primary { margin-left: auto; }
+.welcome-top .link { color: var(--soft); }
+.welcome-mode { padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); display: flex; flex-direction: column; gap: 2px; }
+.welcome-mode.connected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.welcome-mode h1 { font-size: 19px; }
+.welcome-mode p { margin: 0; color: var(--soft); font-size: 14px; }
+.welcome-facts { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; }
+.welcome-facts dt { color: var(--soft); }
+.welcome-facts dd { margin: 0; display: flex; flex-wrap: wrap; column-gap: 8px; }
+.welcome-facts dd .says::before { content: "· "; }
+.welcome-wait { padding: 10px 12px; border-radius: 10px; background: var(--raised); }
+.welcome-from { margin-top: -8px; font-size: 13px; text-align: right; }
+.welcome-said:empty { display: none; }
+@media (max-width: 480px) {
+  .welcome { padding: 18px; }
+  .welcome-facts { grid-template-columns: 1fr; gap: 2px; }
+  .welcome-facts dd { margin-bottom: 8px; }
+  .welcome-from { text-align: left; }
+}
+
+/* A meeting's settings (D89, board 4): one row of 32 px controls, their sentences under it. */
+.settings { display: flex; flex-direction: column; gap: 8px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.setting { display: inline-flex; align-items: center; gap: 8px; min-height: 32px; min-width: 0; max-width: 100%; overflow: hidden; padding: 0 10px; border-radius: 8px; border: 1px solid; border-color: var(--line); border-bottom-color: var(--edge); background: var(--surface); color: var(--soft); font: inherit; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+.setting:hover { background: var(--raised); border-color: var(--edge); }
+.setting .value { min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; color: var(--ink); font-weight: 500; }
+.setting select { appearance: none; -webkit-appearance: none; min-width: 0; min-height: 0; max-width: 28ch; padding: 0 4px 0 0; border: 0; background: transparent; color: var(--ink); font-size: 13.5px; font-weight: 500; cursor: pointer; }
+.setting select:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+/* The language's list drawn as board 4's: its value and a chevron, the system's box not drawn. */
+.setting .chevron { margin-left: -4px; color: var(--soft); pointer-events: none; }
+/* « Confidentielle »'s switch (board 4): the same checkbox, its role switch, drawn as a track and
+   its knob — off at the start, the knob soft; on, the track in the accent, the knob at the end. */
+.setting input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 32px; height: 20px; margin: 0; border: 1px solid var(--edge); border-radius: 10px; background: radial-gradient(circle closest-side, var(--soft) 82%, transparent 90%) no-repeat 2px 50% / 14px 14px, var(--raised); cursor: pointer; transition: background-position 120ms ease; }
+.setting input[type="checkbox"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.setting input[type="checkbox"]:checked { border-color: var(--accent); background: radial-gradient(circle closest-side, var(--surface) 82%, transparent 90%) no-repeat calc(100% - 2px) 50% / 14px 14px, var(--accent); }
+/* Read by a screen reader, not drawn. */
+.unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.settings .left { margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+/* A meeting's context (D59's board): a field, its count, closed while a making runs; opened from its row (D89). */
+.context-panel { padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.context-label { font-weight: 600; font-size: 14.5px; }
+.context-text { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--edge); background: var(--ground); color: var(--ink); font: inherit; font-size: 14px; line-height: 1.4; resize: vertical; }
+.context-text:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.context-text[readonly] { background: var(--raised); color: var(--soft); }
+.context-count { font-size: 12.5px; color: var(--soft); font-variant-numeric: tabular-nums; line-height: 1.35; }
+.context-count.other-script { color: var(--ink); }
+.context .says:empty { display: none; }
+#context-said { color: var(--ink); font-weight: 500; }
+.context-changed { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 4px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.context-changed .says { flex: 1 1 240px; color: var(--ink); }
+#small .disclose { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 40px; font-size: 14px; text-align: left; }
+#small .disclose .chevron { color: var(--soft); font-size: 13px; }
+.small-context { display: flex; flex-direction: column; gap: 5px; margin-top: -4px; }
+#small .context-text { resize: none; }
+
+/* A meeting said confidential (D60's board): the settings' switch, a lock before its words. */
+.lock { color: var(--soft); }
+.confidential { flex-wrap: nowrap; gap: 10px; cursor: pointer; }
+.confidential .said { flex: 1 1 auto; }
+.confidential .says { font-size: 13px; }
+.confidential.on .lock { color: var(--ok); }
+.confidential input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.chip.locked { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 600; }
+.chip.locked .lock { color: inherit; }
+#small .confidential .name { font-size: 14px; }
+#small .confidential .says { font-size: 12.5px; }
+
+/* The window in two panes (D61's board): the meetings in a sidebar of 280 px, the one chosen in the
+   pane beside it, as wide as the window leaves it; under 840 px, one at a time. */
+.frame { display: flex; align-items: flex-start; min-height: 100vh; }
+.sidebar {
+  position: sticky; top: 0; width: 280px; height: 100vh; flex: none; display: flex; flex-direction: column;
+  gap: 10px; padding: 14px 12px 10px; background: var(--surface); border-right: 1px solid var(--line);
+}
+.side-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.side-top .brand { font-size: 16px; gap: 8px; }
+.side-top #fold { flex: none; }
+.sidebar .act { margin: 0; flex-direction: column; align-items: stretch; gap: 4px; }
+.sidebar .act .primary { justify-content: center; min-height: 32px; padding: 0 12px; white-space: nowrap; }
+.sidebar .search { min-width: 0; width: 100%; }
+/* The search field, its icon in it (D89). */
+.finding { position: relative; }
+.finding .glyph { position: absolute; left: 10px; top: 8px; color: var(--soft); pointer-events: none; }
+.finding .search { padding-left: 32px; }
+#list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 4px 4px; margin: 0 -4px; gap: 10px; }
+.sidebar .group { gap: 2px; }
+.sidebar .group h2 { margin: 6px 0 2px 10px; font-size: 11.5px; }
+.sidebar .group ol { gap: 2px; }
+.sidebar .session {
+  display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 4px; padding: 8px 10px;
+  border: 0; border-radius: 10px; background: transparent;
+}
+.sidebar .session .line { display: flex; align-items: flex-end; gap: 8px; }
+/* What a meeting holds, at its row's end: an icon each, 16 px (boards 2 and 4). */
+.marks { display: inline-flex; gap: 6px; color: var(--soft); font-size: 16px; line-height: 1; }
+/* Lighter than a control's glyph (#1094): a mark says what is there, it is not a button. */
+.marks .glyph { stroke-width: 1.75; }
+.sidebar .holds:not(:has(> :not([hidden]))) { display: none; }
+.sidebar .session .when { flex: 1 1 auto; }
+.sidebar .session .day { font-size: 14px; }
+.sidebar .session .on { font-size: 12px; }
+.sidebar .holds { gap: 4px; font-size: 11.5px; }
+.sidebar .chip { padding: 2px 6px; border-radius: 6px; }
+.sidebar .session:hover { background: var(--raised); }
+.sidebar .session[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); box-shadow: inset 3px 0 0 var(--accent); }
+.foot { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.foot .weight { padding: 0 4px; gap: 6px; font-size: 12.5px; }
+.foot .total { gap: 4px; color: var(--soft); }
+.foot .total strong { font-size: inherit; color: var(--ink); }
+/* The foot's tools (D89): freeing space and the recording bar, Réglages at the end. */
+.foot nav { display: flex; align-items: center; gap: 4px; margin: 0 -4px; }
+.foot nav #settings-link { margin-left: auto; }
+.foot nav a[aria-current="page"] { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); }
+.pane { flex: 1; min-width: 0; container: pane / inline-size; }
+/* « Enregistré » laid over its own line, never in its flow (D101): over the description it hides the
+   while, right-aligned at its end — or on the name's line —, the line's box holding it. */
+.saying { position: relative; }
+.saved-said { position: absolute; margin: 0; color: var(--ok); font-size: 13px; line-height: 1.35; text-align: right; white-space: nowrap; pointer-events: none; }
+.saved-under { visibility: hidden; }
+.redo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+/* The button that starts names its model (D96): a long name wraps inside the panel, never past it. */
+.redo-actions .primary { max-width: 100%; padding-block: 6px; overflow-wrap: anywhere; text-align: start; }
+.pane > .back { display: none; }
+#pane-again { margin: 8px 16px; align-self: flex-start; }
+/* A page come after one left: it arrives, rather than blinks. */
+.arriving > * { animation: page-arrives 120ms ease-out; }
+@keyframes page-arrives { from { opacity: 0.4; } }
+/* Folding the sidebar (D61): its button at its top, the one that brings it back at the pane's. */
+/* An icon button has no border (GNOME HIG, header bars): its tooltip and its name say it (D89). */
+.icon-button { display: inline-grid; place-items: center; width: 32px; min-height: 32px; padding: 0; border-radius: 8px; border: 0; background: transparent; color: var(--soft); font-size: 16px; cursor: pointer; }
+.icon-button:hover { background: var(--raised); color: var(--ink); }
+.icon-button:active { background: var(--pressed); color: var(--ink); }
+.pane > #unfold { display: none; margin: 14px 0 0 16px; }
+@media (min-width: 840px) {
+  body.folded .sidebar { display: none; }
+  body.folded .pane > #unfold { display: inline-grid; }
+}
+.empty { padding: 28px 24px; }
+.small-said { margin: 8px 0 0; padding: 0; }
+.empty .card { max-width: 480px; padding: 22px 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.empty .none { margin: 0; color: var(--ink); font-weight: 600; }
+.empty .says { margin: 0; }
+.empty .folder { margin: 0; color: var(--soft); font-size: 12.5px; overflow-wrap: anywhere; }
+/* Waiting for what it needs, the transcript says that alone (#775): not also that there is none. */
+#transcript-state:not([hidden]) ~ .none { display: none; }
+/* Too low for the list to hold between the gesture and the foot: the sidebar scrolls with the page. */
+@media (max-width: 839px), (max-height: 559px) {
+  .sidebar { position: static; height: auto; min-height: 100vh; }
+  #list { flex: none; overflow: visible; }
+}
+@media (max-width: 839px) {
+  .sidebar { width: 100%; border-right: 0; }
+  #fold { display: none; }
+  body[data-at="list"] .pane, body[data-at="page"] .sidebar { display: none; }
+  body.no-meeting .frame { flex-direction: column; align-items: stretch; }
+  body.no-meeting .sidebar { min-height: 0; }
+  body.no-meeting[data-at="list"] .pane { display: block; }
+  /* A sentence of the pane said at the list's address: it alone above the list, the pane's other
+     children — what to do with no meeting — staying under the header. */
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .frame { flex-direction: column; align-items: stretch; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane { display: contents; }
+  body[data-at="list"]:has(#pane-said:not([hidden])) #pane-said, body[data-at="list"]:has(#pane-said:not([hidden])) #pane-again, body[data-at="list"] #settings-banner-live { order: -1; }
+  body[data-at="list"]:has(#pane-said:not([hidden]), #settings-banner) .pane > .back { display: none; }
+  .pane > .back { display: inline-block; margin: 8px 0 0 16px; }
+  .pane > main { padding: 12px 16px 40px; }
+  .meeting-head { margin: 0 -16px; padding: 8px 16px; }
+}
+
+/* A little motion (D69): one fade between the small window's two states, one pop when a chip turns. */
+.small-rest, .small-live { animation: settle 160ms ease-out; }
+@keyframes settle { from { opacity: 0; } }
+.turned { animation: chip-turn 180ms ease-out; }
+@keyframes chip-turn { from { opacity: 0.4; transform: scale(0.94); } }
+@media (prefers-reduced-motion: reduce) { .small-rest, .small-live, .turned { animation: none; } }
+
+/* Last, for all of it: who asked for less motion is given none — hover, levels and chevrons too (D69). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+/* « Vérifier le son » (D88, board 7): a modal panel, 440 px wide at most; each side its name, its
+   device and an 8 px meter — the microphone's in the accent, the meeting's in green —, a sentence
+   per case, the test sound and the recording's start, the microphone's note under them. */
+.check-sound { width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); box-shadow: 0 8px 28px rgb(0 0 0 / 0.18); }
+.check-sound::backdrop { background: rgb(0 0 0 / 0.32); }
+.check-sound > * { margin: 0 16px; }
+.check-head { display: flex; align-items: center; gap: 12px; margin: 0; padding: 8px 8px 8px 16px; border-bottom: 1px solid var(--line); }
+.check-head .mark { width: 20px; height: 20px; flex: none; border-radius: 5px; background: var(--accent); color: var(--surface); padding: 2px; }
+.check-head h2 { flex: 1 1 auto; margin: 0; font-size: 15px; font-weight: 600; }
+.check-source { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.check-top { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.check-name { font-weight: 600; }
+.check-device { margin-left: auto; color: var(--soft); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check-track { height: 28px; gap: 4px; }
+.check-track > i { flex-basis: 6px; border-radius: 3px; }
+/* « Dates mentionnées » (D115): « Vérifier le son »'s panel, each date ticked or not, its passage under it. */
+.dates-day { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+.dates-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.dates-what { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.dates-when { font-weight: 600; }
+.dates-passage { margin: 4px 0 0 26px; padding-left: 10px; border-left: 2px solid var(--line); color: var(--soft); font-size: 13px; white-space: pre-line; }
+.dates-goes { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 0; }
+.check-said { display: flex; gap: 8px; align-items: flex-start; margin-top: 14px; font-size: 12.5px; line-height: 1.4; color: var(--soft); }
+.check-said .glyph { margin-top: 1px; }
+.check-said.okay { color: var(--ok); font-weight: 600; font-size: 13px; }
+.check-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+/* Both on one row at 440 px, as the board draws them: 13 px, 10 px aside; narrower, they wrap. */
+.check-actions button { font-size: 13px; padding: 0 10px; white-space: nowrap; }
+.with-icon { display: inline-flex; align-items: center; gap: 8px; }
+.check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.check-actions .open:disabled { border-style: dashed; border-color: var(--edge); color: var(--soft); cursor: default; }
+.check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }
+/* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
+.icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
+.icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+/* A brand's mark, as its owner gives it (#1238): 16 px, never recoloured; OpenRouter's Ink on light, Cloud on dark. */
+.brand-mark { display: inline-flex; flex: none; }
+.brand-mark img { width: 16px; height: 16px; object-fit: contain; }
+.brand-mark .on-dark { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .brand-mark .on-light { display: none; } :root:not([data-theme="light"]) .brand-mark .on-dark { display: inline; } }
+:root[data-theme="dark"] .brand-mark .on-light { display: none; }
+:root[data-theme="dark"] .brand-mark .on-dark { display: inline; }
+/* A destination's kind, a tile each (#1238). */
+.kinds .tiles { display: flex; flex-wrap: wrap; gap: 8px; }
+.kinds .tile { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--edge); border-radius: 10px; cursor: pointer; }
+.kinds .tile:has(input:checked) { border-color: var(--accent); background: var(--raised); }
+.kinds .tile:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.kinds .tile input { margin: 0; accent-color: var(--accent); }
+.kinds .tile .glyph, .send-to .glyph, #destinations .glyph, .service-mark .glyph { width: 16px; height: 16px; flex: none; }
+#destinations li > .brand-mark, #destinations li > .glyph { align-self: center; margin-right: 8px; }
+.send-to { display: inline-flex; align-items: center; gap: 8px; }
+#model-fetch .brand-mark { margin-right: 8px; vertical-align: -3px; }
+.with-mark { display: flex; align-items: center; gap: 8px; }
+.with-mark select { flex: 1 1 auto; min-width: 0; }
+/* A summary's section with nothing in it (#1234): said, in the soft colour. */
+.minutes .body .empty-section { color: var(--soft); }

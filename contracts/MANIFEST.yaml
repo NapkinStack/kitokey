@@ -1,0 +1,37 @@
+module:
+  name: contracts
+  responsibility: >
+    Defines and versions the interface contracts between modules.
+  owner: "NapkinStack/maintainers"
+  contact: "https://github.com/NapkinStack/kitokey/discussions"
+  lifecycle: active
+  criticality: high
+  user_facing: false
+
+provides: []
+consumes: []
+data:
+  owns: []
+  shared: []
+dependencies:
+  - name: jsoncompat
+    purpose: Says whether a contract's schema, as changed, still allows only what the merged one allowed
+    adr: docs/adr/0005-a-contract-carries-a-schema-and-a-comparator-judges-its-changes.md
+    exit_strategy: >
+      One call, analyze_compat, in scripts/compat.py, held by tests/test_compat.py on changes
+      made there; any comparator of JSON Schemas that passes them replaces it.
+
+# What `nstack <verb> contracts` runs, from this folder. `compat` is the project's
+# comparator (rule V1): it is run as merged, with the version as merged in
+# $NSTACK_BASE_PATH and the version as changed in $NSTACK_HEAD_PATH, and exits 0 when the
+# change is compatible. It compares the schemas a version holds, never its pages.
+commands:
+  bootstrap: uv sync --locked
+  check: uv run --locked ruff check . && uv run --locked ruff format --check .
+  test: uv run --locked pytest -q
+  compat: uv run --locked python scripts/compat.py
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  runbook: docs/runbook.md

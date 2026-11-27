@@ -1,0 +1,22 @@
+---
+// The site's root: the landing in French, the decider's language (proposal D); English one link away.
+import "../styles/site.css";
+import { open } from "../../site.config.mjs";
+---
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="refresh" content="0; url=/fr/" />
+    <link rel="canonical" href="https://kitokey.com/fr/" />
+    <title>Kitokey</title>
+    {!open && <meta name="robots" content="noindex" />}
+  </head>
+  <body>
+    <main class="wrap prose">
+      <h1>Kitokey</h1>
+      <p><a href="/fr/">Kitokey en français</a> · <a href="/en/" hreflang="en" lang="en">Kitokey in English</a></p>
+    </main>
+  </body>
+</html>

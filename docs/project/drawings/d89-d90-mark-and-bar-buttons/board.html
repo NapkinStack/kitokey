@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, deuxième tour : la marque et les boutons de la barre</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes, with the first round's --edge.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Everything is drawn at its size unless a title says
+     otherwise. Yellow = the author's notes and measures, never part of the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  p { margin: 0; }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .tab { font-variant-numeric: tabular-nums; }
+  .k { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--note); color: var(--note-ground); font: 700 11px/1 system-ui, sans-serif; }
+  .anchor { position: relative; }
+  .pin { position: absolute; z-index: 3; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+
+  /* ——— Board 1 · the marks ——— */
+  .cands { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  .cand { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .cand .name { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .cand .name .l { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+  .cand .idea { font-size: 12.5px; color: var(--soft); min-height: 54px; }
+  .tiles { display: flex; align-items: flex-end; gap: 10px; }
+  .tray { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 8px; font-size: 10px; }
+  .tray.darkbar { background: #000; color: #FFF; --dot-rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --dot-rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .big { display: flex; justify-content: space-between; align-items: flex-end; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 20px 28px; }
+  .big .one { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 12px; color: var(--soft); }
+
+  /* ——— Board 2 · the bar ——— */
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fld .val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The two new buttons: 28 px, round to record, rounded square to stop; red for recording alone. */
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .rb.hover i { width: 16px; height: 16px; }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .live { width: 10px; height: 10px; border-radius: 50%; background: var(--red); flex: none; margin: 0 4px 0 6px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--red) 22%, transparent); }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .tip { position: absolute; z-index: 4; padding: 4px 8px; border-radius: 6px; background: var(--ink); color: var(--ground); font-size: 12px; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.18); }
+  .tip kbd { font: inherit; opacity: .75; margin-left: 6px; }
+  .ghost { outline: 2px dashed var(--note-line); outline-offset: 2px; border-radius: 6px; }
+  table.names { border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 13px; width: 100%; }
+  table.names th { text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--soft); padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  table.names td { padding: 6px 12px; border-top: 1px solid var(--line); vertical-align: middle; }
+  table.names tr:nth-child(2) td { border-top: 0; }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<!-- Lucide 1.14.0, ISC -->
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+
+<!-- Five marks, each on a 24 grid, stroke 2.5, round ends; --dot is the part that turns red while recording. -->
+<!-- C · La bulle : a speech bubble holding the recording dot. -->
+<symbol id="m-c" viewBox="0 0 24 24"><path d="M7 4h10a4 4 0 0 1 4 4v5a4 4 0 0 1-4 4h-4.5L8 20.5V17H7a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/><circle cx="12" cy="10.5" r="3" style="fill:var(--dot,currentColor)"/></symbol>
+<!-- D · La clé sonore : a key whose bow holds the dot and whose teeth are a sound wave. -->
+<symbol id="m-d" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4.25" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="7" cy="12" r="1.6" style="fill:var(--dot,currentColor)"/><path d="M11.25 12H21.5M15 8.5v7M18.5 10v4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
+<!-- E · Deux voix : two discs that overlap, you and the others, the meeting's two sides. -->
+<symbol id="m-e" viewBox="0 0 24 24"><circle cx="15" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="8.5" cy="12" r="5.5" style="fill:var(--dot,currentColor)"/></symbol>
+<!-- G · Kito : a small round face wearing a headset, listening. -->
+<symbol id="m-g" viewBox="0 0 24 24"><path d="M4.5 14v-2a7.5 7.5 0 0 1 15 0v2" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><rect x="2.5" y="12.5" width="4" height="7" rx="2" style="fill:var(--dot,currentColor)"/><rect x="17.5" y="12.5" width="4" height="7" rx="2" style="fill:var(--dot,currentColor)"/><circle cx="10" cy="14.5" r="1.4" fill="currentColor"/><circle cx="14" cy="14.5" r="1.4" fill="currentColor"/><path d="M10.2 18.2q1.8 1.3 3.6 0" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+<!-- H · L'onde : the recording dot and two arcs, the sound it takes in. -->
+<symbol id="m-h" viewBox="0 0 24 24"><circle cx="8.5" cy="12" r="4" style="fill:var(--dot,currentColor)"/><path d="M15 7.5a6.5 6.5 0 0 1 0 9M18.5 4.5a10.5 10.5 0 0 1 0 15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
+</defs>
+</svg>
+
+<!-- ═══════════════ 1 · CINQ MARQUES ═══════════════ -->
+<section data-board="1">
+  <h2>1 · La marque de Kitokey, deuxième tour — cinq pistes, une à garder (D89)</h2>
+  <div class="cands" data-cands></div>
+  <h3 style="margin-top:24px">Les cinq côte à côte, à 128 px — l’icône des applications, du Store, du .deb et du .rpm</h3>
+  <div class="big" data-big></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le premier tour (un « K » et un point) disait la lettre plutôt que le produit : ces pistes montrent ce que fait Kitokey (écouter une réunion, garder les deux côtés, en tirer l’essentiel) avec une forme simple qu’on reconnaît à 16 px.</li>
+      <li><b style="display:inline">C · La bulle</b> est la plus lisible et dit « conversation » ; <b style="display:inline">G · Kito</b> est la plus ludique : un personnage peut vivre dans le produit (états vides, aide) ; <b style="display:inline">E · Deux voix</b> est la plus sobre et la plus propre au produit (les deux pistes).</li>
+      <li>La recommandation de l’auteur : <b style="display:inline">C</b>, ou <b style="display:inline">G</b> si Kitokey doit d’abord être sympathique. D et H se lisent moins bien à 16 px ou ressemblent à beaucoup d’autres (H : l’icône « diffusion » de nombreux podcasts).</li>
+      <li>Toutes gardent le carreau de l’accent (#2253CF) et ne changent pas avec le thème ; pendant un enregistrement, dans la barre système, la partie marquée devient rouge (#FF7A72 sur une barre sombre, #C2352D sur une claire) et la forme ne bouge pas.</li>
+      <li>La recherche de marque déposée (Plus tard du cycle 08) passe avant toute publication de la marque gardée.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 2 · LA BARRE, BOUTONS EN ICÔNES ═══════════════ -->
+<section data-board="2">
+  <h2>2 · La barre — « Enregistrer » et « Arrêter » deviennent ● et ■, 440 × 44 px, à taille réelle (D90)</h2>
+  <div class="row" style="gap:40px">
+    <div class="col" style="gap:20px">
+      <div class="col" style="gap:6px"><h3>Au repos</h3><div data-bar="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Au repos, survolé — l’infobulle</h3><div class="anchor" style="margin-bottom:30px" data-bar="rest-tip"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div data-bar="rec"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement, survolé</h3><div class="anchor" style="margin-bottom:30px" data-bar="rec-tip"></div></div>
+      <div class="col" style="gap:6px"><h3>Au clavier — le focus sur ●</h3><div class="anchor" data-bar="rest-keys"></div></div>
+      <div class="col" style="gap:6px"><h3>Avant — le premier tour</h3><div data-bar="before"></div></div>
+    </div>
+    <div class="col" style="flex:1">
+      <h3>Les deux boutons, à 28 px puis grossis 3 ×</h3>
+      <div style="display:flex;gap:28px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 20px;height:120px">
+        <span class="rb"><i></i></span><span class="rb hover"><i></i></span><span class="sq"><i></i></span>
+        <span style="width:1px;align-self:stretch;background:var(--line)"></span>
+        <span class="rb" style="transform:scale(3);margin:0 30px"><i></i></span><span class="sq" style="transform:scale(3);margin:0 30px"><i></i></span>
+      </div>
+      <div class="cap">Repos · survol (le point grossit de 14 à 16 px) · enregistrement</div>
+      <h3 style="margin-top:12px">Ce que disent les deux boutons</h3>
+      <table class="names">
+        <tr><th>Bouton</th><th>Infobulle</th><th>Nom accessible</th><th>Touches</th></tr>
+        <tr><td><span class="rb" style="display:inline-grid;vertical-align:middle"><i></i></span></td><td>Démarrer un enregistrement · Super + Alt + M</td><td>Démarrer un enregistrement / Start recording</td><td>Entrée, Espace, le raccourci ; Entrée dans le contexte</td></tr>
+        <tr><td><span class="sq" style="display:inline-grid;vertical-align:middle"><i></i></span></td><td>Arrêter l’enregistrement · Super + Alt + M</td><td>Arrêter l’enregistrement / Stop recording</td><td>Entrée, Espace, le raccourci</td></tr>
+      </table>
+      <div class="note"><b>Propositions</b>
+        <ul>
+          <li>● et ■ sont les signes d’enregistrement de tous les appareils (magnétophones, dictaphones, Dictaphone d’Apple, OBS) : la barre les montre seuls, l’infobulle et le nom accessible gardent les mots entiers.</li>
+          <li>● : un rond cerclé de rouge, le point rouge dedans — un bouton qu’on a envie d’appuyer ; au survol, le point grossit. ■ : un carré arrondi plein, rouge, le carré blanc dedans. Le rouge reste le seul signe d’enregistrement.</li>
+          <li>Le contexte gagne près de 80 px : la place du mot « Enregistrer ».</li>
+          <li>Ludique sans distraire : le point rouge vivant à gauche du temps bat doucement pendant l’enregistrement, sauf si le système demande moins d’animations ; rien d’autre ne bouge.</li>
+          <li>La fenêtre et « Vérifier le son » gardent « Démarrer un enregistrement » en mots (réponse du premier tour).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const marks = [
+    ["C", "m-c", "La bulle", "Une bulle de conversation qui tient le point d’enregistrement : Kitokey écoute la réunion."],
+    ["D", "m-d", "La clé sonore", "Une clé — le « key » de Kitokey — dont l’anneau tient le point et les dents sont une onde."],
+    ["E", "m-e", "Deux voix", "Deux disques qui se touchent : vous et les autres, les deux côtés de la réunion que Kitokey garde."],
+    ["G", "m-g", "Kito", "Un petit visage rond, un casque sur les oreilles : un compagnon qui écoute pour vous."],
+    ["H", "m-h", "L’onde", "Le point d’enregistrement et deux ondes : le son que Kitokey reçoit."],
+  ];
+  const use = (id, size, style = "") => `<svg width="${size}" height="${size}" style="${style}"><use href="#${id}"/></svg>`;
+  const tile = (id, size) => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><use href="#${id}" x="12" y="12" width="40" height="40" style="color:#FFFFFF"/></svg>`;
+  const tray = (id, cls) => `<div class="tray ${cls}">${use(id, 16)}${use(id, 22)}<span class="sep"></span>${use(id, 16, "--dot:var(--dot-rec)")}${use(id, 22, "--dot:var(--dot-rec)")}<span style="opacity:.7">repos · enregistre</span></div>`;
+  document.querySelector("[data-cands]").innerHTML = marks.map(([l, id, name, idea]) => `
+    <div class="cand">
+      <div class="name"><span class="l">${l}</span>${name}</div>
+      <div class="idea">${idea}</div>
+      <div class="tiles">${tile(id, 64)}${tile(id, 32)}${tile(id, 24)}${tile(id, 16)}</div>
+      <div class="cap tab">64 · 32 · 24 · 16 px</div>
+      ${tray(id, "darkbar")}${tray(id, "lightbar")}
+      <div class="head">${tile(id, 20)}Kitokey</div>
+    </div>`).join("");
+  document.querySelector("[data-big]").innerHTML = marks.map(([l, id, name]) => `<div class="one">${tile(id, 128)}${l} · ${name}</div>`).join("");
+
+  // The bar: handle (the kept mark; C drawn here), context, the new buttons, the first round's three icons.
+  const I = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+  const handle = `<span class="handle">${tile("m-c", 20)}</span>`;
+  const tools = `<span class="ib">${I("chevron-down")}</span><span class="ib">${I("maximize-2")}</span><span class="ib">${I("minus")}</span>`;
+  const rest = (btn = `<span class="rb"><i></i></span>`) => `<div class="strip">${handle}<span class="gap"></span><span class="fld"><span class="ph">Contexte de la réunion</span></span><span class="gap"></span>${btn}<span class="gap"></span>${tools}</div>`;
+  const rec = () => `<div class="strip"><span class="live"></span><span class="time">00:16:42</span><span class="meters"><span class="mt">${I("mic")}<span class="track"><i class="fill" style="width:62%"></i></span></span><span class="mt far">${I("volume-2")}<span class="track"><i class="fill" style="width:38%"></i></span></span></span><span class="sq"><i></i></span><span class="gap"></span>${tools}</div>`;
+  const before = () => `<div class="strip">${handle}<span class="gap"></span><span class="fld"><span class="ph">Contexte de la réunion</span></span><span class="gap"></span><span style="height:28px;padding:0 10px;border-radius:6px;background:var(--accent);color:var(--on-accent);display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13px"><span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>Enregistrer</span><span class="gap"></span>${tools}</div>`;
+  const draw = { rest: () => rest(), "rest-tip": () => rest(`<span class="rb hover"><i></i></span>`), rec, "rec-tip": rec, "rest-keys": () => rest(`<span class="rb focus"><i></i></span>`), before };
+  for (const host of document.querySelectorAll("[data-bar]")) {
+    const bar = document.createElement("div");
+    bar.className = "bar"; bar.innerHTML = draw[host.dataset.bar](); host.append(bar);
+  }
+  const tipOver = (host, sel, text) => {
+    const el = host.querySelector(sel), box = host.getBoundingClientRect(), r = el.getBoundingClientRect();
+    const tip = document.createElement("div");
+    tip.className = "tip"; tip.innerHTML = text;
+    tip.style.left = `${r.left - box.left - 110}px`; tip.style.top = `${r.bottom - box.top + 6}px`;
+    host.append(tip);
+  };
+  tipOver(document.querySelector("[data-bar=rest-tip]"), ".rb", "Démarrer un enregistrement<kbd>Super + Alt + M</kbd>");
+  tipOver(document.querySelector("[data-bar=rec-tip]"), ".sq", "Arrêter l’enregistrement<kbd>Super + Alt + M</kbd>");
+  for (const host of document.querySelectorAll("[data-bar=rest-keys]")) {
+    const box = host.getBoundingClientRect();
+    [host.querySelector(".fld"), host.querySelector(".rb"), ...host.querySelectorAll(".ib")].forEach((el, n) => {
+      const r = el.getBoundingClientRect(), k = document.createElement("span");
+      k.className = "k pin"; k.textContent = n + 1;
+      k.style.left = `${r.left - box.left + r.width / 2 - 9}px`; k.style.top = `${r.top - box.top - 12}px`;
+      host.append(k);
+    });
+  }
+
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>

@@ -1,0 +1,216 @@
+//! What `transcript/v1` promises of a transcript as it is written, tried on text written here:
+//! no engine, no sound of anyone (rules/security.md, 2).
+
+use std::{fs, path::Path};
+
+use kitokey_transcription::{Making, Segment, Speaker, Transcript};
+
+fn making() -> Making {
+    Making {
+        engine: "an-engine".into(),
+        model: "a-model".into(),
+        language: Some("fr".into()),
+        context: Some("Quatre personnes.".into()),
+    }
+}
+
+fn said(start: f64, end: f64, text: &str) -> Segment {
+    Segment {
+        start,
+        end,
+        text: text.into(),
+    }
+}
+
+/// The file as any reader finds it: every line whole, each a JSON object with its type.
+fn lines(folder: &Path) -> Vec<serde_json::Value> {
+    let text = fs::read_to_string(folder.join("transcript.jsonl")).unwrap();
+    assert!(text.is_empty() || text.ends_with('\n'), "the file ends on a line being written");
+    text.lines()
+        .map(|line| serde_json::from_str(line).expect("a line that is not JSON"))
+        .collect()
+}
+
+fn types(folder: &Path) -> Vec<String> {
+    lines(folder)
+        .iter()
+        .map(|line| line["type"].as_str().unwrap().to_string())
+        .collect()
+}
+
+#[test]
+fn a_transcript_opens_on_what_made_it_and_holds_what_was_heard_with_its_times_and_speaker() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut transcript = Transcript::start(folder.path(), &making()).unwrap();
+    transcript
+        .heard(Speaker::Others, &[said(0.0, 3.204, "Du coup, on confirme\nla   date ?")], 30.0)
+        .unwrap();
+    transcript
+        .heard(Speaker::Me, &[said(3.4, 5.1, "Première semaine de juin.")], 30.0)
+        .unwrap();
+    let before = chrono::Local::now().timestamp();
+    transcript.complete(302.337).unwrap();
+    let after = chrono::Local::now().timestamp();
+
+    let written = lines(folder.path());
+    assert_eq!(
+        written[0],
+        serde_json::json!({ "type": "header", "contract": "transcript/v1", "engine": "an-engine",
+        "model": "a-model", "language": "fr", "context": "Quatre personnes." })
+    );
+    // One line per segment, its text on one line, its times to the hundredth.
+    assert_eq!(
+        written[1],
+        serde_json::json!({ "type": "segment", "speaker": "others", "track": "remote", "voice": null, "start": 0.0, "end": 3.2, "text": "Du coup, on confirme la date ?" })
+    );
+    assert_eq!(
+        written[2],
+        serde_json::json!({ "type": "covered", "speaker": "others", "until": 30.0 })
+    );
+    assert_eq!(written[3]["speaker"], "me");
+    // The last line says when the transcript was made whole: this computer's time, its offset
+    // said, to the second — as `edited` and the minutes' `made` are written (transcript/v1, D93).
+    let made = written[5]["made"].as_str().expect("the complete line says when it was made");
+    let at = chrono::DateTime::parse_from_rfc3339(made).expect("RFC 3339");
+    assert!((before..=after).contains(&at.timestamp()), "{made} is not now");
+    let local = at.with_timezone(&chrono::Local);
+    assert_eq!(made, local.to_rfc3339_opts(chrono::SecondsFormat::Secs, false));
+    assert_eq!(
+        written[5],
+        serde_json::json!({ "type": "complete", "duration": 302.34, "made": made })
+    );
+    assert_eq!(
+        types(folder.path()),
+        ["header", "segment", "covered", "segment", "covered", "complete"]
+    );
+}
+
+#[test]
+fn what_an_engine_gives_that_is_no_segment_or_no_time_is_not_written() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut transcript = Transcript::start(folder.path(), &making()).unwrap();
+    // No text; an end before its start; the same start again.
+    transcript
+        .heard(
+            Speaker::Me,
+            &[
+                said(0.0, 1.0, "Au début."),
+                said(2.0, 3.0, "  \n "),
+                said(5.0, 4.0, "À l'envers."),
+                said(5.004, 6.0, "Deux fois."),
+            ],
+            30.0,
+        )
+        .unwrap();
+    let segments: Vec<_> = lines(folder.path()).into_iter().filter(|line| line["type"] == "segment").collect();
+    assert_eq!(segments.len(), 2);
+    assert_eq!(
+        (segments[0]["start"].as_f64(), segments[0]["text"].as_str()),
+        (Some(0.0), Some("Au début."))
+    );
+    assert_eq!((segments[1]["start"].as_f64(), segments[1]["end"].as_f64()), (Some(5.0), Some(5.0)));
+    // Given out of order, they are written in the order they were said.
+    let call = [said(50.0, 51.0, "Après."), said(40.0, 41.0, "D'abord.")];
+    transcript.heard(Speaker::Me, &call, 60.0).unwrap();
+    let starts = |folder: &Path| -> Vec<f64> {
+        lines(folder)
+            .iter()
+            .filter(|line| line["type"] == "segment")
+            .map(|line| line["start"].as_f64().unwrap())
+            .collect()
+    };
+    assert_eq!(starts(folder.path()), [0.0, 5.0, 40.0, 50.0]);
+    // Two starts five hundredths apart are two segments, wherever the hundredths fall.
+    let close = [
+        said(60.095, 60.12, "Un."),
+        said(60.145, 60.9, "Deux."),
+        said(60.195, 61.2, "Trois."),
+    ];
+    transcript.heard(Speaker::Me, &close, 65.0).unwrap();
+    assert_eq!(starts(folder.path())[4..].len(), 3);
+    // The same start for the other speaker is another segment.
+    transcript
+        .heard(Speaker::Others, &[said(5.0, 6.0, "En même temps.")], 30.0)
+        .unwrap();
+    assert_eq!(types(folder.path()).iter().filter(|kind| *kind == "segment").count(), 8);
+
+    // A time that is no number of seconds is refused, and nothing of the call is written.
+    let before = fs::read(folder.path().join("transcript.jsonl")).unwrap();
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -100.0, -0.4, 1e300] {
+        for (start, end, until) in [(bad, 81.0, 90.0), (80.0, bad, 90.0), (80.0, 81.0, bad)] {
+            let call = [said(75.0, 76.0, "Bon."), said(start, end, "Non.")];
+            assert!(transcript.heard(Speaker::Me, &call, until).is_err(), "{start} {end} {until}");
+        }
+        assert!(transcript.complete(bad).is_err(), "{bad}");
+    }
+    // A segment that starts after the span it was heard in is no segment of that span.
+    assert!(transcript.heard(Speaker::Me, &[said(100.0, 101.0, "Plus tard.")], 90.0).is_err());
+    assert_eq!(fs::read(folder.path().join("transcript.jsonl")).unwrap(), before);
+}
+
+#[test]
+fn the_end_is_the_last_line_and_a_transcript_that_is_there_is_not_started_again() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut transcript = Transcript::start(folder.path(), &making()).unwrap();
+    transcript.heard(Speaker::Me, &[said(1.0, 2.0, "Un.")], 30.0).unwrap();
+    transcript.complete(30.0).unwrap();
+    transcript.complete(30.0).unwrap();
+    let before = fs::read(folder.path().join("transcript.jsonl")).unwrap();
+    assert!(transcript.heard(Speaker::Me, &[said(31.0, 32.0, "Après la fin.")], 60.0).is_err());
+    assert!(Transcript::start(folder.path(), &making()).is_err());
+    assert_eq!(fs::read(folder.path().join("transcript.jsonl")).unwrap(), before);
+    assert_eq!(types(folder.path()).last().unwrap(), "complete");
+}
+
+/// `made` is this computer's own time, not UTC: written by a child of this test under a zone
+/// with no summer time, it says that zone's offset. Unix only: chrono reads `TZ` there.
+#[cfg(unix)]
+#[test]
+fn the_complete_line_says_when_in_the_computers_own_time_zone() {
+    const NAME: &str = "the_complete_line_says_when_in_the_computers_own_time_zone";
+    if let Some(folder) = std::env::var_os("KITOKEY_TEST_WRITE_IN") {
+        let mut transcript = Transcript::start(Path::new(&folder), &making()).unwrap();
+        transcript.complete(1.0).unwrap();
+        return;
+    }
+    let folder = tempfile::tempdir().unwrap();
+    let status = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", NAME, "--test-threads=1"])
+        .env("TZ", "Asia/Kolkata")
+        .env("KITOKEY_TEST_WRITE_IN", folder.path())
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let made = lines(folder.path()).last().unwrap()["made"].as_str().unwrap().to_string();
+    assert!(made.ends_with("+05:30"), "{made} is not Kolkata's time");
+}
+
+#[test]
+fn a_transcript_one_step_made_whole_says_how_long_that_step_took() {
+    let folder = tempfile::tempdir().unwrap();
+    // The step began a second and a half ago: its loading counts, as the user waited for it (D97).
+    let began = std::time::Instant::now() - std::time::Duration::from_millis(1500);
+    let mut transcript = Transcript::start(folder.path(), &making()).unwrap().since(began);
+    transcript.heard(Speaker::Me, &[said(0.0, 1.0, "Bonjour.")], 30.0).unwrap();
+    transcript.complete(30.0).unwrap();
+    let last = &lines(folder.path())[3];
+    let took = last["made_in"].as_f64().expect("the complete line says how long the step took");
+    assert!((1.5..15.0).contains(&took), "{last}");
+    // To the hundredth, as `duration` is written.
+    assert_eq!((took * 100.0).round() / 100.0, took, "{last}");
+}
+
+#[test]
+fn a_transcript_taken_up_from_an_earlier_step_says_no_time() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut first = Transcript::start(folder.path(), &making()).unwrap();
+    first.heard(Speaker::Me, &[said(0.0, 1.0, "Bonjour.")], 30.0).unwrap();
+    drop(first);
+    // Live: a later step takes it up and makes it whole. Its time alone would say a speed the
+    // transcript never had (D97).
+    let mut later = Transcript::open(folder.path(), &making()).unwrap().since(std::time::Instant::now());
+    later.complete(30.0).unwrap();
+    let last = lines(folder.path()).pop().unwrap();
+    assert_eq!(last["type"], "complete");
+    assert!(last.get("made_in").is_none(), "{last}");
+}

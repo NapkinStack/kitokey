@@ -1,0 +1,166 @@
+# transcription
+
+Turns the audio of a session into a timestamped transcript.
+
+- **Owner**: NapkinStack/maintainers
+- **Criticality**: standard
+- **Manifest**: [MANIFEST.yaml](./MANIFEST.yaml)
+
+```mermaid
+flowchart LR
+    A["The session's sound, in either form<br/>session.json · context.txt"]:::file --> P["kitokey-transcription<br/>a program, no window"]:::mod
+    P -->|"one span of sound at a time"| E["The engine:<br/>Whisper, on this machine"]:::ext
+    E -->|"segments"| P
+    P -->|"transcript/v1, a file that only grows"| T["transcript.jsonl"]:::file
+    P -.->|"hearing · written"| W["Whoever started it"]:::user
+
+    classDef file fill:#1e3a8a,color:#fff
+    classDef mod fill:#065f46,color:#fff
+    classDef ext fill:#374151,color:#fff
+    classDef user fill:#92400e,color:#fff
+```
+
+**Legend** — blue: files of the session's folder · green: this module · grey: what hears,
+behind one interface (ADR-0003) · orange: who reads its events, one JSON object per line.
+Nothing leaves the machine unless a service is named: with `--provider`, each span is sent to that address (D43, below), the shell having asked the user to agree to the host first. On a Mac, `kitokey-speech install` has macOS fetch Apple's model of a language — run on the user's word only.
+
+```bash
+# The model is a Whisper model in whisper.cpp's format, already on the machine: nothing is fetched.
+kitokey-transcription <session-folder> --model ggml-large-v3-turbo-q8_0.bin --language fr
+```
+
+**On a Mac with macOS 26**, Apple's SpeechAnalyzer can hear instead of Whisper, when asked, on the Mac (D42,
+[ADR-0012](../../docs/adr/0012-on-macos-speechanalyzer-hears-through-a-program-of-its-own.md)):
+the step is the same; each span goes to `kitokey-speech`, a Swift program of this module's
+(`speech/`), built beside the program by the release on a Mac. It hears the language asked, French
+or English, with Apple's model of it, which macOS fetches from Apple on the user's word:
+
+```bash
+kitokey-speech status fr-FR                       # available, supported, installed
+kitokey-speech install fr-FR                      # Apple's model, fetched by macOS
+kitokey-transcription <session-folder> --engine speechanalyzer --language fr
+```
+
+**A service the user names** (D43, [ADR-0013](../../docs/adr/0013-a-transcription-service-the-user-names-heard-as-the-minutes-are-written.md)):
+each span goes to OpenAI's `/audio/transcriptions` at the address given, its times asked
+(`verbose_json`), the context the user attached as `prompt`; a service that gives no times is
+refused, never timed by guess. The key, when it wants one, is read from `KITOKEY_PROVIDER_KEY`.
+
+```bash
+kitokey-transcription <session-folder> --provider https://api.groq.com/openai/v1 --model whisper-large-v3 --language fr
+kitokey-transcription --test --provider http://localhost:8000/v1 --model whisper-1   # a sound of its own
+```
+
+`kitokey-transcription --version` prints its version, the package's (D78), and does nothing else.
+
+| Tried on a public meeting of five minutes, four speakers, in French | Words that differ from a person's transcript | Time |
+|---|---|---|
+| Built with `--features vulkan`, on a laptop's graphics card | 26.8 % | 34 to 38 s |
+| Built without, on its processor | 26.0 % | 230 s |
+
+**Stopped at any moment, it is run again** and goes on from where it was: what the transcript
+covers is not heard twice. A recording still going on is heard up to here; its transcript
+gets its last line once the session's record says `stopped`.
+
+**On loudspeakers, the echo is taken out** of what the engine hears of the microphone — never
+out of the recording. WebRTC's canceller, fed what the loudspeakers played, takes the remote
+voices out of the local track; it is used only where it measures an echo — 3 dB taken out at
+least — so that a headset's microphone goes to the engine as recorded. On the bench, the
+remote words written a second time under the local side fall from about 210 to none
+(cycle 02, D10).
+
+**What the engine heard is kept**, in `derived/` in the session's folder: `local.wav` and
+`remote.wav`, one channel, 16,000 samples a second, the samples it was given, to the bit; and
+`made.json`, what made them — the files they come from, whether an echo was taken out, how
+much was measured. They weigh about 230 MB an hour of meeting each, and may be deleted: the
+next run makes them again, the same to the byte, and the transcript with them. A transcript
+begun while the meeting was recorded keeps the decision taken then — echo or not — for the
+rest: its beginning was heard so. Delete `made.json` with it, or not at all.
+
+**A turn starts where it was said.** Each word is timed by the model's alignment heads, and a
+segment is cut where the words stop for more than 0.8 s: on the bench, at most two
+exchanges in forty-four are out of order, against one in four with the engine's own segments
+(cycle 02, D10). A model whose heads whisper.cpp does not hold — or the first two versions
+of `large`, which one header cannot tell apart — keeps the engine's segments, and `hearing`
+says so: `"times": "segments"` instead of `"words"`.
+
+**A turn the engine jumped over is heard again.** Whisper sometimes goes from one sentence
+to a later one over a whole turn whose sound is intact. Where a span holds a voice at the
+level of the words the engine wrote there, for a second and a half with no word written,
+that stretch is heard again alone; where it wrote nothing, nothing is. A stray word it
+wrote alone in such a turn is heard again with the turn, in place of where it stood. On
+the bench, the local words wrong fall from 57.5 to 41 on loudspeakers and from 41.5 to 27
+with a headset, a median of four draws, and no local turn is lost with a headset. Heard alone,
+Whisper may jump once more from where the stretch starts: what it leaves there is heard
+again, twice deep. With a television in the room and at a quiet level, nothing is heard
+again and the transcript is the same; on the trial meeting a stray word of a remote turn
+becomes the turn (cycle 02, D10).
+
+**A loop is heard again.** Whisper hears each thirty seconds of a span after the text of the
+thirty before; where a track falls silent, it may write that text again and again and lose what
+follows. Where a run of four words is written three times or more in what a span gave, with the
+pieces of its words cut beside it, the stretch from the segment before to the segment after is
+heard again alone, after no text of the window before — the context, if any, still before it —
+and what it gives as marks alone (`...`) is not written. A loop is heard again first; what the
+engine left unwritten is then heard again as before, where it still is. On the bench, the two
+draws in eight whose remote track looped fall from 113 and 139 remote words wrong to 22 and 21;
+every other draw, the television and the trial meeting are unchanged (cycle 02, D10).
+
+**What the engine writes on a silence it was given stays.** Within a span that holds a voice,
+Whisper may write on a side's silence a sentence nobody said — the *Sous-titrage …* class.
+It is the engine's, kept as it is: a list of known phrases would tune to one model, and the
+levers tried against it were refuted (cycle 02, D10). Accepted by the decider on 2026-10-24
+([#355](https://github.com/NapkinStack/wholeheard/issues/355)); what holds no word at all is
+left out (#357).
+
+**A first word may be written twice on a microphone that rests far from zero** — a laptop's
+built-in one at a quarter of full scale: its rest reads as loud as a voice, is heard again
+alone, and the engine writes there the start of the word cut at its end, a line of no
+duration. Kept as it is, accepted by the decider on 2026-10-24
+([#362](https://github.com/NapkinStack/wholeheard/issues/362)): measuring the level without the
+offset took the word out and moved the engine's inventions elsewhere on the trial's sessions.
+
+**Attach a context** — `context.txt` in the session's folder: names and words of the trade
+the engine would otherwise write as it hears them.
+
+Whatever is wrong — a folder that is not a session, an audio file that is not what
+`session-audio/v1`, `v2` or `v3` describes, a language the engine does not know, a model that cannot be
+loaded — is one sentence on the error stream, before anything is said to be heard, and no
+transcript is created or changed. What only shows once the model is there — a transcript
+another language or model made, a folder that cannot be written to — is said after `hearing`. Leave `--language` out to have the language detected.
+
+What it does is logged — the tracks' lengths, the echo found, each span heard with how long it
+took and how many segments it gave, each failure with its detail; never a word heard, the
+context, nor the session's path (ADR-0007): one JSON line per step in
+`$XDG_STATE_HOME/kitokey/logs/transcription.<date>.jsonl` (UTC), fourteen days kept and the
+folder under 50 MB. `KITOKEY_LOG_DIR`, an absolute path, puts them elsewhere, `KITOKEY_LOG=debug` asks for more, and
+`KITOKEY_TRACE` is the id of the making the shell passes.
+
+## Getting started
+
+The standard verbs — `bootstrap`, `check`, `test`, `run` — are declared in the `commands`
+section of the [manifest](./MANIFEST.yaml), for this module's stack. What each one must do:
+`.nstack/handbook/09-platform.md` §2.
+
+`release` puts `THIRD-PARTY-NOTICES.html` beside the program, for the package to ship (D102): each
+crate the program links, with every feature, under its licence's text — and whisper.cpp's and
+ggml's MIT notice under whisper-rs-sys, which builds them in. It is made with cargo-about from
+`about.toml`, whose `accepted` list refuses any other licence, GPL among them, and committed;
+`tests/notices.rs` is red once it no longer names the crates the program links, and `about.toml`'s
+header gives the two commands that make it again.
+
+## Contracts
+
+- Provided: [`transcript/v1`](../../contracts/transcript/v1/README.md), `experimental`
+- Consumed: [`session-audio/v1`](../../contracts/session-audio/v1/README.md),
+  [`session-audio/v2`](../../contracts/session-audio/v2/README.md) and
+  [`session-audio/v3`](../../contracts/session-audio/v3/README.md) — `session.json` names
+  which, and `hearing` says which was read (`audio`). A track of v3 is its WAV while it is there,
+  its FLAC once it is not, read with Symphonia ([ADR-0016](../../docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md))
+
+## Decisions
+
+[ADR-0003](../../docs/adr/0003-transcribe-behind-one-interface-whisper-on-the-graphics-card.md):
+one interface, Whisper on the graphics card.
+[ADR-0004](../../docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md):
+the tracks are the recording; what an engine hears is made from them, and kept apart.

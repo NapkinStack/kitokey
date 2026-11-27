@@ -1,0 +1,291 @@
+# recording — version 1
+
+What the program that records says while it records — or while it only listens, before one —, and
+how it is told to stop: one line of text per event, for whoever started it.
+
+```mermaid
+flowchart LR
+    S["shell — or a script,<br/>a terminal"]:::consumer -->|"starts: kitokey-capture record <sessions-folder>, with --microphone <name>, or with --as v1"| C["capture"]:::producer
+    S -->|"asks: kitokey-capture microphones · listen, with --microphone <name>"| C
+    C -->|"its output: one JSON object per line"| S
+    S -->|"its input: the line stop"| C
+    S -.->|"its environment: KITOKEY_TRACE, its log's id"| C
+    C -.->|"its error stream: one sentence, when it fails"| S
+    C --> F["The session's folder<br/>(session-audio)"]:::file
+
+    classDef producer fill:#065f46,color:#fff
+    classDef consumer fill:#1e3a8a,color:#fff
+    classDef file fill:#374151,color:#fff
+```
+
+**Legend** — green: the producer · blue: whoever started it, the consumer · grey: what the
+recording leaves, described by `session-audio`.
+
+The lines are the same whichever version of `session-audio` the recording leaves: in the
+second, what `record` writes unasked, the program still names its sources `me` and `others`,
+where the folder's tracks are `local` and `remote`; `--as v1` leaves the first.
+
+**For a machine**: [`event.schema.json`](./event.schema.json) says what a line of the output
+is — and is what the project's comparator judges a change to this version by (ADR-0005). The
+order of the events, and what each means, are said here and nowhere else.
+
+## What it carries
+
+**The output**: UTF-8, one JSON object per line, nothing else. Each has `event`:
+
+| `event` | Other fields | Says |
+|---|---|---|
+| `unavailable` | `source`: `me` or `others`; `reason`: a sentence, free: for a person or a log, no consumer reads a meaning from its words | This source could not be opened: in a session of `session-audio/v2` it has no track — in one of `session-audio/v1`, its file is silence. Said before `started`; the other source is still recorded. It is not always for good: *A microphone that waits*, below |
+| `started` | `folder`: the session's folder, a path; `sources`: for `me` and `others`, the name the system gave it, or `unavailable` | The recording runs, and `session.json` is in the folder. **Once**, and first unless `unavailable` or `microphone_gone` came before |
+| `silent` | `source`; `nothing`: `true` when not one sample other than an exact zero came — optional | This source has given no sound for ten seconds. Said once per silence. `nothing`: the device delivers nothing at all — no microphone at rest gives exact zeros —, not a quiet room (#361); absent, unknown |
+| `heard` | `source` | A source that was said `silent` gives sound again |
+| `level` | `source`; `level`: how loud it is now, from 0 (silence) to 1 (the loudest it can be), a number | About ten times a second for each source being recorded, after `started` and before `stopped`: for a meter that moves as sound comes (cycle 03, D22). Also while listening (*Listening*, below) |
+| `microphone_gone` | none | The microphone named at the start (*A microphone named*, below) was not found or could not be looked for, before `started`; or, after it, was seen to have gone: `me` is recorded as with no name |
+| `microphone_back` | none | The microphone said gone is there again, whether a stream follows or not (*A microphone named*, below) |
+| `device` | `source`; `device`: the name the system gives the device, or `null` | This source is now recorded from another device: the user chose another default, or the one recorded was taken away and the system named another — or, for `others`, a call plays on an output other than the default, or left it for the default (cycle 04, D41) — or, for `me`, a call holds a microphone other than the one recorded, or no longer does (cycle 05, D66). Its track goes on, in the form it opened with (`session-audio`). `null`: the system names no device for it, or the call let go of it, and nothing comes from it before a `device` names one. Said at each change, after `started` and before `stopped`; of a source said `unavailable`, as *A microphone that waits* says, below. While listening, as *Listening* says, with `headset` — optional: `true` when `me`'s device is a Bluetooth headset's microphone, `false` when it is not; absent, not known. `headset`: never said by a recording |
+| `stopped` | `folder`; `seconds`: the recording's length, a number | The session's files are whole and `session.json` says `stopped`. **Last**, and only when the recording was stopped as below |
+| `microphone` | `name`: what the start takes; `description`: as a person reads it | One microphone of what `microphones` lists (*A microphone named*, below). Never said by a recording |
+
+**Stopping**: the line `stop` on the program's input, an interrupt or a termination signal.
+All three end the same way: `stopped`, then the program ends well. Closing a recording's input
+stops nothing; closing `listen`'s stops it (*Listening*).
+
+**The tracks final**: in a session of `session-audio/v3`, between `stopped` and its end, the program
+keeps each track as FLAC in place of its WAV, as that version says (cycle 09, D87). **Its end, well — a
+success —, tells that the session's tracks are final**: each is the file or files it stays — its FLAC,
+its WAV, or both, as that version allows. No event is added after `stopped`, which stays the last line.
+
+- **A track not compressed is no failure**: a FLAC that cannot be written whole — a disk full — or whose
+  samples decode other than the WAV's leaves that track's WAV, its `.flac.part` removed, said in the
+  program's log; the program still ends well, and that WAV is the track.
+- **A second interrupt or termination signal** while it compresses stops the compressing: the
+  `.flac.part` being written is removed, the tracks are left as they are, and the program ends well —
+  its end still tells them final.
+- **Killed** after `stopped`, the program ends in failure, saying nothing: the session is whole, as
+  `session-audio/v3` says of a track killed while compressed — a WAV, a FLAC, or both.
+
+What compressing costs in time is measured on the bench and said on capture's page; a consumer that
+starts the steps that follow on `stopped` need not wait for it, since `session-audio/v3` says what it
+reads in between.
+
+**Failing**, a recording — `listen`'s is said under *Listening*: before `stopped`, the program ends in failure with one sentence on its error stream, and
+no `stopped`. After `stopped`, it fails only when it is killed (*The tracks final*, above). Before `started`, nothing was recorded; after it, the folder holds what
+`session-audio` promises of a recording ended by a crash.
+
+**Its log**: the program logs what it does ([ADR-0007](../../../docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md)),
+at `info`, under an id of its own, in the user's folder for logs — on Linux
+`$XDG_STATE_HOME/kitokey/logs`, or `~/.local/state/kitokey/logs`; on macOS
+`~/Library/Logs/Kitokey`; on Windows `%LOCALAPPDATA%\Kitokey\logs`. There it also removes
+the day files written more than fourteen days ago, then the oldest until the folder weighs
+under 50 MB — every program's day files, nothing else.
+Whoever starts it may set, in its environment:
+
+- `KITOKEY_TRACE` — the making's id: ASCII letters, digits and dashes, 64 at most. Any other value
+  is replaced by an id of the run's own, without a word;
+- `KITOKEY_LOG` — `off`, `error`, `warn`, `info`, `debug` or `trace`, in lower case; a value
+  holding `=` is read as a `tracing` filter, for whoever knows them; any other value is `info`. Turned `off`, the log leaves nothing: no file, no day file removed;
+- `KITOKEY_LOG_DIR` — an absolute folder; a relative one is ignored. A folder that cannot be
+  made or written leaves no log, and changes nothing else.
+
+None is required. None, and no state of the log, changes a line of the output, the error stream
+or what the program leaves — with one exception: a run that crosses midnight UTC while the
+next day's file cannot be created has the logging library say so once on the error stream.
+The log is not what the program leaves. What the log holds is not this
+contract: it is read by people, never by a consumer.
+
+## A microphone named
+
+Cycle 06, D74; additive: a consumer that names none, and asks nothing, sees no change.
+
+**The list.** `kitokey-capture microphones` prints one `microphone` line for each microphone the
+system offers by name, then ends well. It reads the system and opens nothing. It fails as *Failing*
+says, when the list could not be read. No line: nothing to choose from — the system has no such list
+(today, all but Linux with PipeWire), or no microphone: no list is offered. A choice the user already
+kept is still shown, so that they can go back to Auto.
+
+`name` is capture's id for a microphone: stable from one run to the next, to be kept and given back
+as it is, its form meaning nothing to a consumer. No line of this page holds a Bluetooth address:
+`name` holds a digest in its place, `description` none. `device` and `started`'s `sources` carry the
+`description`, never `name`, and neither they nor anything else says which id a recording is on.
+
+**The start.** `kitokey-capture record <sessions-folder> --microphone <name>`, a `name` of that
+list. With `--as v1`, the program refuses it as it refuses any other wrong use, and records nothing:
+the first form never follows a microphone, as *A microphone that waits* says of it.
+
+| Named at the start | `me` records | Said |
+|---|---|---|
+| Nothing | The microphone a call holds, otherwise the default input: as above | As above |
+| A microphone that is there | That one for the whole recording: neither a call holding another nor a new default moves it | `started`, its description |
+| A headset's, that a stream would switch to another profile | That one, only while a call holds it, listened to without ever making it run (ADR-0015); no stream otherwise, whatever else a call holds. No profile is ever asked for, even for a name the user chose | A call already running it at the start: `started`, its description. Otherwise `unavailable`, as *A microphone that waits* says — no call on it, or one that holds it and does not run it yet —, and `device` once a stream has its form. `device: null` when the call lets go |
+| A name not found at the start, or that could not be looked for | As with nothing named, its track going on | `microphone_gone` before `started`, which names what is recorded |
+| A name seen to have gone during the recording | As with nothing named, its track going on | `microphone_gone`, then `device` as above. The graph not read during a recording says nothing and moves nothing: the stream named goes on |
+| A name said gone that is there again | What the second and third rows say of it: an ordinary microphone at once, its track going on; a headset's with no call on it, no stream | `microphone_back`, whether or not a stream follows; then `device` with its description, or `device: null` at most when what stood in closes |
+
+`microphone_gone` and `microphone_back` alternate, the first of them `microphone_gone`. Whether
+`me` is recorded, and from what, is never read from them: it is `device`'s to say.
+
+## Listening
+
+Cycle 09, D88; additive: a consumer that never asks it sees no change.
+
+`kitokey-capture listen`, or `kitokey-capture listen --microphone <name>` — a `name` of `microphones`
+— opens the two sources as a recording would, to show that each is heard, and **records nothing**: no
+session's folder, no file anywhere; only its log, as any run (*Its log*).
+
+- **What it listens to.** `others`: the default output, as a recording opens it. `me`: the microphone
+  named, when it is there; otherwise the one a call holds; otherwise the default input. **Its stream is
+  active, a headset's too**: a Bluetooth headset may switch to its call profile while it listens, and
+  the system restores it once listening ends (ADR-0015, its amendment of 2026-11-07). It follows no call
+  after its start; what the system moves on its own is said by `device`, as while recording.
+- **What it says**, in the lines a recording says, of the same meaning: `microphone_gone` first, when the
+  name given is not there; `unavailable` for a source that could not be opened; then `device` for each
+  source opened, `me` before `others`, naming it; then `level`, about ten times a second for each source
+  opened, and `device` at each change. **Never `started` nor `stopped`**: there is no folder to name, nor a
+  length; nor `silent`, `heard` or `microphone_back`: the meter says it.
+- **A headset** (cycle 09, D88, additive). `me`'s first `device` says `headset: true` when what it
+  listens to is a Bluetooth headset's microphone — which may switch to its call profile while it
+  listens, as above —, `false` when it is not. Absent — on `others`, on a later `device`, or where the
+  system does not tell: today, all but Linux with PipeWire —, not known: a later `device` of `me` without
+  it says nothing of the new microphone. A recording never says `headset`.
+- **A microphone named that goes while it listens**: nothing takes its place, and no line says it —
+  `me`'s `level` falls to 0 and stays there, still said ten times a second, until it is stopped; the error
+  stream may hold a line of the system's about that stream, which is no failure. Whoever wants another
+  microphone stops it and starts it again.
+- **Stopping**: the line `stop`, an interrupt, a termination signal — **or its input closed**, unlike a
+  recording: a consumer gone, crashed while it showed the meters, leaves no microphone open behind it.
+  Within one second of any of the four, its streams are closed and the program ends well, saying nothing
+  more.
+- **Its end is told by its exit status alone**, as it never says `stopped`: a success, it stopped as
+  asked, and nothing of it is open any more; a failure, it could not listen — both sources unavailable,
+  or a wrong use —, said in one sentence on its error stream, the last line there.
+- **Never during a recording.** Whoever starts it does not while one runs: it is no part of one, and the
+  local side a recording opens passively would gain an active stream beside it.
+
+## What it never does
+
+- It never says anything of what was said: a `level` is how loud, not what — it was added for
+  the meter of the small window (cycle 03, D22), as additive as the comparator allows: a consumer
+  of this version already ignores an `event` it does not know.
+- It never says `stopped` for a recording that was killed: the consumer learns it from the
+  program's end, and from a `session.json` without `stopped`.
+- It never says anything after `stopped`: the tracks made final are told by its end alone.
+- It never prints anything but these lines on its output: a consumer may refuse a line that
+  is not one — and must ignore a field or an `event` it does not know, so that a second
+  version can add one.
+- It never ends because its consumer did: a consumer that is gone — its end of the output
+  closed — stops nothing. (`listen` ends when its *input* closes: *Listening*.) **A consumer that keeps the output open reads it**: the system holds
+  some 1,700 unread events, and the program waits on the next one.
+
+**A source that becomes unavailable during the recording** — a headset unplugged — is said by
+`device` when the system names another default for it, which it records from then on, and by
+`device` with `null` when it names none: nothing comes from that source then, and its track
+holds zeros, as a silence of the capture (`session-audio`), until a `device` names one again
+(cycle 01, D3's fifth criterion; cycle 03, D31). `device` was added in cycle 03, as `level` was:
+a consumer of this version already ignores an `event` it does not know.
+
+**A microphone that waits** (cycle 05, D66; [ADR-0015](../../../docs/adr/0015-the-local-side-records-the-microphone-the-call-holds-passively.md)):
+`me` may be said `unavailable` because nothing may open its microphone yet, a headset's that a
+stream would switch to another profile, or because its microphone was refused at the start. No
+track, no `level`, while it waits. It may be taken as the graph changes: a call takes a microphone,
+or the default input changes.
+
+`device` on `me` says what is being recorded now: a stream is named when it has a track, that is,
+when it received its format; a stream linked to a source that does not run says nothing and has no
+track.
+
+A name said is closed by the next when another stream takes over at once, otherwise by `device:
+null`; `stopped` closes the last. A stream that never received a format said nothing and owes no
+`null`. (A live cpal stream may say `null` when the system names no device: D31.)
+
+Under `null`, its track holds zeros where its clock says them. As often as calls come, for as long
+as the recording lasts. Never taken, it stays what `unavailable` says. During a gap of over ten
+seconds, `silent` with `nothing: true` may come: there it says the gap, not a device at rest.
+
+A recording that leaves `session-audio/v1` (`--as v1`) still follows a call's output on `others`;
+`me` does not follow a call's microphone: on a headset's default it says `unavailable` with the
+waiting reason and records no microphone, its file silence to the end.
+
+**A consumer must accept** that sequence: `unavailable` is what was true at the start, `started`'s
+`sources` does not change, and what `me` records now is the last `device`. `null` says that nothing
+comes from the source, never why: not that the computer has no microphone left. The change is
+additive for a consumer that reads each line for itself, as this page has always asked; this page
+said before that `device` was never said of a source said `unavailable`.
+
+## Examples
+
+Valid — a recording where nothing plays for a while, stopped by the line `stop`:
+
+```text
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"Digital Microphone","others":"Speaker"}}
+{"event":"level","source":"me","level":0.42}
+{"event":"silent","source":"others"}
+{"event":"heard","source":"others"}
+{"event":"device","source":"me","device":"Headset Microphone"}
+{"event":"stopped","folder":"<sessions-folder>/2026-10-13_14-05","seconds":1912.4}
+```
+
+Valid — the microphone refused, the meeting still recorded:
+
+```text
+{"event":"unavailable","source":"me","reason":"the system names no default device"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"unavailable","others":"Speaker"}}
+```
+
+Valid — a microphone that waits, taken by a call, let go, taken again, let go:
+
+```text
+{"event":"unavailable","source":"me","reason":"the default input is a Bluetooth headset's: the microphone waits for a call to take it"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"unavailable","others":"Speaker"}}
+{"event":"device","source":"me","device":"Headset Microphone"}
+{"event":"device","source":"me","device":null}
+{"event":"device","source":"me","device":"Headset Microphone"}
+{"event":"device","source":"me","device":null}
+{"event":"stopped","folder":"<sessions-folder>/2026-10-13_14-05","seconds":70.1}
+```
+
+Valid — a microphone named that is not there, the recording going on with what the system offers:
+
+```text
+{"event":"microphone_gone"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"Digital Microphone","others":"Speaker"}}
+```
+
+Valid — what `microphones` prints:
+
+```text
+{"event":"microphone","name":"alsa_input.pci-0000_00_1f.3.analog-stereo","description":"Digital Microphone"}
+{"event":"microphone","name":"bluez_input.unknown.0#3f6a91c2d07e4b18","description":"Headset Microphone"}
+```
+
+Valid — a headset's microphone named, gone, then back with no call on it:
+
+```text
+{"event":"unavailable","source":"me","reason":"the microphone chosen is a Bluetooth headset's: the microphone waits for a call to take it"}
+{"event":"started","folder":"<sessions-folder>/2026-10-13_14-05","sources":{"me":"unavailable","others":"Speaker"}}
+{"event":"microphone_gone"}
+{"event":"device","source":"me","device":"Digital Microphone"}
+{"event":"microphone_back"}
+{"event":"device","source":"me","device":null}
+```
+
+Valid — listening, the microphone and the meeting's sound heard, then stopped by the line `stop`:
+
+```text
+{"event":"device","source":"me","device":"Headset Microphone"}
+{"event":"device","source":"others","device":"Speaker"}
+{"event":"level","source":"me","level":0.0}
+{"event":"level","source":"others","level":0.0}
+{"event":"level","source":"me","level":0.61}
+{"event":"level","source":"others","level":0.38}
+```
+
+Valid — listening on a Bluetooth headset's microphone:
+
+```text
+{"event":"device","source":"me","device":"AirPods Pro","headset":true}
+{"event":"device","source":"others","device":"AirPods Pro"}
+{"event":"level","source":"me","level":0.52}
+{"event":"level","source":"others","level":0.0}
+```
+
+To refuse: a line that is not a JSON object with an `event`.

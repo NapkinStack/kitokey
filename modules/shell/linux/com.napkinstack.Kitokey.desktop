@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kitokey
+Comment=Records a meeting, transcribes it and writes its minutes, on your machine
+Comment[fr]=Enregistre une réunion, la transcrit et en rédige le compte rendu, sur votre machine
+Exec=kitokey --window
+Icon=com.napkinstack.Kitokey
+Terminal=false
+Categories=Office;AudioVideo;
+StartupNotify=false

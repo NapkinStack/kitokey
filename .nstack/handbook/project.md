@@ -1,0 +1,230 @@
+# The project's own folder — `docs/project/`
+
+It holds what the framework cannot know about this project: who it is for, when it is finished,
+and what is being delivered now. Every agent session reads the charter and the current
+cycle before working (`AGENTS.md` §4).
+
+| File | Holds | Written by | Accepted by |
+|---|---|---|---|
+| `discovery.md` | An idea tested: evidence, value hypothesis, challenge, decision | The framer, then the challenger (`.nstack/playbooks/discovery.md`) | The decider |
+| `charter.md` | Users, problem, constraints, risks, success criteria, out of scope | The framer (`.nstack/playbooks/framing.md`) | The decider |
+| `cycles/NN-<slug>.md` | One goal, a finite list of deliverables, an appetite, an end date, the closure | The framer | The decider |
+| `rules/<subject>.md`, `rules/always.md` | The project's own rules, read with the playbook of the same name; absent until the project has one | Whoever meets the constraint, the decision or the incident | The foundation team |
+| `.nstack/forms/` — `discovery.md`, `charter.md`, `cycle.md`, `rules.md` | The forms these files are copied from; they are the framework's and live in its folder | — | — |
+
+```mermaid
+flowchart LR
+    P["proposed"]:::draft -->|"the decider accepts"| A["accepted<br/>running from start"]:::run
+    A -->|"every deliverable delivered or accepted"| C["closed<br/>completed"]:::ok
+    A -->|"end date reached"| B{"Circuit breaker<br/>the decider chooses"}:::stop
+    B -->|"ship what is delivered or accepted"| S["closed<br/>shipped"]:::ok
+    B -->|"new cycle"| R["stopped<br/>reframed"]:::stop
+    B -->|"stop the project"| X["stopped<br/>stopped"]:::stop
+
+    classDef draft fill:#374151,color:#fff
+    classDef run fill:#1e3a8a,color:#fff
+    classDef ok fill:#065f46,color:#fff
+    classDef stop fill:#7c2d12,color:#fff
+```
+
+**Legend** — grey: a proposal · blue: the cycle in progress · green: an accepted end ·
+red: the circuit breaker and what it can lead to.
+
+## Framed, or unframed
+
+```mermaid
+flowchart LR
+    U["UNFRAMED<br/>no accepted charter"]:::un -->|"the decider accepts<br/>the charter"| F["FRAMED<br/>cycles bound the work"]:::fr
+    U -.-> RU["Every rule applies<br/>except the cycle's"]:::note
+    F -.-> RF["Every rule applies"]:::note
+
+    classDef un fill:#374151,color:#fff
+    classDef fr fill:#1e3a8a,color:#fff
+    classDef note fill:#065f46,color:#fff
+```
+
+**Legend** — grey: a project that has framed nothing yet, a stage and not a fault · blue:
+a project whose charter is accepted · green: what judges a change in each.
+
+The stage is read from this folder, never declared, and every run that judges names it. An
+unframed project is held to its boundaries, its contracts, the scope of its pull requests,
+the test sheet and the hooks; only the rules that bound work inside a cycle — K1 to K3 and K5 — are silent,
+since there is no cycle. **Framing is worth its price when there is something to bound** —
+several people, a deadline, a decider who is not the one typing. It is one-way: once the
+charter is accepted, a project between two cycles is framed, and is told which cycle is
+missing.
+
+## What CI checks
+
+| Check | When | Rules |
+|---|---|---|
+| The plan, a fitness function | Every push | Formats; one accepted cycle at a time, under an accepted charter; `end` = `start` + the appetite; acceptance criteria once a deliverable is ready; closures recorded; a discovery decided with its decider and date, a charter only after a go. A charter, a cycle or a deliverable still holding the template's words is refused. A decision record due at a closure and not yet read is warned of, never refused (C10) |
+| The pull request check | Every pull request changing a module beyond its description — manifest, `AGENTS.md`, `README.md`, `docs/`, unless the manifest moves its criticality or its user-visible surface; not a framework update — **once the charter is accepted** | An accepted cycle; not past its end date; a ready or in-progress deliverable named — and, when someone holds it, delivered by its holder — or the `out-of-cycle` label with its justification. An accepted charter changed with no decision record is warned of (C9) |
+
+## A cycle's progress
+
+`nstack plan` opens with what needs a person — `Needs you (n):`, one line each: a charter or a cycle waiting for
+the decider's word — a next cycle accepted while one runs (`accepted_on`) waits for its closure, not for them —, a cycle at its end or with nothing left to deliver, and each open row of the cycle's *What needs a
+person*. A row closes when its deliverables are accepted, deferred or dropped. A delivery record closes it only when
+the row names nothing but ids and its gesture cites what the record cites; a row saying more (`D66, trial`) waits for
+the person: a delivery proves a merge, never a person's answer. *Nothing needs you* is said only when certain; a
+cycle with no such section, or checks that fail, gives `Needs you: cannot say`. It reads the repository: a pull request waiting for a human approver is not in it yet.
+A decision whose criterion is due stays a warning below: an agent reads it, and only a missed one comes to a person.
+
+Read, never kept: `nstack plan` computes the progress from the accepted cycle's front matter and says it in
+one line, then who holds each deliverable.
+
+```
+Cycle 03-the-window: 10 of 14 accepted · 2 in progress · 2 ready · day 5 of 21, 17 left (ends 2026-11-07)
+Holds in 03-the-window: 3 held, of which 0 stale (from origin; stale after 7 days without work):
+```
+
+Nobody writes progress down during a cycle. Once a deliverable's work is merged and each criterion holds,
+the agent records it, with no pull request and nothing under `docs/`, and the plan computes `delivered`:
+
+```bash
+nstack deliver D30 --held '#412' --session alice-d30                   # every criterion held by that pull request
+nstack deliver D30 --held '1=#412' --held '2=#415' --session alice-d30   # criterion by criterion; an acceptance issue the cycle names counts
+nstack deliver D30 --held '1=#412' --held '1=#413' --held '2=#415' --session alice-d30   # a criterion held by two: each kept
+```
+
+It is refused with no merge of the deliverable on the default branch since the cycle started, with a criterion
+unanswered, or with an answer that is no merge of it, nor the acceptance issue the cycle names for it. Carried from
+an earlier cycle, its merges there, only that issue answers. A session on the hold, its person or the decider records it, a stale hold
+being taken over first. A delivered deliverable is not held, never goes stale, cannot be taken, and its issue
+closes; its recorder or the decider withdraws a record found wrong with `nstack unclaim`, and once a merge it names or every merge is seen reverted it reads as back in work; a revert that names nothing it undoes is not seen.
+The rule sees that a merge exists, never that a criterion is really met: the closure's reading is what
+catches a false record. Below the holds, `nstack plan` names what is merged and not recorded, read from commit
+titles, no approval checked. At the closure, `nstack deliver --write-states` writes each recorded deliverable as `accepted` in the cycle file,
+for the closure's one pull request: its approval is the acceptance (`.nstack/playbooks/framing.md` §5).
+
+*Accepted* counts what the decider accepted; a `dropped` deliverable counts in nothing. From its
+end date — the first day the cycle is over — the line says the circuit breaker fell and the
+decider chooses, and the pull request check refuses delivery work (K2). The project's own
+success — the charter's criteria — is recorded at a cycle's closure, and said with the project
+below. An agent reporting
+progress gives this line, so that one figure circulates.
+
+### On the forge
+
+The same plan, where a person already looks: after every merge to the default branch, and once a
+day — so that a new holder shows within a day —, the workflow *Plan on the forge* runs `nstack board`. Each cycle the decider accepted,
+closed or stopped is a **milestone** — titled by the cycle file's heading, due on its end date,
+its description carrying the line above, counts only — and each deliverable an **issue** in it: its acceptance
+criteria as a checklist, its module and state, who holds it, the pull requests that name it.
+An issue closes as *completed* when the deliverable is delivered or accepted, as *not planned* when it is
+dropped, deferred, or left unfinished by a closed cycle.
+
+Nothing is maintained by hand and nothing on the forge is the plan: an issue or a milestone edited
+there is put back at the next run, and the run says it updated it — it cannot tell an edit by
+hand from the plan moving: the plan is edited in the cycle files, in a pull request. The display
+finds its own objects by a marker in their body; an issue or a milestone a person made is never
+touched, and a person's milestone already holding a cycle's title is said, not overwritten. What cannot be shown — no token, a refusal, holds unreadable — is said in the
+run's summary, never a failed merge. The first run on a project creates an issue per deliverable,
+and the repository's watchers get a notification for each.
+
+## The project across its cycles
+
+There is no backlog to measure the project against: framing bounds one cycle at a time, and
+what it leaves out waits in that cycle's *Later*. `nstack plan` says the project as it stands,
+read from this folder and kept nowhere else — the charter's success criteria, every cycle in one
+line, and what the latest cycle left for the next framing:
+
+```
+Project: 0 of 3 success criteria met · criterion 1 observed since 2026-10-17 · 3 cycles: 1 accepted, 1 closed, 1 stopped
+  01-first-meeting  stopped (reframed) on 2026-10-13 · 1 of 7 accepted · 6 deferred
+  02-the-audio      closed (completed) on 2026-10-17 · 9 of 9 accepted
+  03-the-window     in progress, ends 2026-11-07 · 18 of 20 accepted · 2 in progress
+  Later in 03-the-window, for the next framing: 9 candidates
+```
+
+**The project's progress is its charter's success criteria.** A closure records the ones the
+decider says it moved, in the cycle's front matter — the charter itself changes only through a
+decision:
+
+```yaml
+success:
+  - criterion: 1          # its number in the charter's list, from 1
+    state: observing      # met | observing
+    since: 2026-10-17     # observing: the day observation started
+```
+
+A criterion's state is its latest record, in the order of the cycles; one never recorded is not
+yet met. Numbers follow the charter's list; a criterion still holding the form's words is
+listed, never counted. When every criterion is met, the line says the charter's goal is reached,
+and the decider says whether the project is finished. A record outside a closure, twice in one,
+on a number the charter does not fill, in an unknown state, or observing with no day is refused
+(C6).
+
+Each cycle is counted as its own line above counts it. Deliverables are never added up across
+cycles: one deferred by a cycle is often framed again in the next, and a total would count it
+twice. *Later* is the running cycle's, or between two cycles the last one ended — where the next
+framing starts; its candidates are counted when the section is a list, one item each, and prose is
+said as prose. A status or an outcome the plan's rules refuse is said as unknown, and a date they refuse is left
+out: none is printed raw. The view is `nstack plan`'s alone — `nstack fitness` and CI keep to the cycle in progress.
+
+## Who holds a deliverable
+
+With several contributors, a deliverable is **held** before its first change, so that two of
+them never deliver it twice:
+
+```bash
+nstack claim D30 --person @alice --session <session>   # held; its first work branch d30-… made, unless one exists
+nstack plan                                             # who holds what, since when; what is stale
+nstack unclaim D30 --session <session>                 # given back: by its holder's session (its person read from the hold), the decider, anyone once stale; a record: who made it, the decider
+nstack claim D30 --take-over --person @alice            # a hold nobody worked on for hold_days, or your own person's other session
+nstack claim '#14' --person @alice --session <session>  # an issue no cycle plans — a bug, a flaky test: held the same way, work on issue-14-…
+```
+
+The hold works the same on any forge, and on none. On GitHub, with a token, the claim also opens a
+draft pull request from its first work branch, where people look; on another forge nothing is shown
+there, the claim says so, and `nstack plan` is where the hold is seen.
+
+An issue is held as a deliverable is, in a framed project or not: the forge's assignee says who
+works on it and refuses nobody, the hold does. `nstack plan` lists the issues held. Quote `'#14'`
+— `#` starts a shell comment — or write `14`. Its work merged, its holder gives it back
+(`nstack unclaim '#14'`): an issue's hold does not end with a cycle.
+
+Two agents one person runs are two holders: a session renews only a hold it is on, or one its
+own agent put there. Another agent's session of that person, or any session outside `nstack
+agent run`, is refused like anyone else, and takes the hold with `--take-over` when the person
+says so, stale or not; a person with no `--session` renews their own. An agent restarted under a new session is the same holder: in
+`nstack agent run`, when its own App's identity committed every event that put a session on the
+hold, `nstack claim D30 --person @alice --session <it>` renews it, says so and records the session
+it leaves, and `nstack unclaim D30 --person @alice --session <it>` gives it back. Two live sessions
+of one agent are therefore one holder. A renewed
+hold with no work branch left gets its first one again, unless the deliverable is merged.
+
+An empty branch its claim started for another title of the same id — an earlier cycle's `D30` —
+is never this deliverable's work: the claim makes its own beside it.
+
+When a deliverable's work went on other branches, the empty branch its claim started — one empty
+commit — is the framework's own: `nstack deliver` removes it with the delivery, here and on the
+remote, unless a push since gave it work. `nstack plan` names those left — the default branch
+records the deliverable's delivery (its `Deliverable:` line, or its id in parentheses in a
+subject), it is no longer `ready` or `in-progress`, or it belongs to another cycle — and
+`nstack plan --prune` removes them all, the decider's one command for what no delivery meets.
+
+The hold is a branch of the shared remote, `nstack/hold/<cycle>/D30`, whose commits are its
+events; the remote takes the first of two claims and refuses the second. The cycle a claim reads
+is the one on that remote's default branch, whatever this checkout holds. A remote that is
+somebody's clone — a `git clone --shared` of a working clone — is refused: a hold pushed there is
+nobody else's. A local hub, bare or a working tree cloned from nowhere, stays a shared remote. A hold's last work is
+its newest event or commit on a branch `d30-…`; with none for `hold_days` (an answer of the
+project, 7 by default) it is **stale**, and anyone may take it over — recorded, with whom it was
+taken from; the previous work is kept. The pull request check refuses delivery work for a
+deliverable someone else holds (K5): its commits name none of the hold's sessions, and no
+author, committer or opener is its person; nobody holds it, it asks nothing. A holder working
+from a new session takes it first, on the person's word — `nstack claim D30 --take-over --person @alice --session <it>` —,
+or, an agent restarted under its own identity, renews it with `nstack claim D30 --person @alice --session <it>`. The
+previous session's work goes on with the new one: its commits — a merge of the default branch into
+the former branch is enough — name the new session, and K5 reads it there. A hold says who is
+accountable; it proves nobody's identity.
+
+**A hold lasts its cycle.** Once the cycle is closed or stopped, nothing it guarded can be delivered, and
+a deliverable framed again is held afresh, on a branch of the new cycle. `nstack unclaim` says such a
+hold ended rather than refusing it. Its branch is never deleted — the ruleset forbids it: it is the
+hold's record, and the cycle in its name tells a finished hold from a live one.
+
+The charter changes only through a PDR (`.nstack/handbook/06-decisions.md` §4). A cycle is never
+extended: past its end date, delivery work stops until the decider records a decision.

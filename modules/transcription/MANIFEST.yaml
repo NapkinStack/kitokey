@@ -1,0 +1,153 @@
+# Machine-readable source of truth for the module.
+# Read by: humans (onboarding), agents (scoping), CI (fitness functions).
+# Any divergence between this file and the code fails CI.
+
+module:
+  name: "transcription"
+
+  # ONE sentence. If it needs an "and", the module probably does two things.
+  responsibility: >
+    Turns the audio of a session into a timestamped transcript.
+
+  owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
+  contact: "@NapkinStack/maintainers"
+
+  # proposed | active | maintenance | deprecated | retired   (.nstack/handbook/02-modules.md §6)
+  lifecycle: active
+
+  # What does a failure of this module cost? nothing, thrown away | a user's patience |
+  # a day of work | a key, an order, money, personal data. The decider settles it; what
+  # each value requires is the table in .nstack/handbook/05-workflow.md §7.
+  # prototype | standard | high | critical
+  criticality: "standard"
+
+  # Does a user see this module? true requires a test sheet on its pull requests from
+  # standard up (.nstack/handbook/05-workflow.md §7).
+  user_facing: true
+
+  # The module's name in the code, when it differs from the folder (package, namespace).
+  # Used by boundary detection.
+  # code_name: transcription
+
+  # Only when lifecycle = deprecated. The check turns red once the date has passed.
+  # deprecation:
+  #   replaced_by:
+  #   removal_date: YYYY-MM-DD
+
+# Contracts PROVIDED by this module. `path` holds its document (B7).
+provides:
+  - contract: transcript
+    version: v1
+    path: contracts/transcript/v1
+    stability: experimental      # experimental | stable | deprecated
+#  - contract: transcription-api
+#    version: v1
+#    path: contracts/transcription-api/v1
+#    stability: experimental      # experimental | stable | deprecated
+#    # removal_date: YYYY-MM-DD   # required when stability = deprecated
+
+# Contracts CONSUMED - this is the DECLARED graph.
+# CI compares it with the contracts this module's files read: one read and not declared
+# fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
+consumes:
+  - contract: session-audio
+    version: v1
+    module: capture
+  - contract: session-audio
+    version: v2
+    module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
+#  - contract: identity-api
+#    version: v1
+#    module: identity
+
+# Data owned. Nobody else accesses it directly.
+data:
+  owns: []
+  shared: []                     # any exception requires a named ADR
+
+# Significant external dependencies.
+# Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
+dependencies:
+  - name: serde_json
+    purpose: Writes and reads the lines of the transcript
+    adr: docs/adr/0003-transcribe-behind-one-interface-whisper-on-the-graphics-card.md
+    exit_strategy: One writer and one reader of lines in src/lib.rs; any JSON library replaces it.
+  - name: whisper-rs
+    purpose: Whisper on this machine, through whisper.cpp built with the module — the engine every system can run
+    adr: docs/adr/0003-transcribe-behind-one-interface-whisper-on-the-graphics-card.md
+    exit_strategy: One file, src/whisper.rs, behind the Engine interface of src/step.rs; another engine is another file.
+  - name: rubato
+    purpose: Brings a track of any rate to the 16,000 samples a second an engine hears
+    adr: docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md
+    exit_strategy: >
+      One function, `resampled` in src/tracks.rs, measured by tests/tracks.rs on notes; any
+      resampler that passes them replaces it.
+  - name: ureq
+    purpose: Sends a span to the transcription service the user named, OpenAI's /audio/transcriptions (D43)
+    adr: docs/adr/0013-a-transcription-service-the-user-names-heard-as-the-minutes-are-written.md
+    exit_strategy: >
+      One function, `ask` in src/online.rs, held by tests/online.rs against a server played on the
+      machine; the shell and summary use the same client; any HTTP client replaces it there.
+  - name: sonora
+    purpose: Takes the echo of loudspeakers out of what an engine hears of the microphone — WebRTC's canceller, in Rust
+    adr: docs/adr/0004-the-audio-as-recorded-is-kept-everything-else-is-derived.md
+    exit_strategy: >
+      One function, `cancelled` in src/echo.rs, held by tests/echo.rs and by the bench's
+      counts; any canceller that passes them replaces it.
+  - name: symphonia
+    purpose: Reads a track kept as FLAC once its recording stopped (session-audio/v3), its FLAC decoder alone
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      One function, `opened` in src/flac.rs, held by tests/tracks.rs and tests/as_delivered.rs on FLACs
+      libFLAC wrote; claxon, or libFLAC's own decoder, passes them in its place (ADR-0016).
+  - name: chrono
+    purpose: When the transcript was made whole, its `complete` line's `made`, in this computer's time
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One call in `complete`, src/lib.rs, held by tests/writing.rs; the same crate and call as
+      capture's, summary's and the shell's.
+  - name: tracing
+    purpose: The steps and failures the program logs, as events of a run (ADR-0007)
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: The info! and error! calls of src/main.rs and src/step.rs; any logging facade replaces them.
+  - name: tracing-subscriber
+    purpose: Writes those events as JSON lines, at the level asked
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: tracing-appender
+    purpose: A file a day
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
+#  - name:
+#    purpose:
+#    adr:
+#    exit_strategy:
+
+# Standard verbs: the same names everywhere, running this module's stack commands
+# (.nstack/handbook/09-platform.md §2). `nstack <verb> <module>` runs them from this folder.
+# No stack is imposed. check and test are required once the module holds more than its
+# description (fitness M7): declare them before its first file of code.
+commands:
+  bootstrap: bash scripts/bootstrap.sh
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  test: cargo test --locked
+  run: cargo run --locked --release --
+  clean: cargo clean
+  release: bash scripts/release.sh
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  adr: docs/adr/
+  # runbook: docs/runbook.md     # required when criticality >= high

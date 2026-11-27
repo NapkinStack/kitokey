@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A line of transcript.jsonl",
+  "description": "transcript/v1 — one JSON object a line. What a schema cannot say is on the contract's page: the order of the lines, that they are only ever added until the transcript is complete, that a segment ends after it starts.",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "header"
+        },
+        "contract": {
+          "const": "transcript/v1"
+        },
+        "engine": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "context": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "type",
+        "contract",
+        "engine",
+        "model",
+        "language",
+        "context"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "segment"
+        },
+        "speaker": {
+          "$ref": "#/$defs/speaker"
+        },
+        "track": {
+          "$ref": "#/$defs/track"
+        },
+        "voice": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "not": {
+            "type": "string",
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "start": {
+          "$ref": "#/$defs/seconds"
+        },
+        "end": {
+          "$ref": "#/$defs/seconds"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "edited": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the user corrected this segment's text, once the transcript was complete (ADR-0014). Absent: as the engine heard it."
+        },
+        "given": {
+          "description": "When a person gave this segment its voice, once the transcript was complete: RFC 3339 with its offset, as the page says — the page's promise, not this schema's. Absent: the voice is the producer's. It comes with voice, never without; that voice is then a person's label, starting with #, or null — the page's promise too: the comparator cannot decide a condition between two fields.",
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        }
+      },
+      "required": [
+        "type",
+        "speaker",
+        "start",
+        "end",
+        "text"
+      ],
+      "dependentRequired": {
+        "given": [
+          "voice"
+        ]
+      },
+      "if": {
+        "properties": {
+          "speaker": {
+            "const": "me"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "track": {
+            "const": "local"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "track": {
+            "const": "remote"
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "covered"
+        },
+        "speaker": {
+          "$ref": "#/$defs/speaker"
+        },
+        "until": {
+          "$ref": "#/$defs/seconds"
+        }
+      },
+      "required": [
+        "type",
+        "speaker",
+        "until"
+      ]
+    },
+    {
+      "type": "object",
+      "properties": {
+        "type": {
+          "const": "complete"
+        },
+        "duration": {
+          "$ref": "#/$defs/seconds"
+        },
+        "made": {
+          "description": "When the transcript was made whole: RFC 3339 with its offset, as the page says — the page's promise, not this schema's. Absent: made before it was written.",
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "[\\n\\r]"
+          }
+        },
+        "made_in": {
+          "description": "The time the one step that made it whole took, from its start to its last line, in seconds. Absent: made in several steps (live), or not measured.",
+          "$ref": "#/$defs/seconds"
+        },
+        "cost": {
+          "description": "The price the service reported for the making, as it reported it; never an estimate. With its currency, or neither.",
+          "type": "number",
+          "minimum": 0
+        },
+        "currency": {
+          "description": "That price's currency, an ISO 4217 code: three capital letters.",
+          "type": "string",
+          "pattern": "^[A-Z]{3}",
+          "maxLength": 3
+        }
+      },
+      "required": [
+        "type",
+        "duration"
+      ],
+      "dependentRequired": {
+        "cost": [
+          "currency"
+        ],
+        "currency": [
+          "cost"
+        ]
+      }
+    },
+    {
+      "description": "A line of a type this version does not name: a reader skips it.",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "not": {
+            "enum": [
+              "header",
+              "segment",
+              "covered",
+              "complete"
+            ]
+          }
+        }
+      },
+      "required": [
+        "type"
+      ]
+    }
+  ],
+  "$defs": {
+    "speaker": {
+      "enum": [
+        "me",
+        "others"
+      ]
+    },
+    "seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "track": {
+      "enum": [
+        "local",
+        "remote"
+      ]
+    }
+  }
+}

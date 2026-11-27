@@ -1,0 +1,439 @@
+# Machine-readable source of truth for the module.
+# Read by: humans (onboarding), agents (scoping), CI (fitness functions).
+# Any divergence between this file and the code fails CI.
+
+module:
+  name: "shell"
+
+  # ONE sentence. If it needs an "and", the module probably does two things.
+  responsibility: >
+    Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifications, one window.
+
+  owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
+  contact: "@NapkinStack/maintainers"
+
+  # proposed | active | maintenance | deprecated | retired   (.nstack/handbook/02-modules.md §6)
+  lifecycle: active
+
+  # What does a failure of this module cost? nothing, thrown away | a user's patience |
+  # a day of work | a key, an order, money, personal data. The decider settles it; what
+  # each value requires is the table in .nstack/handbook/05-workflow.md §7.
+  # prototype | standard | high | critical
+  criticality: "standard"
+
+  # Does a user see this module? true requires a test sheet on its pull requests from
+  # standard up (.nstack/handbook/05-workflow.md §7).
+  user_facing: true
+
+  # The module's name in the code, when it differs from the folder (package, namespace).
+  # Used by boundary detection.
+  # code_name: shell
+
+  # Only when lifecycle = deprecated. The check turns red once the date has passed.
+  # deprecation:
+  #   replaced_by:
+  #   removal_date: YYYY-MM-DD
+
+# Contracts PROVIDED by this module. `path` holds its document (B7).
+provides: []
+#  - contract: shell-api
+#    version: v1
+#    path: contracts/shell-api/v1
+#    stability: experimental      # experimental | stable | deprecated
+#    # removal_date: YYYY-MM-DD   # required when stability = deprecated
+
+# Contracts CONSUMED - this is the DECLARED graph.
+# CI compares it with the contracts this module's files read: one read and not declared
+# fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
+consumes:
+  - contract: recording
+    version: v1
+    module: capture
+  - contract: transcript
+    version: v1
+    module: transcription
+  - contract: session-audio
+    version: v1
+    module: capture
+  - contract: session-audio
+    version: v2
+    module: capture
+  - contract: session-audio
+    version: v3
+    module: capture
+  - contract: minutes
+    version: v1
+    module: summary
+  - contract: minutes
+    version: v2
+    module: summary
+  - contract: minutes
+    version: v3
+    module: summary
+  - contract: minutes
+    version: v4
+    module: summary
+  - contract: summarising
+    version: v1
+    module: summary
+  # D110: `kitokey-send --check` judges a destination's address before it is kept.
+  - contract: posting
+    version: v1
+    module: send
+  # D109: `kitokey-export` writes each summary to the folder chosen in Settings.
+  - contract: exporting
+    version: v1
+    module: export
+#  - contract: identity-api
+#    version: v1
+#    module: identity
+
+# Data owned. Nobody else accesses it directly.
+data:
+  owns: []
+  shared: []                     # any exception requires a named ADR
+
+# Significant external dependencies.
+# Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
+dependencies:
+  - name: chrono
+    purpose: When a person corrected a transcript's line, written with its offset as the minutes' made is (D62)
+    adr: docs/adr/0014-a-transcript-line-corrected-in-place-once-complete.md
+    exit_strategy: One call in transcript_corrected, src/main.rs; any clock that formats RFC 3339 replaces it.
+  - name: serde_json
+    purpose: Reads the lines a step's program prints, and the logs' lines a meeting's diagnostic gathers
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One reader of lines in src/recording.rs and one in log::diagnostic; any JSON library replaces it.
+  - name: toml
+    purpose: Reads the settings file, a few lines the user can write by hand
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One call in src/settings.rs, behind serde; another format is another reader of the same struct.
+  - name: toml_edit
+    purpose: Writes the settings file again keeping the user's comments and the keys it does not know
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, write, in src/settings.rs; writing the whole file anew replaces it, losing comments.
+  - name: keyring-core
+    purpose: Keeps a provider's key in the system's keyring, never in a file — with its store for each system
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      Three functions and the store's opening in src/keys.rs; secret-tool, the Keychain and the
+      Credential Manager's own interfaces replace it.
+  - name: trash
+    purpose: Moves the audio kept longer than the settings say to the system's trash, never deleting it
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One call, trash::delete_all, in src/main.rs; gio trash and the systems' own trash
+      interfaces replace it.
+  - name: http
+    purpose: Reads a provider's address as kitokey-summary does, to tell one of this machine
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One parse, in providers::local; any reader of addresses kitokey-summary also uses replaces it.
+  - name: tauri-plugin-dialog
+    purpose: Opens the system's own dialog to choose the sessions' folder
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One call, blocking_pick_folder, in src/main.rs; rfd, which it wraps, or the folder typed
+      in the page replace it.
+  - name: dirs
+    purpose: Names the user's configuration and documents folders, on the three systems
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: Three calls in src/settings.rs; environment variables replace it on Linux.
+  - name: tauri
+    purpose: The tray, its menu, the application's life, and the window in the system's own web view
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      src/main.rs and the page in ui/ alone know it; the library beside it holds every
+      decision and knows no toolkit.
+  - name: tauri-plugin-single-instance
+    purpose: "One Kitokey per session — a second start hands its arguments to the running one and leaves (D35, #386)"
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One plugin and its callback in src/main.rs; a lock file and a socket, or the session bus's
+      own name ownership, replace it.
+  - name: tauri-plugin-notification
+    purpose: Shows a notification on the three systems
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, tell, in src/main.rs.
+  - name: ashpd
+    purpose: Asks a Linux desktop's portal for the global shortcut (ADR-0002)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, bound, in src/main.rs; elsewhere tauri-plugin-global-shortcut does it.
+  - name: libc
+    purpose: Ends a transcript with what its program started, by signalling its process group, on Linux and macOS
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One call in src/transcription.rs; the `kill` command, or nix, replaces it.
+  - name: notify-rust
+    purpose: A notification whose click opens the session's folder, under Linux; the toolkit's plugin tells no click
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, tell_opening, in src/main.rs; the toolkit's plugin, the day it tells a click.
+  - name: ureq
+    purpose: Fetches the default model, on the user's word, from where its authors publish it
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, receive, in src/model.rs; any HTTP client that sends a Range.
+  - name: sha2
+    purpose: Checks a fetched model against its published SHA-256 before it is used
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One function, fingerprint, in src/model.rs; any SHA-256.
+  - name: pulldown-cmark
+    purpose: Renders a session's minutes from CommonMark, the reader kitokey-summary judged them with
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      One function, parse_minutes, in src/minutes.rs; any CommonMark renderer whose events let
+      raw HTML and links be turned to text.
+  - name: sys-locale
+    purpose: Reads the language the user's system is set to, on the three systems
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One call in src/words.rs; the environment replaces it on Linux, a system call elsewhere.
+  - name: hyper
+    purpose: >
+      The loopback server the window plays an opened meeting from, its tracks alone (D26), with
+      hyper-util, http-body-util, bytes, futures-util and tokio — all already among Tauri's own
+      dependencies
+    adr: docs/adr/0008-the-window-plays-a-meeting-from-a-loopback-server.md
+    exit_strategy: >
+      src/player.rs alone: serve and answer; any HTTP server that bounds a request's headers,
+      never reads a body and caps the connections held replaces them.
+  - name: rubato
+    purpose: >
+      Brings a track of a lower rate up to the mix's, for the window's player (ADR-0009) — the
+      resampler the transcription already uses, same version
+    adr: docs/adr/0009-the-window-plays-a-meeting-s-tracks-as-one-sound.md
+    exit_strategy: One function, mix::Track::raised; any resampler of fixed ratio replaces it.
+  - name: symphonia
+    purpose: >
+      Reads a track kept as FLAC once its recording stopped (session-audio/v3) — for the diagnostic's
+      levels, then the list and the window's player —, its FLAC demuxer and decoder alone
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      src/flac.rs alone: open and frame held by tests/levels.rs, seek by tests/mix.rs, on FLACs libFLAC
+      wrote; claxon, or libFLAC's own decoder,
+      passes them in its place (ADR-0016).
+  - name: libflac-sys
+    purpose: >
+      For the tests only (a dev-dependency) — writes the FLACs the tests read as capture writes
+      them, with libFLAC, the reference, its verify on
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      One helper, tests/kept/mod.rs; the flac program, or any encoder Symphonia reads exactly,
+      replaces it. Removing it loses the tests, not the program.
+  - name: getrandom
+    purpose: The loopback server's token, 128 random bits from the system
+    adr: docs/adr/0008-the-window-plays-a-meeting-from-a-loopback-server.md
+    exit_strategy: One call in player::Served::start; the system's own source (/dev/urandom) replaces it.
+  - name: minisign-verify
+    purpose: >
+      Verifies the decider's minisign signature on the list of models read again (D56); 0.3.0,
+      MIT, no dependency of its own, by minisign's author
+    adr: docs/adr/0010-the-models-offered-are-a-list-kept-in-the-repository.md
+    exit_strategy: >
+      One function, verify in src/registry.rs, and a format that is public: any Ed25519 library
+      and the few lines that read a .minisig replace it; dropping the reading again leaves the
+      shipped list as it is.
+  - name: oxc_parser
+    purpose: >
+      For the tests only (a dev-dependency, with oxc_allocator, oxc_ast, oxc_ast_visit and oxc_span;
+      0.156, MIT) — reads window.js in tests/silence.rs (D67), where a reading of its text was shown
+      blind; none of it reaches the program built
+    adr: null
+    exit_strategy: >
+      One test file: any JavaScript parser's visitor replaces it, or ESLint's rule if the module comes
+      to hold Node. Removing it loses the test, not the program.
+  - name: minisign
+    purpose: >
+      For the tests only (a dev-dependency) — makes a key at each run and signs with it, so that
+      no key is kept in the repository
+    adr: docs/adr/0010-the-models-offered-are-a-list-kept-in-the-repository.md
+    exit_strategy: >
+      Two helpers of tests/registry_fetch.rs; a test-only pair and signatures written in the test
+      replace it.
+  - name: windows
+    purpose: >
+      On Windows only, the Store's licence and its purchase (D83): StoreContext, the package's
+      identity, and IInitializeWithWindow giving the Store Kitokey's window; 0.62, MIT or
+      Apache-2.0, Microsoft's own projection, already among Tauri's dependencies at this version
+    adr: docs/pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md
+    exit_strategy: >
+      The module store of src/licence.rs alone; windows-rs's smaller crates, or the same calls
+      through any WinRT projection, replace it. Removing it, Windows reads no licence: nothing
+      is limited, as on the zip.
+  - name: tracing
+    purpose: The steps and failures the shell logs, each making under its id (ADR-0007)
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: >
+      The info! and error! calls of src/main.rs, src/recording.rs, src/transcription.rs and
+      src/summarising.rs; any logging facade replaces them.
+  - name: tracing-subscriber
+    purpose: Writes those events as JSON lines, at the level asked
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: tracing-appender
+    purpose: A file a day
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
+#  - name:
+#    purpose:
+#    adr:
+#    exit_strategy:
+
+# Standard verbs: the same names everywhere, running this module's stack commands
+# (.nstack/handbook/09-platform.md §2). `nstack <verb> <module>` runs them from this folder.
+# No stack is imposed. check and test are required once the module holds more than its
+# description (fitness M7): declare them before its first file of code.
+commands:
+  bootstrap: bash scripts/bootstrap.sh
+  # Every icon drawn from icons/kitokey.svg (D89), where ImageMagick and librsvg are (Linux); the
+  # header's name drawn from Montserrat by scripts/name.py, where fontTools and the font are.
+  # The page's script read for its syntax where Node is there (the hosted runners have it): a
+  # name declared twice in one scope blanks the whole window, which only the e2e saw (D42).
+  check: >-
+    bash -n scripts/release.sh && bash -n scripts/headless.sh && bash -n scripts/icons.sh
+    && { [ "$(uname)" != Linux ] || ! command -v magick >/dev/null || bash scripts/icons.sh --check; }
+    && { [ ! -f /usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Bold.otf ]
+    || ! python3 -c 'import fontTools' 2>/dev/null || python3 scripts/name.py --check; }
+    && { ! command -v node >/dev/null || { node --check ui/window.js && node --check ui/engines.js; }; }
+    && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  # And the licence's tests built for release, where the stand-in licence must never be read
+  # (D83): a build for release is what the Store sells.
+  test: cargo test --locked && cargo test --locked --release --test licence
+  run: cargo run --locked --release --bin kitokey
+  release: bash scripts/release.sh
+  # In a GNOME of the run's own, never on the user's desktop (scripts/headless.sh, README).
+  e2e: bash scripts/headless.sh
+  clean: cargo clean
+
+# Each warning or error a scenario of the e2e provokes on purpose, as its log line says it (D29).
+# Any other warning or error logged fails the run, and so does one declared and never logged
+# (scripts/e2e_logs.py); NapkinStack audits the same logs, in $NSTACK_EVIDENCE (M12).
+evidence:
+  # Its e2e brings its own session, sound server and ports, and reads nothing another run reads
+  # (D222): it neither waits on nor holds the machine's e2e lock.
+  sealed: true
+  provoked:
+    # The played recorder says the output has no device left (D31), at each of its starts: A, B, C, F, G, M, S;
+    # and the window's Q, when it asks (D33).
+    - pattern: '"message":"shell\.recording_lost"'
+      level: warning
+      scenario: A
+    # The window's AO: capture says the microphone chosen is gone, and its list cannot be read (D74).
+    - pattern: '"message":"shell\.recording_microphone_gone"'
+      level: warning
+      scenario: AO
+    - pattern: '"message":"shell\.microphones_unread"'
+      level: warning
+      scenario: AO
+    # The window's AO records with the settings' folder unwritable: the recording is not kept for a
+    # Kitokey started again to find (#773).
+    - pattern: '"message":"shell\.recording_not_kept"'
+      level: warning
+      scenario: AO
+    # The window's BH: a recording found, the settings' folder read-only, so that what was kept of it
+    # can be neither removed nor, unreadable, set aside (#818).
+    - pattern: '"message":"shell\.recording_not_forgotten"'
+      level: warning
+      scenario: BH
+    - pattern: '"message":"shell\.recording_unread"'
+      level: warning
+      scenario: BH
+    # The window's AN starts a recording with no microphone to open, its side said waiting (D49).
+    - pattern: '"message":"shell\.recording_unavailable"'
+      level: warning
+      scenario: AN
+    # The window's CF: the stand-in kitokey-export refuses the folder (file.unwritable), as a folder
+    # that cannot be written does; said on the meeting's page (D109).
+    - pattern: '"message":"shell\.export_failed"'
+      level: warning
+      scenario: CF
+    # The window's AV and AW: the stand-in licence says what no licence says, once in the log (D83).
+    - pattern: '"message":"shell\.licence_unread"'
+      level: warning
+      scenario: AV
+    # No recorder where Kitokey looks for one.
+    - pattern: '"message":"shell\.recording_failed"'
+      level: error
+      scenario: D
+    # The played engine fails once; the window's N has a transcript redone that fails; the window's AA
+    # ends a service hearing a meeting said confidential (D60).
+    - pattern: '"message":"shell\.transcript_failed"'
+      level: error
+      scenario: F
+    # The window's Z tests a model that gives no segment times: refused, as the step says it (D43, D63).
+    - pattern: '"message":"shell\.transcription_test_failed"'
+      level: warning
+      scenario: Z
+    # What is fetched is not the published model, and is removed.
+    - pattern: '"message":"shell\.model_fetch_failed"'
+      level: error
+      scenario: G
+    # The list of models read again, refused: no key built in yet, nothing asked (the window's W, D40, D56).
+    - pattern: '"message":"shell\.registry_refused"'
+      level: warning
+      scenario: W
+    # Ollama's pull of the minutes' model cut, then refused (the window's V, D37).
+    - pattern: '"message":"shell\.model_pull_failed"'
+      level: error
+      scenario: V
+    # The settings name a provider that is no address.
+    - pattern: '"message":"shell\.minutes_refused"'
+      level: warning
+      scenario: M
+    # The window's BJ: a false key refused when the summary's service is asked its models (D95).
+    - pattern: '"message":"shell\.models_refused"'
+      level: warning
+      scenario: BJ
+    # Tester, a service that refuses the key.
+    - pattern: '"message":"shell\.test_failed"'
+      level: error
+      scenario: K
+    # The played summary answers no minutes; the window's AA ends one a service writes, the meeting
+    # said confidential (D60).
+    - pattern: '"message":"shell\.minutes_failed"'
+      level: error
+      scenario: N
+    # A command the page calls refused (D47): the window's AB corrects a transcript not complete.
+    - pattern: '"message":"shell\.command_failed"'
+      level: warning
+      scenario: AB
+    # The window's K starts once on a settings file broken by hand: settings.rs's sentence goes to
+    # the log, the user is told which setting and what to do (#783).
+    - pattern: '"message":"shell\.settings_unread"'
+      level: warning
+      scenario: K
+    # The window's CL: a send played to fail by its destination (gone, busy, offline, silent), each said on
+    # the page with what to do (D110, posting/v1); any other send not sent is not provoked.
+    - pattern: '^(?=.*"message":"shell\.summary_not_sent")(?=.*"code":"destination\.(gone|busy|silent)")'
+      level: warning
+      scenario: CL
+    - pattern: '^(?=.*"message":"shell\.summary_not_sent")(?=.*"code":"network\.unreachable")'
+      level: warning
+      scenario: CL
+    # The window's CL: a send's record made unwritable on purpose; the send said all the same.
+    - pattern: '^(?=.*"message":"shell\.send_unrecorded")'
+      level: warning
+      scenario: CL
+    # A failure of the page's own, thrown then rejected; any other kind of the page's is not provoked.
+    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioI")'
+      level: error
+      scenario: I
+    # The window's BL: a reading refused on the way to a page: what is shown takes presses again.
+    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"ScenarioBL")'
+      level: error
+      scenario: BL
+    # An address that does not decode: its drawing fails, said on the page.
+    - pattern: '^(?=.*"message":"shell\.page_failed")(?=.*"kind":"URIError")'
+      level: error
+      scenario: BL
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  adr: docs/adr/
+  # runbook: docs/runbook.md     # required when criticality >= high

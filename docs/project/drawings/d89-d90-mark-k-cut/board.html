@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>D89 — D90, cinquième tour : le rond posé sur le K, qui le coupe</title>
+<!-- The source of the images beside it, rendered at 1280 px by chromium-browser --headless.
+     The colours are ui/window.css's, both themes. The name is set in Montserrat 700 (OFL) as
+     installed on the author's workstation; the name kept is outlined before it is published.
+     ?dark draws the dark theme; ?only=N draws board N alone. Icons: Lucide 1.14.0, inline,
+     ISC (modules/shell/ui/LUCIDE-LICENSE). Yellow = the author's notes, never the interface. -->
+<style>
+  :root {
+    --ground: #F2F4F7; --surface: #FFFFFF; --raised: #EEF1F5; --line: #D9DDE5;
+    --ink: #15171C; --soft: #4C5464; --accent: #2253CF; --ok: #16794A; --red: #C2352D;
+    --on-accent: #FFFFFF; --edge: #808898;
+    --note: #7A5A00; --note-ground: #FFF6DB; --note-line: #C9A227;
+  }
+  :root.dark {
+    --ground: #15171C; --surface: #1E2129; --raised: #282C37; --line: #343946;
+    --ink: #EEF0F4; --soft: #AAB1BF; --accent: #8AB0FF; --ok: #63D49C; --red: #FF7A72;
+    --on-accent: #1E2129; --edge: #737B8C;
+    --note: #F2CC6B; --note-ground: #2E2A1E; --note-line: #8C7330;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; width: 1280px; padding: 32px 34px 8px; background: var(--ground); color: var(--ink); font: 14px/1.45 system-ui, sans-serif; }
+  section { margin-bottom: 40px; }
+  h2 { margin: 0 0 14px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--soft); }
+  .note { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--note-ground); color: var(--note); font-size: 13px; line-height: 1.45; }
+  .note b { display: block; margin-bottom: 2px; }
+  .note ul { margin: 4px 0 0; padding-left: 18px; }
+  .row { display: flex; gap: 32px; align-items: flex-start; }
+  .col { display: flex; flex-direction: column; gap: 12px; }
+  .cap { font-size: 12px; color: var(--soft); }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; }
+  svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .hidden-board { display: none !important; }
+  .tiles { display: flex; align-items: flex-end; gap: 14px; }
+  .grid24 { background-color: var(--surface); background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px); background-size: 10px 10px; border: 1px solid var(--line); border-radius: 8px; }
+  .tray { display: flex; gap: 12px; align-items: center; padding: 8px 12px; border-radius: 8px; font-size: 11px; }
+  .tray.darkbar { background: #000; color: #FFF; --rec: #FF7A72; }
+  .tray.lightbar { background: #F3F3F3; color: #15171C; border: 1px solid #D9DDE5; --rec: #C2352D; }
+  .tray .sep { width: 1px; align-self: stretch; background: currentColor; opacity: .25; }
+  .wm { font-family: Montserrat, system-ui, sans-serif; font-weight: 700; letter-spacing: -.02em; display: inline-flex; align-items: baseline; line-height: 1; }
+  .wm .ii { position: relative; display: inline-block; }
+  .wm .ii .dot { position: absolute; left: 50%; transform: translateX(-50%); border-radius: 50%; background: var(--wdot, currentColor); box-shadow: 0 0 0 var(--cut) var(--cutc, var(--surface)); }
+  .cands { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .cand { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .cand.pick { box-shadow: 0 0 0 2px var(--note-line); }
+  .cand .name { font-size: 15px; font-weight: 700; display: flex; align-items: baseline; gap: 8px; }
+  .cand .name .l { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 6px; background: var(--raised); font-size: 12px; }
+  .cand .idea { font-size: 12.5px; color: var(--soft); min-height: 38px; }
+  .cand .tray { padding: 8px 10px; gap: 10px; font-size: 10px; }
+  .head { display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; font-weight: 700; font-size: 15px; width: 280px; }
+  .bar { width: 440px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 8px 28px rgba(0,0,0,.16); flex: none; }
+  .strip { height: 44px; padding: 0 8px; display: flex; align-items: center; gap: 4px; }
+  .strip > .gap { width: 4px; }
+  .handle { width: 28px; height: 28px; display: grid; place-items: center; flex: none; }
+  .ib { width: 28px; height: 28px; border-radius: 6px; display: inline-grid; place-items: center; color: var(--soft); flex: none; }
+  .fld { height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--edge); background: var(--surface); display: flex; align-items: center; font-size: 13px; min-width: 0; flex: 1; }
+  .fld .ph { color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rb { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); display: grid; place-items: center; flex: none; background: var(--surface); }
+  .rb i { width: 14px; height: 14px; border-radius: 50%; background: var(--red); }
+  .sq { width: 28px; height: 28px; border-radius: 8px; background: var(--red); display: grid; place-items: center; flex: none; }
+  .sq i { width: 10px; height: 10px; border-radius: 2px; background: var(--on-accent); }
+  :root.dark .sq i { background: #1E2129; }
+  .time { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; width: 64px; padding-left: 4px; }
+  .meters { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; padding: 0 8px; }
+  .mt { display: flex; align-items: center; gap: 6px; height: 16px; color: var(--soft); }
+  .mt .track { flex: 1; height: 4px; border-radius: 2px; background: var(--raised); overflow: hidden; }
+  .mt .fill { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
+  .mt.far .fill { background: var(--ok); }
+  .arrow { font-size: 22px; color: var(--soft); }
+</style>
+<script>
+  if (location.search.includes("dark")) document.documentElement.classList.add("dark");
+</script>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+<symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></symbol>
+<symbol id="i-volume-2" viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="m21 3-7 7"/><path d="m3 21 7-7"/><path d="M9 21H3v-6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+</defs>
+</svg>
+
+<!-- ═══════════════ 1 · LE ROND SUR LE K ═══════════════ -->
+<section data-board="1">
+  <h2>1 · La marque, cinquième tour — le K entier, le rond d’enregistrement posé dessus, la lettre coupée autour de lui (D89)</h2>
+  <div class="cands" data-cands></div>
+  <h3 style="margin-top:24px">Construction de P1 — grille de 24 : le K entier, puis le rond et sa découpe</h3>
+  <div class="row" style="gap:20px;align-items:flex-end" data-build></div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Le K est entier — fût, bras, jambe, trait 3,2, bouts ronds. Le rond d’enregistrement se pose sur la lettre et la <b style="display:inline">coupe</b> : un jour de 1,3 autour du rond, comme le point du « i » dans « kitokey » au troisième tour. Pas d’anneau dessiné : la découpe est du vide, elle prend la couleur du fond.</li>
+      <li><b style="display:inline">P1 · Sur le fût</b> : le rond coiffe le fût, à la place exacte du point du « i » — le même geste dans la marque et dans le nom. <b style="display:inline">P2 · Au cœur</b> : là où bras et jambe se rejoignent. <b style="display:inline">P3 · Au bout du bras</b> : le bras se lève vers le bouton. <b style="display:inline">P4 · Point final</b> : au pied de la jambe.</li>
+      <li>La recommandation de l’auteur : <b style="display:inline">P1</b> — la marque et le nom se répondent lettre pour lettre ; P3 si le rond doit se voir le premier.</li>
+      <li>Au repos, le rond a la couleur de la lettre. Pendant un enregistrement, il devient rouge et grossit un peu (rayon 3,3 → 3,7, la découpe suit) : la forme change aussi, la couleur ne parle pas seule. L’icône de l’application, une image fixe, reste au repos.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══════════════ 2 · LE MÊME ROND DANS LE NOM ═══════════════ -->
+<section data-board="2">
+  <h2>2 · Le rond se déplace — sur le K dans la marque, sur le i dans le nom ; rouge pendant un enregistrement · tracé avec P1 (D89, D90)</h2>
+  <div class="col" style="gap:18px">
+    <div class="card" style="display:flex;align-items:center;gap:28px" data-move></div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>Le nom, au repos</h3><div class="card" data-wm-rest></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div class="card" data-wm-rec></div></div>
+      <div class="col" style="gap:6px"><h3>Sur l’accent</h3><div class="card" style="background:#2253CF;border-color:#2253CF;color:#fff;--cutc:#2253CF" data-wm-inv></div></div>
+    </div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>L’en-tête de la fenêtre, au repos</h3><div class="head" data-head="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement</h3><div class="head" data-head="rec"></div></div>
+    </div>
+    <div class="row" style="gap:28px">
+      <div class="col" style="gap:6px"><h3>La barre, au repos — la poignée est la marque</h3><div data-bar="rest"></div></div>
+      <div class="col" style="gap:6px"><h3>Pendant un enregistrement — le rond de la poignée rougit</h3><div data-bar="rec"></div></div>
+    </div>
+  </div>
+  <div class="note"><b>Propositions</b>
+    <ul>
+      <li>Un seul rond, qui change de lettre : sur le K quand la marque est seule, sur le i quand le nom est écrit en entier ; il coupe la lettre de la même façon aux deux places.</li>
+      <li>Au repos, le rond a la couleur du texte ; il rougit seulement pendant un enregistrement — barre système, poignée de la barre, en-tête de la fenêtre, et sur kitokey.com une animation courte (aucune si le système demande moins d’animations).</li>
+      <li>Hors du carreau (poignée, en-tête), la marque est tracée à l’accent sur la surface : un rouge sur le carreau bleu n’atteint pas 3:1 (quatrième tour).</li>
+    </ul>
+  </div>
+</section>
+
+<script>
+  // The mark: a whole K; a round dot at one of four places, cutting the K around it by a 1.3 gap.
+  const K = `<path d="M6.5 4v16M6.5 14.2 17 4M9.8 11 17.3 20" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const PLACES = { P1: [6.5, 4.6, 3.3], P2: [8.3, 12.6, 3.2], P3: [16.6, 4.6, 3.3], P4: [16.8, 19.4, 3.3] };
+  let uid = 0;
+  // rec: the dot red (--rec) and 0.4 larger. color: the K's colour. The cut is a mask: empty, the ground shows.
+  const mark = (place, size, { rec = false, color = "currentColor", style = "" } = {}) => {
+    const [x, y, r0] = PLACES[place], r = rec ? r0 + 0.4 : r0, id = `cut${++uid}`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="color:${color};${style}"><defs><mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#fff"/><circle cx="${x}" cy="${y}" r="${r + 1.3}" fill="#000"/></mask></defs><g mask="url(#${id})">${K}</g><circle cx="${x}" cy="${y}" r="${r}" style="fill:${rec ? "var(--rec)" : "currentColor"}"/></svg>`;
+  };
+  const tile = (place, size) => `<svg width="${size}" height="${size}" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#2253CF"/><foreignObject x="10" y="10" width="44" height="44">${mark(place, 44, { color: "#FFFFFF" })}</foreignObject></svg>`;
+  const bare = (place, size, rec) => mark(place, size, { rec, color: "var(--accent)", style: "--rec:var(--red)" });
+  const tray = (place, cls) => `<div class="tray ${cls}">${mark(place, 16)}${mark(place, 22)}<span class="sep"></span>${mark(place, 16, { rec: true })}${mark(place, 22, { rec: true })}<span style="opacity:.7">repos | rec.</span></div>`;
+  const names = { P1: ["Sur le fût", "Le rond coiffe le fût, à la place du point du « i »."], P2: ["Au cœur", "Le rond au croisement du bras et de la jambe."], P3: ["Au bout du bras", "Le bras se lève vers le rond, comme vers un bouton."], P4: ["Point final", "Le rond au pied de la jambe."] };
+  document.querySelector("[data-cands]").innerHTML = Object.keys(PLACES).map(p => `
+    <div class="cand${p === "P1" ? " pick" : ""}">
+      <div class="name"><span class="l">${p}</span>${names[p][0]}</div>
+      <div class="idea">${names[p][1]}</div>
+      <div class="tiles">${tile(p, 80)}${tile(p, 48)}${tile(p, 32)}${tile(p, 24)}${tile(p, 16)}</div>
+      <div class="cap">80 · 48 · 32 · 24 · 16 px</div>
+      ${tray(p, "darkbar")}${tray(p, "lightbar")}
+      <div class="head" style="width:auto;height:44px">${bare(p, 22, false)}Kitokey<span style="margin-left:auto"></span>${bare(p, 22, true)}</div>
+    </div>`).join("");
+  const grid = inner => `<div class="grid24" style="width:200px;height:200px;color:var(--ink);display:grid;place-items:center">${inner}</div>`;
+  document.querySelector("[data-build]").innerHTML =
+    `<div class="col" style="gap:6px">${grid(`<svg width="200" height="200" viewBox="0 0 24 24" style="color:var(--ink)">${K}</svg>`)}<span class="cap">Le K entier</span></div>` +
+    `<div class="col" style="gap:6px">${grid(`<svg width="200" height="200" viewBox="0 0 24 24">${K}<circle cx="6.5" cy="4.6" r="4.6" fill="none" stroke="var(--note-line)" stroke-width=".15" stroke-dasharray=".5 .3"/><circle cx="6.5" cy="4.6" r="3.3" fill="var(--note-line)" opacity=".5"/></svg>`)}<span class="cap">Le rond (3,3) et sa découpe (+1,3)</span></div>` +
+    `<div class="col" style="gap:6px">${grid(mark("P1", 200, { color: "var(--ink)" }))}<span class="cap">Au repos</span></div>` +
+    `<div class="col" style="gap:6px">${grid(mark("P1", 200, { rec: true, color: "var(--ink)", style: "--rec:var(--red)" }))}<span class="cap">Pendant un enregistrement</span></div>`;
+
+  // The name: "k", a dotless i, the dot set on its stem and cutting it, "tokey".
+  const wm = (s, dot = "currentColor") => `<span class="wm" style="font-size:${s}px;--wdot:${dot};--cut:${Math.max(1.5, s * 0.06)}px">k<span class="ii">ı<span class="dot" style="width:${s * 0.25}px;height:${s * 0.25}px;top:${s * 0.17}px"></span></span>tokey</span>`;
+  document.querySelector("[data-move]").innerHTML = `${tile("P1", 96)}<span class="arrow">⇄</span>${wm(72)}<span class="cap" style="max-width:300px">Le même rond, qui coupe sa lettre de la même façon : sur le K dans la marque, sur le i dans le nom.</span>`;
+  document.querySelector("[data-wm-rest]").innerHTML = wm(44);
+  document.querySelector("[data-wm-rec]").innerHTML = wm(44, "var(--red)");
+  document.querySelector("[data-wm-inv]").innerHTML = wm(44);
+  for (const el of document.querySelectorAll("[data-head]")) {
+    const rec = el.dataset.head === "rec";
+    el.innerHTML = `${bare("P1", 24, rec)}Kitokey${rec ? `<span style="margin-left:auto;font-size:12px;font-weight:600;color:var(--red)">00:16:42</span>` : ""}`;
+  }
+
+  const I = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+  const tools = `<span class="ib">${I("chevron-down")}</span><span class="ib">${I("maximize-2")}</span><span class="ib">${I("minus")}</span>`;
+  const draw = {
+    rest: () => `<div class="strip"><span class="handle">${bare("P1", 22, false)}</span><span class="gap"></span><span class="fld"><span class="ph">Contexte de la réunion</span></span><span class="gap"></span><span class="rb"><i></i></span><span class="gap"></span>${tools}</div>`,
+    rec: () => `<div class="strip"><span class="handle">${bare("P1", 22, true)}</span><span class="time">00:16:42</span><span class="meters"><span class="mt">${I("mic")}<span class="track"><i class="fill" style="width:62%"></i></span></span><span class="mt far">${I("volume-2")}<span class="track"><i class="fill" style="width:38%"></i></span></span></span><span class="sq"><i></i></span><span class="gap"></span>${tools}</div>`,
+  };
+  for (const host of document.querySelectorAll("[data-bar]")) {
+    const bar = document.createElement("div"); bar.className = "bar"; bar.innerHTML = draw[host.dataset.bar](); host.append(bar);
+  }
+
+  const only = new URLSearchParams(location.search).get("only");
+  if (only) for (const s of document.querySelectorAll("section")) if (s.dataset.board !== only) s.classList.add("hidden-board");
+  document.body.dataset.h = Math.ceil(document.body.getBoundingClientRect().height);
+</script>
+</body>
+</html>

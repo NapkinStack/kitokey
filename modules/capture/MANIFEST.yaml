@@ -1,0 +1,183 @@
+# Machine-readable source of truth for the module.
+# Read by: humans (onboarding), agents (scoping), CI (fitness functions).
+# Any divergence between this file and the code fails CI.
+
+module:
+  name: "capture"
+
+  # ONE sentence. If it needs an "and", the module probably does two things.
+  responsibility: >
+    Records the audio sources of a conversation into a session.
+
+  owner: "NapkinStack/maintainers"          # a GitHub team, organisation/team; a user only without an organisation
+  contact: "@NapkinStack/maintainers"
+
+  # proposed | active | maintenance | deprecated | retired   (.nstack/handbook/02-modules.md §6)
+  lifecycle: active
+
+  # What does a failure of this module cost? nothing, thrown away | a user's patience |
+  # a day of work | a key, an order, money, personal data. The decider settles it; what
+  # each value requires is the table in .nstack/handbook/05-workflow.md §7.
+  # prototype | standard | high | critical
+  criticality: "critical"
+
+  # Does a user see this module? true requires a test sheet on its pull requests from
+  # standard up (.nstack/handbook/05-workflow.md §7).
+  user_facing: true
+
+  # The module's name in the code, when it differs from the folder (package, namespace).
+  # Used by boundary detection.
+  # code_name: capture
+
+  # Only when lifecycle = deprecated. The check turns red once the date has passed.
+  # deprecation:
+  #   replaced_by:
+  #   removal_date: YYYY-MM-DD
+
+# Contracts PROVIDED by this module. `path` holds its document (B7).
+provides:
+  - contract: session-audio
+    version: v1
+    path: contracts/session-audio/v1
+    stability: experimental      # experimental | stable | deprecated
+  - contract: session-audio
+    version: v2
+    path: contracts/session-audio/v2
+    stability: experimental
+  # What `record` writes unasked (D87); v2 on `--as v2`, v1 on `--as v1`.
+  - contract: session-audio
+    version: v3
+    path: contracts/session-audio/v3
+    stability: experimental
+  - contract: recording
+    version: v1
+    path: contracts/recording/v1
+    stability: experimental
+#  - contract: capture-api
+#    version: v1
+#    path: contracts/capture-api/v1
+#    stability: experimental      # experimental | stable | deprecated
+#    # removal_date: YYYY-MM-DD   # required when stability = deprecated
+
+# Contracts CONSUMED - this is the DECLARED graph.
+# CI compares it with the contracts this module's files read: one read and not declared
+# fails (B1), one declared and never read is reported (B4), one nobody provides fails (B6).
+consumes: []
+#  - contract: identity-api
+#    version: v1
+#    module: identity
+
+# Data owned. Nobody else accesses it directly.
+data:
+  owns: []
+  shared: []                     # any exception requires a named ADR
+
+# Significant external dependencies.
+# Each one declares its exit strategy (.nstack/handbook/06-decisions.md §3).
+dependencies:
+  - name: cpal
+    purpose: Opens the microphone and what the system plays, with one code on the three systems
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >
+      Used in src/main.rs only, behind one function that hands samples to the library of
+      this module. A system it fails on gets its own capture there; src/lib.rs does not move.
+  - name: pipewire
+    purpose: On Linux, listens to a headset's virtual input passively, what cpal cannot ask of a stream
+    adr: docs/adr/0015-the-local-side-records-the-microphone-the-call-holds-passively.md
+    exit_strategy: >
+      The one file src/passive.rs, behind one function. Deleted, cpal opens the source again, and
+      #494 is back; on the day cpal offers the property, it goes. Its -sys crate allows one version
+      in a build, so its version moves with cpal's.
+  - name: libflac-sys
+    purpose: Writes a stopped track as FLAC with libFLAC, the reference, its verify on (session-audio/v3)
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      The one function written in src/keep.rs, held by tests/keep.rs; any encoder whose files Symphonia
+      reads back equal replaces it. Removed, the tracks stay WAV, which session-audio/v3 allows.
+  - name: symphonia
+    purpose: Reads a FLAC just written back from the disk, to compare every sample with its WAV before the WAV goes
+    adr: docs/adr/0016-flac-written-by-libflac-read-by-symphonia.md
+    exit_strategy: >
+      The one function checked in src/keep.rs, held by tests/keep.rs; claxon, or libFLAC's own decoder,
+      replaces it (ADR-0016's way out).
+  - name: chrono
+    purpose: The local day, hour and offset a session is named and dated by
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: Two calls in src/main.rs; any library that gives the local offset replaces it.
+  - name: ctrlc
+    purpose: Stops a recording cleanly on an interrupt or a termination signal
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: One call in src/main.rs; the system's own signal API replaces it.
+  - name: serde_json
+    purpose: Writes session.json and the events the program prints
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: Three small objects; written by hand if it had to go.
+  - name: tracing
+    purpose: The steps and failures the program logs, as events of a run (ADR-0007)
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: The info!, warn! and error! calls of src/main.rs; any logging facade replaces them.
+  - name: tracing-subscriber
+    purpose: Writes those events as JSON lines, at the level asked
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: tracing-appender
+    purpose: A file a day
+    adr: docs/adr/0007-each-program-logs-what-it-does-never-what-was-said.md
+    exit_strategy: One function, start in src/log.rs.
+  - name: cargo-about
+    purpose: >-
+      Makes THIRD-PARTY-NOTICES.html from Cargo.lock, by hand when the lock changes;
+      never run by a build or a release (D102)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: >-
+      Its output is a committed HTML page, about.hbs its template; any generator that lists the
+      crates with their licence texts replaces it, and tests/notices.rs judges the result.
+#  - name:
+#    purpose:
+#    adr:
+#    exit_strategy:
+
+# Standard verbs: the same names everywhere, running this module's stack commands
+# (.nstack/handbook/09-platform.md §2). `nstack <verb> <module>` runs them from this folder.
+# No stack is imposed. check and test are required once the module holds more than its
+# description (fitness M7): declare them before its first file of code.
+commands:
+  bootstrap: bash scripts/bootstrap.sh
+  check: bash -n scripts/release.sh && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
+  test: cargo test --locked
+  run: cargo run --locked --release -- devices
+  release: bash scripts/release.sh
+  e2e: bash scripts/e2e.sh
+  clean: cargo clean
+
+# Each warning or error a scenario of the e2e provokes on purpose, as its log line says it (D29):
+# NapkinStack audits the run's logs, in $NSTACK_EVIDENCE, against it (M12).
+evidence:
+  provoked:
+    # A source that stops and comes back, twice (H), and one mute from its start (I): the gaps of
+    # zeros the remote track is filled with, each counted by its scenario.
+    - pattern: '"message":"capture\.zeros"'
+      level: warning
+      scenario: H
+    # The default input is a stand-in headset's, and no call has it: the microphone waits (M).
+    - pattern: '"message":"capture\.unavailable"'
+      level: warning
+      scenario: M
+    # The microphone named taken away during a recording (O): its stream says "target not found".
+    - pattern: '"message":"capture\.stream_error"'
+      level: warning
+      scenario: O
+    # A microphone named that is not there, at the start and during a recording (O).
+    - pattern: '"message":"capture\.microphone_gone"'
+      level: warning
+      scenario: O
+    # A second signal while a track is compressed (E2): that track stays its WAV.
+    - pattern: '"message":"capture\.not_kept"'
+      level: warning
+      scenario: E2
+
+docs:
+  readme: README.md
+  agents: AGENTS.md
+  adr: docs/adr/
+  runbook: docs/runbook.md

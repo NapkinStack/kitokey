@@ -1,0 +1,52 @@
+name: Pull request
+
+# The rules read from the pull request's description: the test sheet
+# (.nstack/handbook/05-workflow.md §7) and the cycle (.nstack/handbook/project.md). Editing the
+# description or a label re-evaluates them on the same head commit. A review or a comment is a
+# person's hand on the pull request when they are its named verifier (T2), read at the next run:
+# never a trigger, since a review's failed run stays beside the later ones and blocks the merge,
+# and an attested record, pushed as notes, is no event that could replace it (D218, #394): its
+# event is its own status, `nstack / local checks`, when a ruleset requires it (D221, #399).
+#
+# The description is untrusted input: it reaches nstack through env:, never a script.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read        # the head, and the attested record in the remote's notes (A1, A2)
+  pull-requests: read   # whose hand is on the pull request: a person named verifier (T2); approvals (R1, R2)
+
+# Each event's run reads the description and the head as they were at that event: a later event
+# of the same pull request cancels the earlier run, so the verdict shown is the last one's.
+concurrency:
+  group: pull-request-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  description:
+    name: Test sheet and cycle
+    runs-on: ${{ vars.NSTACK_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: NapkinStack, the project version
+        run: bash .nstack/install-engine.sh
+
+      - name: Test sheet and cycle
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_FROM_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: nstack pr-check --root . --base "origin/$BASE_REF"

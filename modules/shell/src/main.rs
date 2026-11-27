@@ -1,0 +1,5872 @@
+//! `kitokey` — Kitokey as the user meets it: an icon in the tray, a global shortcut,
+//! notifications, and a window opened from the tray's menu — or at once with `--window`, the
+//! user's gesture too. It starts the program that records and stops it, then the one that
+//! hears; it records and hears nothing itself, and a recording goes on if this process does
+//! not.
+//!
+//! Everything it decides is in the library beside it — `recording`, `sessions`, `settings`,
+//! `transcription`, `words` —
+//! and tried there. Here is only what needs a desktop.
+
+use std::{
+    collections::HashMap,
+    collections::VecDeque,
+    path::{Path, PathBuf},
+    sync::{Mutex, mpsc::Receiver},
+    time::{Duration, Instant},
+};
+
+use tauri::{
+    AppHandle, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder, Wry,
+    image::Image,
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+};
+use tauri_plugin_notification::NotificationExt;
+// A call starting is seen only on Linux, by PipeWire (D30).
+use kitokey_shell::cancel::Cancel;
+#[cfg(target_os = "linux")]
+use kitokey_shell::microphone;
+use kitokey_shell::{
+    autostart,
+    confidential::{self, Left, Wait, What},
+    context, correction, dates, desktop, engines, example, exporting, keys,
+    licence::{self, Licence},
+    log,
+    meeting::{self, Read, Transcript},
+    meeting_models, migrate,
+    minutes::{self, Minutes},
+    model::{self, Published},
+    named, player,
+    providers::{self, OnlineOffered},
+    recording::{self, Recording, Said, Source},
+    registry, sending,
+    sessions::{self, Listed},
+    settings::{self, After, Appearance, Engine, KeepAudio, Log, Settings},
+    sound_check,
+    speakers::{self, Speakers},
+    speech,
+    speeds::{self, Speeds, Step},
+    spoken,
+    summarising::{self, Summarising},
+    transcription::{self, Hearer, Made, Transcription},
+    trial,
+    words::{self, Failure, Language, Notice, Refusal, Told, Trouble},
+};
+
+const TRAY: &str = "kitokey";
+
+/// Why a meeting's minutes were not written, their cause when named, and the model when it was the meeting's own.
+type MinutesFailed = (String, Option<summarising::Cause>, Option<String>);
+
+/// What the shell holds while it runs.
+struct Shell {
+    /// What the user chose: read at start, changed from the window.
+    settings: Mutex<Settings>,
+    /// The settings file was read once at least: what is held is the user's, not the defaults (#770).
+    settings_read: Mutex<bool>,
+    /// Held while a change is read onto the file and written: two saves never interleave, the
+    /// later undoing the earlier.
+    saving: Mutex<()>,
+    /// Why the system's keyring could not be opened, when it could not.
+    keyring: Mutex<Option<String>>,
+    /// The system's language, read at start: the interface's unless the user chose one (D64), and
+    /// the one SpeechAnalyzer hears in when a meeting names none — never the interface's.
+    system: Language,
+    /// The recording in progress, when there is one.
+    recording: Mutex<Option<Recording>>,
+    /// The folder it records into, once it has said so.
+    recorded: Mutex<Option<PathBuf>>,
+    /// The context typed in the bar before the start, kept for the next recording until the user
+    /// clears it, in `next_file` too (D91): taken by the meeting begun, whichever gesture starts it.
+    next_context: Mutex<String>,
+    /// The menu's entry that starts and stops, relabelled as the recording goes.
+    toggle: MenuItem<Wry>,
+    /// The user asked to quit while a recording ran: it is stopped first, then Kitokey leaves.
+    leaving: Mutex<bool>,
+    /// When the recording was last started or told to stop: a second press in the same
+    /// half-second is the same gesture, not a second one.
+    pressed: Mutex<Option<Instant>>,
+    /// The recording was told to stop and has not ended yet.
+    stopping: Mutex<bool>,
+    /// The menu's entry that makes the transcript of the last recording.
+    transcribe: MenuItem<Wry>,
+    /// The transcript being made, when there is one: one at a time.
+    transcription: Mutex<Option<Transcription>>,
+    /// The keys the desktop granted the shortcut, as it says them; none while it has not.
+    shortcut: Mutex<Option<String>>,
+    /// The menu's entry that has the minutes of the last recording written.
+    minutes: MenuItem<Wry>,
+    /// The menu's entries that open the window and quit: their words follow the language (D64).
+    open: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+    /// A transcript made again: where it goes back, and where it was set aside — taken by the
+    /// run's end, or by Kitokey quitting, whichever comes first.
+    redoing: Mutex<Option<(PathBuf, PathBuf)>>,
+    /// The meeting whose transcript is being made, when one is: it cannot be freed meanwhile.
+    hearing: Mutex<Option<PathBuf>>,
+    /// The recording's meter, for the small window: when it started, and each source's level now.
+    meter: Mutex<(Option<Instant>, [f32; 2])>,
+    /// Whether each side of the recording was heard (D49).
+    checks: Mutex<recording::Checks>,
+    /// The microphone named is not there, as the recording last said (D74).
+    microphone_gone: Mutex<bool>,
+    /// What the recording running is recorded from, for the small window (D33).
+    devices: Mutex<recording::Devices>,
+    /// The list's small reliefs, by transcript, kept until it changes.
+    shapes: Mutex<Shapes>,
+    /// The minutes being written, when they are: one at a time, taken from the gesture on.
+    minuting: Mutex<Option<Summarising>>,
+    /// Minutes made again (*Refaire…*) with a model, waiting for the user's agreement to send,
+    /// by meeting: the model chosen, and who the settings named then — changed since, it is
+    /// dropped: the page the user agrees on shows the settings as they are.
+    asked_again: Mutex<HashMap<PathBuf, AskedAgain>>,
+    /// The meeting whose minutes are being written: busy, never freed meanwhile (D19).
+    writing_minutes: Mutex<Option<PathBuf>>,
+    /// What writes them, and since when: said on the meeting's page (D25).
+    minutes_by: Mutex<Option<(String, String, Instant)>>,
+    /// Meetings whose minutes wait for the user's agreement to send them, and to which host: set
+    /// aside, said on their page, in the order they were set aside; the line never waits behind
+    /// them (D25).
+    awaiting: Mutex<Vec<(PathBuf, String)>>,
+    /// Minutes asked while others were written: made in turn, never dropped (D25).
+    minutes_waiting: Mutex<VecDeque<Queued>>,
+    /// Why the last minutes of a meeting were not written, until they are (D25).
+    /// With their cause, when kitokey-summary named one this version knows: one entry, so
+    /// that a later failure never shows an earlier one's cause (D29); and the model, when it was the
+    /// meeting's own (D91): its gesture is then in *Refaire…*, not in Settings.
+    minutes_failed: Mutex<HashMap<PathBuf, MinutesFailed>>,
+    /// The meetings whose summary could not be written to the export folder, and why (D109).
+    not_exported: Mutex<HashMap<PathBuf, String>>,
+    /// The loopback server the opened meeting is played from, started with the first (D26).
+    served: Mutex<Option<player::Served>>,
+    /// How many times each meeting's minutes were written since the start: a page drawn with
+    /// fewer is drawn again, however quickly they were made (D25).
+    minutes_made: Mutex<HashMap<PathBuf, u64>>,
+    /// The model each meeting's last minutes were asked with, when one was named (a Refaire…):
+    /// tried again, with that one (D25).
+    minutes_tried: Mutex<HashMap<PathBuf, Option<(String, String)>>>,
+    /// The sessions whose transcripts wait for the one being made, or for the model — in
+    /// the order they were asked, each once; made again as a *Refaire…* asked (D25, D59).
+    waiting: Mutex<VecDeque<(PathBuf, Option<Again>, Cancel)>>,
+    /// The examples tried (D126): their minutes follow their transcript, whatever Settings say.
+    examples: Mutex<std::collections::HashSet<PathBuf>>,
+    /// The model making the transcript, and since when: said on the meeting's page (D25).
+    hearing_by: Mutex<Option<(String, Instant)>>,
+    /// Why a meeting's last transcript was not made, until one is begun (D25).
+    transcripts_failed: Mutex<HashMap<PathBuf, String>>,
+    /// How many transcripts each meeting got since the start: its page drawn with fewer is drawn
+    /// again (D25).
+    transcripts_made: Mutex<HashMap<PathBuf, u64>>,
+    /// The same for the transcript: made again as a Refaire… asked, tried again so.
+    transcripts_tried: Mutex<HashMap<PathBuf, Option<Again>>>,
+    /// The tray's menu, and its entry that fetches the default model — in it only while the
+    /// model is needed and not there.
+    menu: Menu<Wry>,
+    download: MenuItem<Wry>,
+    /// The menu's « Afficher la barre d’enregistrement », in it only while the bar is hidden (D90).
+    show_bar: MenuItem<Wry>,
+    /// When the bar was last moved: its place is kept once it stays still (D90).
+    bar_moved: Mutex<Option<Instant>>,
+    /// The host the transcript being made is sent to, when a service hears it (D60).
+    hearing_host: Mutex<Option<String>>,
+    /// The host the minutes being written are sent to, when it is not this computer (D60).
+    minutes_host: Mutex<Option<String>>,
+    /// Makings ended because their meeting was said confidential — its transcript, its minutes —:
+    /// made again here, their end is no failure to tell (D60).
+    heard_here: Mutex<std::collections::HashSet<PathBuf>>,
+    written_here: Mutex<std::collections::HashSet<PathBuf>>,
+    /// The token of the transcript being made, set and taken under `transcription`'s lock, and
+    /// of the minutes being written, under `writing_minutes`' (« Annuler », D92).
+    transcript_token: Mutex<Option<Cancel>>,
+    minutes_token: Mutex<Option<Cancel>>,
+    /// The making taken from each line and not yet begun, with its token: « Annuler » meanwhile
+    /// cancels it, and its start then begins nothing (D92).
+    promoted_transcript: Mutex<Option<(PathBuf, Cancel)>>,
+    promoted_minutes: Mutex<Option<(PathBuf, Cancel)>>,
+    /// What was last cancelled of a meeting — its transcript or its minutes —, said on its page
+    /// until a making of it starts again.
+    stopped: Mutex<HashMap<PathBuf, &'static str>>,
+    /// The meeting last stopped, said by the bar at rest with its stage until its page is opened or
+    /// another recording starts (D92); and whether its last step has ended, written or failed.
+    last: Mutex<Option<(PathBuf, bool)>>,
+    /// Whether the transcript being made is followed by its summary: the page's one bar has two parts (D92).
+    hearing_then: Mutex<bool>,
+    /// Meetings whose transcript is written and whose summary follows, not yet in line: between the two
+    /// steps, the page's bar says the summary's (D92).
+    between: Mutex<std::collections::HashSet<PathBuf>>,
+    /// How fast this machine made each step, by model, as last measured: what the page's bar says is
+    /// left (D92). Kept beside the settings.
+    speeds: Mutex<Speeds>,
+    /// What had left before a meeting was said confidential, and to which host: said on its page
+    /// while it stays so, until Kitokey quits (D60).
+    left: Mutex<HashMap<PathBuf, Vec<Left>>>,
+    /// Confidential meetings whose minutes wait for Ollama: silent, or holding no model (D60).
+    ollama_waiting: Mutex<HashMap<PathBuf, Wait>>,
+    /// The model is coming.
+    fetching: Mutex<bool>,
+    /// The model being fetched, by its file, and how far: the bytes held, of how many (D37).
+    fetched: Mutex<Option<(String, u64, u64)>>,
+    /// A recording was refused, the trial over: the window says why until one starts (D83).
+    refused: Mutex<bool>,
+    /// A licence that could not be read was said in the log: once (D83).
+    licence_unread: Mutex<bool>,
+    /// « Vérifier le son » (D88): capture listening while the panel shows (`sound_check::Slot`).
+    sound_check: Mutex<sound_check::Slot>,
+    /// The applications that hold a microphone now, as the graph says (D30): a call — no test sound then.
+    holders: Mutex<std::collections::BTreeSet<u64>>,
+}
+
+impl Shell {
+    /// What the user chose, as it stands now.
+    fn settings(&self) -> Settings {
+        self.settings.lock().unwrap().clone()
+    }
+
+    /// The language Kitokey speaks now: the one the user chose, or the system's (D64).
+    fn language(&self) -> Language {
+        self.settings.lock().unwrap().language.unwrap_or(self.system)
+    }
+
+    /// Reads the settings file again — the user may have changed it by hand — and holds what it
+    /// says; a file that cannot be read is said, by its name and not its path, and what was held
+    /// stays.
+    fn reread(&self) -> Result<Settings, settings::Unread> {
+        let read = settings::file().map_or_else(
+            || Ok(Settings::default()),
+            |file| {
+                settings::read(&file).map_err(|why| settings::Unread {
+                    detail: settings::unnamed(&why.detail, &file),
+                    ..why
+                })
+            },
+        );
+        if let Ok(settings) = &read {
+            *self.settings.lock().unwrap() = settings.clone();
+            *self.settings_read.lock().unwrap() = true;
+        }
+        read
+    }
+
+    /// The licence, read anew, the Store given Kitokey's window (`owner`, asked before any lock is
+    /// held: the toolkit answers it from the window's thread): one that could not be read is said
+    /// in the log once, and records (D83).
+    fn licence(&self, owner: licence::Owner) -> Result<Licence, String> {
+        let read = licence::read(owner);
+        if let Err(error) = &read
+            && !std::mem::replace(&mut *self.licence_unread.lock().unwrap(), true)
+        {
+            tracing::warn!(detail = %error, "shell.licence_unread");
+        }
+        read
+    }
+
+    /// Whether a recording starting now is refused, the trial over — judged at each start, never
+    /// during a recording (D83) —, kept for the window to say.
+    fn refuses(&self, licence: &Result<Licence, String>, sessions: &Path) -> bool {
+        let refused = licence::refused(licence, sessions, seconds_now());
+        *self.refused.lock().unwrap() = refused;
+        refused
+    }
+
+    /// Whether a recording runs as the header says it: one told to stop is over for the user (D68).
+    fn recording_on(&self) -> bool {
+        self.recording.lock().unwrap().is_some() && !*self.stopping.lock().unwrap()
+    }
+
+    /// What a command that failed tells the page, the raw text going to the log too: a detail holds
+    /// nothing of a meeting, no key and no path (`tests/log.rs`).
+    fn told(&self, failure: Failure, detail: impl std::fmt::Display) -> Told {
+        let detail = log::command_failed(&failure, &detail.to_string(), settings::file().as_deref());
+        self.said(failure, &detail)
+    }
+
+    /// The same, when its own line has already logged the failure.
+    fn said(&self, failure: Failure, detail: &str) -> Told {
+        words::told(failure, detail, self.language(), self.settings().developer)
+    }
+
+    /// The settings read again for a command.
+    fn read_or_told(&self) -> Result<Settings, Told> {
+        self.reread().map_err(|why| self.told(Failure::SettingsUnread(why.refused), why))
+    }
+
+    /// The settings written for a command.
+    fn write_or_told(&self, settings: &Settings) -> Result<(), Told> {
+        let file = settings::file().ok_or_else(|| self.told(Failure::SettingsUnwritten, "this system names no folder for settings"))?;
+        settings::write(&file, settings).map_err(|error| self.told(Failure::SettingsUnwritten, error))
+    }
+}
+
+/// How a transcript is made again: with the Whisper model a *Refaire…* picked, this time only;
+/// or by whoever the settings name to hear, its minutes after it — *Refaire la transcription et le
+/// compte rendu*, the context's button (D59, D113).
+#[derive(Clone, PartialEq)]
+enum Again {
+    Model(PathBuf),
+    Settings,
+    /// By whoever the meeting's own models name, else Settings — the transcript alone: *Refaire…*
+    /// once « Avancé » chose (D91).
+    Own,
+}
+
+/// Where the tray is in the life of a recording.
+#[derive(Clone, Copy, PartialEq)]
+enum Shown {
+    Idle,
+    Recording,
+    Stopping,
+}
+
+/// The version this program says (`--version`): the package's, named when it is built
+/// (`KITOKEY_VERSION`, D78), Cargo's when unset or empty.
+const VERSION: &str = match option_env!("KITOKEY_VERSION") {
+    Some(version) if !version.is_empty() => version,
+    _ => env!("CARGO_PKG_VERSION"),
+};
+
+fn main() {
+    // Asked by a package or a person, answered before anything is logged or read.
+    if std::env::args_os().skip(1).eq(["--version"]) {
+        println!("kitokey {VERSION}");
+        return;
+    }
+    // The logs' level the user chose in the developer mode, unless the environment names one:
+    // set before anything runs beside it, so that the shell and every program it starts read it.
+    if std::env::var_os("KITOKEY_LOG").is_none()
+        && let Some(level) = settings::file()
+            .and_then(|file| settings::read(&file).ok())
+            .map(|chosen| chosen.log)
+            .filter(|level| *level != Log::Info)
+    {
+        // SAFETY: the program's first step, before any thread of it exists.
+        unsafe { std::env::set_var("KITOKEY_LOG", level.as_str()) };
+    }
+    // What the shell does is logged — never what was said — in the user's state folder (ADR-0007).
+    let _run = log::start("shell");
+    tracing::info!("shell.started");
+    // What the bar kept for the next recording before D125, never read again: removed, said once.
+    if let Some(folder) = settings::file().as_deref().and_then(Path::parent) {
+        for name in settings::leftovers_removed(folder) {
+            tracing::info!(file = name, "shell.leftover_removed");
+        }
+    }
+    let app = tauri::Builder::default()
+        // One Kitokey per session: a second start hands its arguments over and leaves — from
+        // the applications' menu (`--window`) its window opens; started again with the session,
+        // nothing does (D35, #386). The plugin comes first, as its documentation asks.
+        .plugin(tauri_plugin_single_instance::init(|app, args, _| {
+            if args.iter().skip(1).any(|arg| arg == "--window") {
+                open_window(app);
+            }
+        }))
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        // « Vérifier le son »'s window destroyed with the panel open: its listening goes with it, within
+        // the second capture promises (D88) — stopped off the window's thread. A window hidden closes
+        // the panel itself (`visibilitychange`, `ui/window.js`).
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::Destroyed = event
+                && let Some(shell) = window.app_handle().try_state::<Shell>()
+                && let Some(gone) = shell.sound_check.lock().unwrap().of_window(window.label())
+            {
+                std::thread::spawn(move || {
+                    gone.stop();
+                    tracing::info!("shell.sound_check_closed");
+                });
+            }
+        })
+        .invoke_handler(tauri::generate_handler![
+            listed,
+            destination_added,
+            destination_forgotten,
+            microphones_listed,
+            microphone_chosen,
+            sound_check_open,
+            sound_check_now,
+            sound_check_mark,
+            sound_check_close,
+            model_fetch,
+            model_offered_fetch,
+            registry_refresh,
+            speech_shown,
+            transcription_saved,
+            transcription_tested,
+            transcription_models,
+            speech_installed,
+            ollama_pull_offered,
+            header,
+            meeting_seen,
+            makings,
+            record,
+            buy,
+            recording_now,
+            small_window,
+            bar_fit,
+            bar_drag,
+            bar_hide,
+            full_window,
+            minutes_asked,
+            minutes_again,
+            busy_meetings,
+            freed,
+            minutes_redo,
+            making_cancelled,
+            context_shown,
+            context_saved,
+            context_redo,
+            next_context,
+            next_context_kept,
+            language_set,
+            speakers_named,
+            meeting_models_shown,
+            meeting_models_chosen,
+            models_offered,
+            transcript_redo_own,
+            previous_back,
+            title_saved,
+            confidential_set,
+            sending_of,
+            summary_sent,
+            transcript_redo,
+            transcript_corrected,
+            transcript_asked,
+            example_tried,
+            transcript_again,
+            opened,
+            open_folder,
+            dates_resolved,
+            date_google,
+            dates_file_chosen,
+            dates_ics,
+            open_logs,
+            diagnostic,
+            peaks_of,
+            settings_shown,
+            settings_saved,
+            minutes_shown,
+            minutes_saved,
+            minutes_models,
+            services_offered,
+            minutes_tested,
+            agreement_shown,
+            agreed,
+            local_instead,
+            choose_folder,
+            shortcut_settings,
+            page_failed
+        ])
+        .setup(|app| {
+            let system = Language::system();
+            // Wholeheard became Kitokey (D86), Summit Wholeheard (D28): what the user held under an earlier name, carried over
+            // once, before anything is read; a failure leaves everything where it was, and says so.
+            let carried = migrate::Places::here().map(|places| migrate::carry_over(&places));
+            match &carried {
+                Some(Ok(carried)) if carried.settings || carried.data => tell(app.handle(), &words::carried_over(system)),
+                Some(Err(error)) => {
+                    eprintln!("kitokey: the earlier name's folders could not all be carried over: {error}");
+                    tracing::error!(detail = %error, "shell.carry_failed");
+                    tell(app.handle(), &words::carry_failed(system));
+                }
+                _ => {}
+            }
+            // Wholeheard's entry, when there is one, is Kitokey's from now on (D86), on or off as it
+            // was; then started with the user's session, written once by itself (D32). A settings
+            // file that cannot be read writes nothing, and is said below.
+            if let (Some(entry), Some(file)) = (autostart::file(), settings::file()) {
+                let start = autostart::at_start(&entry, &file);
+                if let Err(error) = &start.carried {
+                    tracing::warn!(kind = ?error.kind(), "shell.autostart_not_carried");
+                }
+                match start.written {
+                    Ok(true) => tracing::info!("shell.autostart_written"),
+                    Ok(false) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {}
+                    Err(error) => tracing::warn!(kind = ?error.kind(), "shell.autostart_refused"),
+                }
+            }
+            // On Windows, the package's startup task as Windows holds it at this start (D84), for the
+            // trial to record; none outside a package.
+            if cfg!(windows) {
+                match autostart::task() {
+                    Ok(Some(task)) => tracing::info!(state = ?task, "shell.startup_task"),
+                    Ok(None) => {}
+                    Err(detail) => tracing::warn!(%detail, "shell.startup_task_unread"),
+                }
+            }
+            let read = settings::file().map_or_else(|| Ok(Settings::default()), |file| settings::read(&file));
+            // The first run (D58): never set up, nothing recorded — the assistant, once.
+            let welcome = read.as_ref().is_ok_and(settings::welcome_due);
+            // Spoken from its first word in the language the user chose, else the system's (D64).
+            let language = read.as_ref().ok().and_then(|settings| settings.language).unwrap_or(system);
+            let labels = words::menu(language);
+            let toggle = MenuItem::with_id(app, "toggle", labels.start, true, None::<&str>)?;
+            let again = MenuItem::with_id(app, "transcribe", labels.transcribe, true, None::<&str>)?;
+            let minutes = MenuItem::with_id(app, "minutes", labels.minutes, true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", labels.quit, true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "open", labels.open, true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &toggle, &again, &minutes, &quit])?;
+            let download = MenuItem::with_id(app, "download", "", true, None::<&str>)?;
+            let show_bar = MenuItem::with_id(app, "show_bar", labels.show_bar, true, None::<&str>)?;
+            TrayIconBuilder::with_id(TRAY)
+                .icon(Image::from_bytes(include_bytes!("../icons/tray.png"))?)
+                .tooltip("Kitokey")
+                .menu(&menu.clone())
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => open_window(app),
+                    "show_bar" => show_small(app),
+                    "toggle" => {
+                        toggle_recording(app);
+                    }
+                    "transcribe" => {
+                        let shell = app.state::<Shell>();
+                        // The latest session is the one being recorded: its transcript follows its stop.
+                        if shell.recording.lock().unwrap().is_some() {
+                            return;
+                        }
+                        match transcription::latest(&shell.settings().sessions) {
+                            Some(last) => transcribe(app, last, Cancel::default()),
+                            None => tell(app, &words::trouble(&Trouble::NoSession, shell.language())),
+                        }
+                    }
+                    "minutes" => {
+                        let shell = app.state::<Shell>();
+                        // The latest session is the one being recorded: it has no transcript yet.
+                        if shell.recording.lock().unwrap().is_some() {
+                            return;
+                        }
+                        match transcription::latest(&shell.settings().sessions) {
+                            Some(last) => make_minutes(app, last),
+                            None => tell(app, &words::trouble(&Trouble::NoSession, shell.language())),
+                        }
+                    }
+                    "download" => fetch(app, 0),
+                    "quit" => leave(app),
+                    _ => {}
+                })
+                .build(app)?;
+            app.manage(Shell {
+                settings: Mutex::new(read.clone().unwrap_or_default()),
+                settings_read: Mutex::new(read.is_ok()),
+                saving: Mutex::new(()),
+                keyring: Mutex::new(None),
+                system,
+                recording: Mutex::new(None),
+                recorded: Mutex::new(None),
+                next_context: Mutex::new(next_file().map(|file| context::read_next(&file)).unwrap_or_default()),
+                toggle,
+                leaving: Mutex::new(false),
+                pressed: Mutex::new(None),
+                stopping: Mutex::new(false),
+                transcribe: again,
+                transcription: Mutex::new(None),
+                shortcut: Mutex::new(None),
+                minutes: minutes.clone(),
+                open: open.clone(),
+                quit: quit.clone(),
+                minuting: Mutex::new(None),
+                shapes: Mutex::new(HashMap::new()),
+                meter: Mutex::new((None, [0.0, 0.0])),
+                checks: Mutex::default(),
+                microphone_gone: Mutex::default(),
+                devices: Mutex::new(recording::Devices::default()),
+                redoing: Mutex::new(None),
+                hearing: Mutex::new(None),
+                writing_minutes: Mutex::new(None),
+                minutes_by: Mutex::new(None),
+                minutes_waiting: Mutex::new(VecDeque::new()),
+                awaiting: Mutex::new(Vec::new()),
+                minutes_failed: Mutex::new(HashMap::new()),
+                not_exported: Mutex::new(HashMap::new()),
+                served: Mutex::new(None),
+                minutes_made: Mutex::new(HashMap::new()),
+                minutes_tried: Mutex::new(HashMap::new()),
+                asked_again: Mutex::new(HashMap::new()),
+                waiting: Mutex::new(VecDeque::new()),
+                examples: Mutex::default(),
+                hearing_by: Mutex::new(None),
+                transcripts_failed: Mutex::new(HashMap::new()),
+                transcripts_made: Mutex::new(HashMap::new()),
+                transcripts_tried: Mutex::new(HashMap::new()),
+                menu,
+                download,
+                show_bar,
+                bar_moved: Mutex::new(None),
+                hearing_host: Mutex::new(None),
+                minutes_host: Mutex::new(None),
+                heard_here: Mutex::default(),
+                written_here: Mutex::default(),
+                transcript_token: Mutex::default(),
+                minutes_token: Mutex::default(),
+                promoted_transcript: Mutex::default(),
+                promoted_minutes: Mutex::default(),
+                stopped: Mutex::default(),
+                last: Mutex::default(),
+                hearing_then: Mutex::default(),
+                between: Mutex::default(),
+                speeds: Mutex::new(speeds_file().map(|file| speeds::read(&file)).unwrap_or_default()),
+                left: Mutex::default(),
+                ollama_waiting: Mutex::default(),
+                fetching: Mutex::new(false),
+                fetched: Mutex::new(None),
+                refused: Mutex::new(false),
+                licence_unread: Mutex::new(false),
+                sound_check: Mutex::default(),
+                holders: Mutex::default(),
+            });
+            // The trial's first day, kept at the first start on a trial licence (PDR-0005).
+            let shell = app.state::<Shell>();
+            let licence = shell.licence(owner(app.handle()));
+            let sessions = shell.settings().sessions;
+            if licence == Ok(Licence::Trial)
+                && let Err(error) = trial::begin(&sessions, seconds_now())
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.trial_not_begun");
+            }
+            // What the licence read at the start is, and whether a recording would be refused: what
+            // the Store answered, said once, for whoever reads after it (D83).
+            let answer = licence
+                .as_ref()
+                .map_or_else(|_| "unread".to_string(), |licence| format!("{licence:?}"));
+            let refused = licence::refused(&licence, &sessions, seconds_now());
+            tracing::info!(licence = %answer, refused, "shell.licence_read");
+            if let Err(why) = read {
+                // The sentence of `settings.rs` to the log, by the file's name; the user is told which
+                // setting and what to do (#783).
+                let detail = settings::file().map_or_else(|| why.detail.clone(), |file| settings::unnamed(&why.detail, &file));
+                tracing::warn!(%detail, "shell.settings_unread");
+                tell(app.handle(), &words::trouble(&Trouble::Settings(why.refused), language));
+            }
+            // A recording a Kitokey ended before this one left running: shown, and stopped from here (#773).
+            found(app.handle());
+            shortcut(app.handle());
+            offers(app.handle());
+            ends_on_sigterm(app.handle());
+            // The audio kept longer than the settings say goes to the trash, now and every hour.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let mut refused = None;
+                loop {
+                    expire(&handle, &mut refused);
+                    std::thread::sleep(Duration::from_secs(3600));
+                }
+            });
+            // The keyring a provider's key is kept in: refused, a key cannot be kept, and the
+            // settings page says so when one is given.
+            let keyring = keys::open_system_keyring().err();
+            *app.state::<Shell>().keyring.lock().unwrap() = keyring;
+            if welcome {
+                show_welcome(app.handle());
+            } else if std::env::args().skip(1).any(|arg| arg == "--window") {
+                open_window(app.handle());
+            }
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("Kitokey could not start");
+    // No window is no reason to leave: Kitokey lives in the tray until the user quits it.
+    app.run(|_, event| {
+        if let RunEvent::ExitRequested { api, code: None, .. } = event {
+            api.prevent_exit();
+        }
+    });
+}
+
+/// SIGTERM — the session ending, the system shutting down — ends Kitokey as « Annuler » ends a making
+/// (D92): what is being made stopped, its program's group with it, then Kitokey leaves, within two
+/// seconds, its single-instance name released (#961). Unhandled, SIGTERM ended Kitokey alone, and a
+/// making's group, its own (`process_group`), lived on, orphaned. A recording is left as it is: its
+/// program is the session's, never stopped because the shell was.
+#[cfg(unix)]
+fn ends_on_sigterm(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        use tokio::signal::unix::{SignalKind, signal};
+        let mut terminated = match signal(SignalKind::terminate()) {
+            Ok(terminated) => terminated,
+            Err(error) => {
+                tracing::warn!(detail = %error, "shell.sigterm_unheard");
+                return;
+            }
+        };
+        terminated.recv().await;
+        tracing::info!("shell.terminated");
+        let shell = app.state::<Shell>();
+        let tokens: Vec<Cancel> = [&shell.transcript_token, &shell.minutes_token]
+            .into_iter()
+            .filter_map(|slot| slot.lock().unwrap_or_else(|poisoned| poisoned.into_inner()).clone())
+            .chain(
+                [&shell.promoted_transcript, &shell.promoted_minutes]
+                    .into_iter()
+                    .filter_map(|slot| {
+                        slot.lock()
+                            .unwrap_or_else(|poisoned| poisoned.into_inner())
+                            .as_ref()
+                            .map(|(_, token)| token.clone())
+                    }),
+            )
+            .collect();
+        // The groups being made, read before they are cancelled. A token stops its program on a thread
+        // of its own — TERM, a second's grace, KILL — and returns at once: Kitokey waits for those groups
+        // to be empty, within 1.8 s, or what was deaf to TERM outlives it (s961g2).
+        let groups: Vec<i32> = [
+            shell
+                .transcription
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Transcription::group),
+            shell
+                .minuting
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .as_ref()
+                .and_then(Summarising::group),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        tokens.iter().for_each(Cancel::cancel);
+        let until = Instant::now() + Duration::from_millis(1800);
+        // SAFETY: signal 0 sends nothing: it asks whether a group still holds a process.
+        while Instant::now() < until && groups.iter().any(|&group| unsafe { libc::kill(-group, 0) } == 0) {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        app.exit(0);
+    });
+}
+
+#[cfg(not(unix))]
+fn ends_on_sigterm(_: &AppHandle) {}
+
+/// Another application taking a microphone — a call starting — is offered to be recorded, by a
+/// notification naming it: never a window (D17), never while recording, never with offers off;
+/// what was seen is shown, and kept nowhere (D30).
+#[cfg(target_os = "linux")]
+fn offers(app: &AppHandle) {
+    let app = app.clone();
+    let offers = Mutex::new(microphone::Offers::default());
+    microphone::watch(move |change| {
+        let shell = app.state::<Shell>();
+        match &change {
+            microphone::Change::Took { key, .. } => shell.holders.lock().unwrap().insert(*key),
+            microphone::Change::Let { key } => shell.holders.lock().unwrap().remove(key),
+        };
+        let recording = shell.recording.lock().unwrap().is_some();
+        if let Some(name) = offers.lock().unwrap().on(&change, recording, shell.settings().offer) {
+            offer_recording(&app, name);
+        }
+    });
+}
+
+#[cfg(not(target_os = "linux"))]
+fn offers(_: &AppHandle) {}
+
+#[cfg(target_os = "linux")]
+fn offer_recording(app: &AppHandle, application: String) {
+    let (notice, [record, later, never]) = words::offer(&application, app.state::<Shell>().language());
+    let app = app.clone();
+    // Logged without the application: what it was is the notification's alone.
+    tracing::info!("shell.offer_made");
+    std::thread::spawn(move || {
+        let shown = notify_rust::Notification::new()
+            .appname("Kitokey")
+            .summary(&notice.title)
+            .body(&notice.body)
+            .action("record", record)
+            .action("later", later)
+            .action("never", never)
+            .show();
+        let Ok(shown) = shown else { return };
+        shown.wait_for_action(|action| match action {
+            "record" => {
+                tracing::info!("shell.offer_taken");
+                // Started meanwhile from the menu: left as it is.
+                if app.state::<Shell>().recording.lock().unwrap().is_none() {
+                    toggle_recording(&app);
+                }
+            }
+            "never" => {
+                tracing::info!("shell.offer_off");
+                let shell = app.state::<Shell>();
+                let _saving = shell.saving.lock().unwrap();
+                let saved = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
+                    settings.offer = false;
+                    let file = settings::file().ok_or("this system names no folder for settings")?;
+                    settings::write(&file, &settings).map_err(|error| error.to_string())?;
+                    *shell.settings.lock().unwrap() = settings;
+                    Ok(())
+                });
+                if let Err(error) = saved {
+                    tracing::error!(detail = %error, "shell.offer_off_refused");
+                }
+            }
+            _ => tracing::info!("shell.offer_declined"),
+        });
+    });
+}
+
+/// Opens the window the user last left — the small one the first time — or brings it forward.
+/// Only ever on a gesture of the user (D35).
+fn open_window(app: &AppHandle) {
+    // A settings file that cannot be read is said in the full window, which the small one has no
+    // room for: it opens there.
+    match app.state::<Shell>().reread().map(|settings| settings.window) {
+        Ok(settings::Window::Small) => show_small(app),
+        Ok(settings::Window::Full) | Err(_) => show_full(app),
+    }
+}
+
+/// The full window, in place of the small one: one window at a time (D35).
+fn show_full(app: &AppHandle) {
+    left(app, settings::Window::Full);
+    if let Some(small) = app.get_webview_window("small") {
+        let _ = small.close();
+        bar_shown(app, true);
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+    build_full(app, "");
+}
+
+/// The full window made, on one of its pages.
+fn build_full(app: &AppHandle, page: &str) {
+    let _ = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(format!("index.html{page}").into()))
+        .title("Kitokey")
+        .inner_size(1100.0, 800.0)
+        .min_inner_size(420.0, 400.0)
+        .build();
+}
+
+/// The first start (D58): the full window opens on the assistant — a first launch is the user's
+/// gesture —, and it is said shown at once, so that it never opens by itself again; closed
+/// midway, the defaults stay, already private. The window left is not changed: the small one
+/// stays the one reopened (D35).
+fn show_welcome(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    {
+        let _saving = shell.saving.lock().unwrap();
+        let written = shell.reread().map_err(|why| why.detail).and_then(|mut settings| {
+            settings.welcomed = true;
+            let file = settings::file().ok_or("this system names no folder for settings")?;
+            settings::write(&file, &settings).map_err(|error| error.to_string())?;
+            *shell.settings.lock().unwrap() = settings;
+            Ok(())
+        });
+        if let Err(error) = written {
+            tracing::warn!(detail = %error, "shell.welcomed_not_kept");
+        }
+    }
+    tracing::info!("shell.welcome_shown");
+    build_full(app, "#/welcome");
+}
+
+/// The recording bar's width and its row's height (D90, the decider's boards of 2026-11-08): made
+/// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
+/// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
+/// 440 × 44 asked left a web view of 388 × 1.
+const BAR: (f64, f64) = (440.0, 44.0);
+/// As tall as the bar may grow: what it holds beyond that scrolls.
+const BAR_TALLEST: f64 = 720.0;
+
+/// The recording bar, in place of the full window, which is hidden: at rest, or showing the
+/// recording above the other windows (D35, D90).
+fn show_small(app: &AppHandle) {
+    left(app, settings::Window::Small);
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.hide();
+    }
+    if let Some(window) = app.get_webview_window("small") {
+        let _ = window.show();
+        let _ = window.set_focus();
+        bar_shown(app, true);
+        return;
+    }
+    let shell = app.state::<Shell>();
+    let recording = shell.recording.lock().unwrap().is_some();
+    // Without the system's title bar (D90, board 8): moved by its handle, hidden by its own button.
+    let mut bar = WebviewWindowBuilder::new(app, "small", WebviewUrl::App("index.html#/small".into()))
+        .title("Kitokey")
+        .inner_size(BAR.0, BAR.1)
+        .decorations(false)
+        .always_on_top(recording);
+    // Where it was left, where the system lets an application place itself (Windows, macOS) and
+    // a screen holds it still: GNOME chooses, and a screen gone leaves the system to choose too.
+    if !cfg!(target_os = "linux")
+        && let Some([x, y]) = shell.settings().bar_at
+        && on_a_screen(app, x, y)
+    {
+        bar = bar.position(f64::from(x), f64::from(y));
+    }
+    if let Ok(window) = bar.build() {
+        bar_shown(app, true);
+        let app = app.clone();
+        window.on_window_event(move |event| match event {
+            // GNOME says « Moved » at each configure, at (0, 0): no place to keep there.
+            tauri::WindowEvent::Moved(_) if !cfg!(target_os = "linux") => bar_moved(&app),
+            // Closed by any path — the full window opened on a page, a notification —: nothing
+            // left to show from the tray.
+            tauri::WindowEvent::Destroyed => bar_shown(&app, true),
+            _ => {}
+        });
+    }
+}
+
+/// Whether a screen of this computer holds the point, in logical pixels: a place kept on a screen
+/// since unplugged is not used.
+fn on_a_screen(app: &AppHandle, x: i32, y: i32) -> bool {
+    app.available_monitors().is_ok_and(|monitors| {
+        monitors.iter().any(|monitor| {
+            let scale = monitor.scale_factor();
+            let at = monitor.position().to_logical::<f64>(scale);
+            let size = monitor.size().to_logical::<f64>(scale);
+            let (x, y) = (f64::from(x), f64::from(y));
+            x >= at.x && y >= at.y && x < at.x + size.width && y < at.y + size.height
+        })
+    })
+}
+
+/// The tray's « Afficher la barre d’enregistrement »: in its menu while the bar is hidden, after the recording's
+/// entry, as board 8 sets it.
+fn bar_shown(app: &AppHandle, shown: bool) {
+    let shell = app.state::<Shell>();
+    let _ = shell.menu.remove(&shell.show_bar);
+    if !shown {
+        let _ = shell.menu.insert(&shell.show_bar, 2);
+    }
+}
+
+/// The bar moved: its place kept once it has stayed still half a second, not at each step of a drag.
+fn bar_moved(app: &AppHandle) {
+    let at = Instant::now();
+    *app.state::<Shell>().bar_moved.lock().unwrap() = Some(at);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(500));
+        let shell = app.state::<Shell>();
+        if *shell.bar_moved.lock().unwrap() != Some(at) {
+            return;
+        }
+        let Some(window) = app.get_webview_window("small") else {
+            return;
+        };
+        // Minimized, Windows says it is at (-32000, -32000): no place the user left it.
+        if window.is_minimized().unwrap_or(true) {
+            return;
+        }
+        let (Ok(place), Ok(scale)) = (window.outer_position(), window.scale_factor()) else {
+            return;
+        };
+        let place = place.to_logical::<i32>(scale);
+        let _saving = shell.saving.lock().unwrap();
+        let Ok(mut settings) = shell.reread() else {
+            return;
+        };
+        if settings.bar_at == Some([place.x, place.y]) {
+            return;
+        }
+        settings.bar_at = Some([place.x, place.y]);
+        if let Some(file) = settings::file()
+            && settings::write(&file, &settings).is_ok()
+        {
+            *shell.settings.lock().unwrap() = settings;
+        }
+    });
+}
+
+/// A recording begins or ends: the small window, when open, is above the others while it runs
+/// only (D35).
+fn small_recording(app: &AppHandle, recording: bool) {
+    if let Some(small) = app.get_webview_window("small") {
+        let _ = small.set_always_on_top(recording);
+    }
+}
+
+/// Keeps the window left in the settings, for the next opening — on a thread of its own: a window
+/// opens from paths that may hold the settings' locks, and never waits for them. A file that
+/// cannot be read is said in the full window, and kept as it is; one that cannot be written
+/// keeps what it says: the window opens all the same.
+fn left(app: &AppHandle, window: settings::Window) {
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let shell = app.state::<Shell>();
+        let _saving = shell.saving.lock().unwrap();
+        let Ok(mut settings) = shell.reread() else {
+            return;
+        };
+        if settings.window == window {
+            return;
+        }
+        settings.window = window;
+        let written = settings::file()
+            .ok_or_else(|| "this system names no folder for settings".to_string())
+            .and_then(|file| settings::write(&file, &settings).map_err(|error| error.to_string()));
+        match written {
+            Ok(()) => *shell.settings.lock().unwrap() = settings,
+            Err(error) => tracing::warn!(detail = %error, "shell.window_not_kept"),
+        }
+    });
+}
+
+/// What the window shows: its words, the folder it reads, and the sessions in it.
+#[derive(serde::Serialize)]
+struct Listing {
+    words: words::Window,
+    /// The folder as people write it, from their home (`~/…`): the window says it, never the machine's root (#1232).
+    folder: String,
+    sessions: Vec<Listed>,
+    /// For each session, in the same order, who spoke over it — here, then remote — when its
+    /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
+    shapes: Vec<Option<[Vec<f32>; 2]>>,
+    /// Whether a recording runs, and the shortcut's keys as the desktop granted them: the header's.
+    recording: bool,
+    stopping: bool,
+    shortcut: Option<String>,
+    /// The sidebar folded, as the user left it (D61).
+    folded: bool,
+    /// Every window's look, as the settings hold it (D98): each window takes it when it draws.
+    appearance: Appearance,
+    /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
+    unreadable: bool,
+    /// The settings file cannot be read (#770): never read since Kitokey started, the folder listed is
+    /// the default one, not the user's; read before, the last settings read are held and listed.
+    settings_unread: bool,
+    /// With `settings_unread`: the last settings read are held — the user's meetings are listed, and no
+    /// change is saved until the file is fixed.
+    settings_kept: bool,
+    /// The last start refused, the trial over (D83).
+    refused: bool,
+}
+
+/// A meeting's small relief, kept until its transcript changes: the list is drawn each time the
+/// window comes forward, and a transcript is read again only when it was written meanwhile.
+type Shapes = HashMap<PathBuf, (Option<std::time::SystemTime>, u64, Option<[Vec<f32>; 2]>)>;
+
+/// The list, read away from the window's and the tray's thread: it reads every transcript it
+/// has not read yet.
+#[tauri::command]
+async fn listed(app: AppHandle) -> Result<Listing, Told> {
+    let asked = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let shell = app.state::<Shell>();
+        // Read anew: fixed meanwhile, the user's folder is listed again (#770). Not during a save:
+        // the file read just before its rename would put the settings it replaced back in memory.
+        let settings_unread = {
+            let _saving = shell.saving.lock().unwrap();
+            shell.reread().is_err()
+        };
+        let recorded = shell.recorded.lock().unwrap().clone();
+        let sessions = sessions::list(&shell.settings().sessions, recorded.as_deref());
+        let mut kept = shell.shapes.lock().unwrap();
+        let shapes = sessions
+            .iter()
+            .map(|session| {
+                let file = session.folder.join("transcript.jsonl");
+                let stamp = std::fs::metadata(&file)
+                    .map(|data| (data.modified().ok(), data.len()))
+                    .unwrap_or((None, 0));
+                if let Some((modified, length, shape)) = kept.get(&file)
+                    && (*modified, *length) == stamp
+                    && session.seconds.is_some()
+                {
+                    return shape.clone();
+                }
+                let shape = match meeting::transcript(&session.folder) {
+                    Read::Present(transcript) if !transcript.segments.is_empty() => {
+                        let said = transcript.segments.iter().map(|segment| segment.end).fold(0.0, f64::max);
+                        Some(meeting::shape(&transcript, session.seconds.unwrap_or(said).max(said), 24))
+                    }
+                    _ => None,
+                };
+                kept.insert(file, (stamp.0, stamp.1, shape.clone()));
+                shape
+            })
+            .collect();
+        drop(kept);
+        Listing {
+            words: words::window(shell.language()),
+            folder: from_home_said(&shell.settings().sessions),
+            sessions,
+            shapes,
+            recording: shell.recording_on(),
+            stopping: *shell.stopping.lock().unwrap(),
+            shortcut: shell.shortcut.lock().unwrap().clone(),
+            folded: shell.settings().folded,
+            appearance: shell.settings().appearance,
+            unreadable: {
+                let folder = shell.settings().sessions.clone();
+                sessions::unreadable(&folder, folder == settings::Settings::default().sessions)
+            },
+            refused: *shell.refused.lock().unwrap(),
+            settings_unread,
+            settings_kept: settings_unread && *shell.settings_read.lock().unwrap(),
+        }
+    })
+    .await
+    .map_err(|error| asked.state::<Shell>().told(Failure::Unexpected, error))
+}
+
+/// What the header shows, asked often: whether a recording runs — started from the tray or the
+/// shortcut as well —, and the shortcut's keys.
+#[derive(serde::Serialize)]
+struct Header {
+    recording: bool,
+    /// Told to stop and not ended yet: the gesture waits (D68).
+    stopping: bool,
+    shortcut: Option<String>,
+    /// The last start refused, the trial over (D83).
+    refused: bool,
+    /// Every window's look (D98): asked by each window as it asks the rest, so that one chosen in
+    /// Settings reaches the bar too.
+    appearance: Appearance,
+    /// The meeting last stopped, for the bar at rest to say with its stage (D92).
+    last: Option<Last>,
+}
+
+#[derive(serde::Serialize)]
+struct Last {
+    /// Its folder's name, as `makings` names it.
+    name: String,
+    /// As a sentence names it, opening it: « La réunion de 17:31 ».
+    said: String,
+    /// Its last step ended, written or failed: told as it is told by a notification (`tell_made`).
+    /// Until then, a moment between its two steps is no « ready ».
+    ended: bool,
+}
+
+#[tauri::command]
+fn header(shell: State<'_, Shell>) -> Header {
+    let last = shell.last.lock().unwrap().clone();
+    Header {
+        recording: shell.recording_on(),
+        stopping: *shell.stopping.lock().unwrap(),
+        shortcut: shell.shortcut.lock().unwrap().clone(),
+        refused: *shell.refused.lock().unwrap(),
+        appearance: shell.settings().appearance,
+        last: last.map(|(folder, ended)| Last {
+            name: named(&folder),
+            said: capitalised(&meeting_said(&folder, shell.language())),
+            ended,
+        }),
+    }
+}
+
+/// A meeting's page opened: the bar no longer says it (D92).
+#[tauri::command]
+fn meeting_seen(shell: State<'_, Shell>, name: String) {
+    let mut last = shell.last.lock().unwrap();
+    if last.as_ref().is_some_and(|(folder, _)| named(folder) == name) {
+        last.take();
+    }
+}
+
+/// A sentence's first letter in capitals, as it opens a line.
+fn capitalised(said: &str) -> String {
+    let mut letters = said.chars();
+    letters
+        .next()
+        .map_or_else(String::new, |first| first.to_uppercase().chain(letters).collect())
+}
+
+/// « Acheter Kitokey »: the purchase asked of the Store, by Kitokey's own Store ID, its dialog owned
+/// by Kitokey's window and asked from that window's thread; failing, or never started, the Store's
+/// page for Kitokey opened in its place (D83). Outside the Store, and with the stand-in licence,
+/// said in the log alone. Then the licence read again: bought, the next recording records. Answers
+/// the header, which says whether a recording is still refused.
+#[tauri::command]
+async fn buy(app: AppHandle) -> Header {
+    tracing::info!("shell.purchase_asked");
+    let owner = owner(&app);
+    let id = tauri::async_runtime::spawn_blocking(move || licence::store_id(owner)).await;
+    match id {
+        Ok(Ok(Some(id))) => {
+            let (said, answered) = tokio::sync::oneshot::channel();
+            let asked = app.run_on_main_thread(move || {
+                licence::purchase(owner, &id, move |purchase| {
+                    let _ = said.send(purchase);
+                });
+            });
+            if asked.is_ok()
+                && let Ok(licence::Purchase::Page(page)) = answered.await
+            {
+                opening_page(&page);
+            }
+        }
+        Ok(Ok(None)) => {}
+        Ok(Err(error)) => tracing::warn!(detail = %error, "shell.purchase_failed"),
+        Err(error) => tracing::warn!(detail = %error, "shell.purchase_failed"),
+    }
+    let shell = app.state::<Shell>();
+    let licence = shell.licence(owner);
+    shell.refuses(&licence, &shell.settings().sessions);
+    header(shell)
+}
+
+/// The window the Store's dialogs belong to (D83): the full window, hidden or not, else the small
+/// one; none when Kitokey shows in the tray alone.
+fn owner(app: &AppHandle) -> licence::Owner {
+    #[cfg(windows)]
+    return ["main", "small"]
+        .into_iter()
+        .find_map(|label| app.get_webview_window(label)?.hwnd().ok())
+        .map(|window| window.0 as isize);
+    #[cfg(not(windows))]
+    {
+        let _ = app;
+        None
+    }
+}
+
+/// Opens the Store's page for Kitokey, the way a folder is opened on Windows (`opening`).
+fn opening_page(page: &str) {
+    match std::process::Command::new("explorer").arg(page).spawn() {
+        Ok(mut started) => {
+            std::thread::spawn(move || started.wait());
+        }
+        Err(error) => tracing::warn!(detail = %error, "shell.store_page_failed"),
+    }
+}
+
+/// What a meeting lacks, made on the user's word from its page (D18): its minutes — through the
+/// same gate as the tray's, the agreement included —, or its transcript.
+#[tauri::command]
+fn minutes_asked(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    make_minutes(&app, folder);
+    Ok(())
+}
+
+/// *Try again*, on a meeting whose minutes were not made: asked as they were last, with the model
+/// a Refaire… named then.
+#[tauri::command]
+fn minutes_again(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let chosen = shell.minutes_tried.lock().unwrap().get(&folder).cloned().flatten();
+    write_minutes(&app, folder, None, chosen);
+    Ok(())
+}
+
+/// *Refaire…*: the minutes made again, with the model chosen on the page, this time only — the
+/// settings' choice when none is named. Through the same gate; the minutes there stay until the
+/// new ones are whole, then go to the trash.
+#[tauri::command]
+fn minutes_redo(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    name: String,
+    provider: Option<String>,
+    model: Option<String>,
+) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // The settings' model, as they name it now, when none is chosen: still a redo, which waits
+    // its turn behind the meeting's own making — never taken for a second first one.
+    let chosen = match provider.zip(model) {
+        Some(choice) => Some(choice),
+        None => {
+            let settings = own(&shell.read_or_told()?, &folder);
+            settings.minutes_provider.zip(settings.minutes_model)
+        }
+    };
+    write_minutes(&app, folder, None, chosen);
+    Ok(())
+}
+
+/// « Annuler » on a meeting's page (D92, the decider's word of 2026-11-13): what is being made of
+/// it — its transcript, its minutes — ends within two seconds, and what waits its turn leaves the
+/// line. The version already whole stays; the user may at once start another making.
+#[tauri::command]
+fn making_cancelled(shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Each making of it cancelled by its own token: waiting in a line — taken out —, taken from one
+    // and not yet begun, or being made, read under its kind's lock. Its start and its end read the
+    // same token: whichever comes first, the other sees it.
+    let taken = |slot: &Mutex<Option<(PathBuf, Cancel)>>| {
+        if let Some((taken, token)) = slot.lock().unwrap().as_ref()
+            && *taken == folder
+        {
+            token.cancel();
+        }
+    };
+    {
+        let mut waiting = shell.waiting.lock().unwrap();
+        waiting.retain(|(queued, _, token)| {
+            let ours = *queued == folder;
+            if ours {
+                token.cancel();
+            }
+            !ours
+        });
+        taken(&shell.promoted_transcript);
+    }
+    {
+        let mut waiting = shell.minutes_waiting.lock().unwrap();
+        waiting.retain(|queued| {
+            let ours = queued.folder == folder;
+            if ours {
+                queued.cancel.cancel();
+            }
+            !ours
+        });
+        taken(&shell.promoted_minutes);
+    }
+    {
+        let _running = shell.transcription.lock().unwrap();
+        if shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path())
+            && let Some(token) = shell.transcript_token.lock().unwrap().as_ref()
+        {
+            token.cancel();
+        }
+    }
+    {
+        let writing = shell.writing_minutes.lock().unwrap();
+        if writing.as_deref() == Some(folder.as_path())
+            && let Some(token) = shell.minutes_token.lock().unwrap().as_ref()
+        {
+            token.cancel();
+        }
+    }
+    tracing::info!(session = %name, "shell.making_cancelled");
+    Ok(())
+}
+
+/// The slot of a making taken from a line freed once its start has been tried — begun, or not —,
+/// unless it already holds the next one taken.
+fn free(slot: &Mutex<Option<(PathBuf, Cancel)>>, token: &Cancel) {
+    let mut slot = slot.lock().unwrap();
+    if slot.as_ref().is_some_and(|(_, taken)| taken.same(token)) {
+        *slot = None;
+    }
+}
+
+/// A line of a meeting's transcript corrected on the user's word (D62, ADR-0014): once complete,
+/// never while it is made or waits to be made again. The making's lock held while it is written:
+/// one writer at a time.
+#[tauri::command]
+fn transcript_corrected(shell: State<'_, Shell>, name: String, track: String, start: f64, text: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let running = shell.transcription.lock().unwrap();
+    let hearing = shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path());
+    let waits = shell.waiting.lock().unwrap().iter().any(|(queued, ..)| *queued == folder);
+    if (running.is_some() && hearing) || waits {
+        return Err(shell.told(Failure::Busy, format!("the transcript of {name} is being made")));
+    }
+    // Its minutes being written read the transcript before: a correction now would be older than
+    // their `made`, and never offered again (#528's verification).
+    if shell.writing_minutes.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Err(shell.told(Failure::Busy, format!("the minutes of {name} are being written")));
+    }
+    let when = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    correction::correct(&folder.join("transcript.jsonl"), &track, start, &text, &when).map_err(|refused| match refused {
+        correction::Refused::NotComplete => shell.told(Failure::NotComplete, format!("the transcript of {name} is not complete")),
+        correction::Refused::NoSuchLine => shell.told(Failure::Unexpected, "no line of the transcript starts there"),
+        correction::Refused::Empty => shell.told(Failure::Unexpected, "a line is not left empty"),
+        correction::Refused::File(why) => shell.told(Failure::MeetingFile, why),
+    })?;
+    drop(running);
+    // What was typed is the meeting's: never in the log.
+    tracing::info!("shell.transcript_corrected");
+    Ok(())
+}
+
+#[tauri::command]
+fn transcript_redo(app: AppHandle, shell: State<'_, Shell>, name: String, model: PathBuf) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    retranscribe(&app, folder, Again::Model(model), Cancel::default()).map_err(|(failure, detail)| shell.told(failure, detail))
+}
+
+/// *Refaire…* on a transcript (D91): made again by whoever the meeting's own models name — chosen
+/// in its « Avancé » —, else Settings; the transcript alone, its minutes left as they are.
+#[tauri::command]
+fn transcript_redo_own(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    retranscribe(&app, folder, Again::Own, Cancel::default()).map_err(|(failure, detail)| shell.told(failure, detail))
+}
+
+/// *Try again*, on a meeting whose transcript was not made: as it was last asked — made again
+/// with the model a Refaire… picked, the transcript there kept until the new one is whole.
+#[tauri::command]
+fn transcript_again(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Read, and the lock let go, before it is asked again: retranscribe takes it too.
+    let tried = shell.transcripts_tried.lock().unwrap().get(&folder).cloned().flatten();
+    match tried {
+        Some(again) => retranscribe_or_say(&app, folder, again, Cancel::default()),
+        None => transcribe(&app, folder, Cancel::default()),
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn transcript_asked(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // The meeting being recorded has no transcript to make yet.
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Err(shell.told(Failure::Busy, format!("{name} is being recorded")));
+    }
+    transcribe(&app, folder, Cancel::default());
+    Ok(())
+}
+
+/// « Essayer sur un exemple » (D126): the example of the window's language, placed as a meeting
+/// started now, then heard and written as any meeting — its minutes whatever Settings say follows a
+/// recording, by whoever writes them; sent nowhere. Its name, for the window to open its page.
+#[tauri::command]
+fn example_tried(app: AppHandle, shell: State<'_, Shell>) -> Result<Tried, Told> {
+    let now = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    let folder = example::place(&shell.settings().sessions, shell.language(), &now)
+        .map_err(|why| shell.told(Failure::MeetingFile, format!("the example could not be placed: {why}")))?;
+    let name = folder
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    tracing::info!(session = %name, "shell.example_tried");
+    shell.examples.lock().unwrap().insert(folder.clone());
+    transcribe(&app, folder, Cancel::default());
+    Ok(Tried { name })
+}
+
+/// The example tried: its meeting's name, its folder's.
+#[derive(serde::Serialize)]
+struct Tried {
+    name: String,
+}
+
+/// The meetings that cannot be freed now: the one being recorded, the one being transcribed.
+fn busy(shell: &Shell) -> Vec<PathBuf> {
+    let recording = shell.recording.lock().unwrap().is_some();
+    let recorded = shell.recorded.lock().unwrap().clone().filter(|_| recording);
+    recorded
+        .into_iter()
+        .chain(shell.hearing.lock().unwrap().clone())
+        .chain(shell.writing_minutes.lock().unwrap().clone())
+        .collect()
+}
+
+/// Their names, for the page that frees space (D19).
+#[tauri::command]
+fn busy_meetings(shell: State<'_, Shell>) -> Vec<String> {
+    busy(&shell)
+        .iter()
+        .filter_map(|folder| folder.file_name().map(|name| name.to_string_lossy().into_owned()))
+        .collect()
+}
+
+/// Frees space on the user's word (D19): the meetings' audio alone — their transcript and minutes
+/// still read —, or the whole meetings; to the system's trash, never deleted, restored from there.
+/// A meeting being recorded, transcribed or its minutes written is refused.
+#[tauri::command]
+fn freed(shell: State<'_, Shell>, names: Vec<String>, whole: bool) -> Result<(), Told> {
+    let busy = busy(&shell);
+    let mut gone = Vec::new();
+    for name in &names {
+        let folder = session_folder(&shell, name)?;
+        if busy.contains(&folder) {
+            return Err(shell.told(
+                Failure::Busy,
+                format!("{name} is being recorded, transcribed or its minutes written"),
+            ));
+        }
+        if whole {
+            gone.push(folder);
+        } else {
+            gone.extend(sessions::audio_of(&folder));
+        }
+    }
+    if gone.is_empty() {
+        return Ok(());
+    }
+    // Its reason alone: the system's own wording names a file.
+    trash::delete_all(&gone).map_err(|error| shell.told(Failure::Trash(refusal(&error)), "the system's trash refused"))
+}
+
+/// What the small window shows (D22), asked ten times a second: whether a recording runs, for
+/// how long, and each source's level now.
+#[derive(serde::Serialize)]
+struct Now {
+    recording: bool,
+    seconds: f64,
+    levels: [f32; 2],
+    /// The microphone and the output recorded now, as the system names them (D33).
+    devices: [Option<String>; 2],
+    /// Whether each side was heard, or why not (D49).
+    checks: [recording::Check; 2],
+    /// How long each side said silent has been, in seconds: the bar says it at two minutes (D90).
+    silent_for: [Option<f64>; 2],
+    /// The microphone chosen is not there: Auto stands in (D74).
+    microphone_gone: bool,
+    /// Whether the transcript is made at the stop, by itself: the small window says so then only.
+    transcript_follows: bool,
+    /// The meeting being recorded, once its folder holds its session: its context can be written
+    /// (D59).
+    meeting: Option<String>,
+    /// Whether it is said confidential (D60).
+    confidential: bool,
+    /// The announcement to copy, the reminder on; none, the reminder off (D50).
+    announcement: Option<&'static str>,
+}
+
+#[tauri::command]
+fn recording_now(shell: State<'_, Shell>) -> Now {
+    // One lock for both: a second `lock()` in the same expression waits on the first for ever.
+    let (checks, silent_for) = {
+        let checks = shell.checks.lock().unwrap();
+        (checks.now(), checks.silent_for(Instant::now()))
+    };
+    let (started, levels) = *shell.meter.lock().unwrap();
+    let recording = shell.recording.lock().unwrap().is_some();
+    let meeting = shell
+        .recorded
+        .lock()
+        .unwrap()
+        .clone()
+        .filter(|folder| recording && folder.join("session.json").is_file());
+    let confidential = meeting.as_deref().is_some_and(confidential::marked);
+    let settings = shell.settings();
+    let spoken = meeting.as_deref().and_then(spoken::read).or(settings.meeting_language.clone());
+    let announcement = settings.reminder.then(|| words::announcement(spoken.as_deref(), shell.language()));
+    let meeting = meeting.map(|folder| named(&folder));
+    Now {
+        recording: shell.recording.lock().unwrap().is_some() && started.is_some(),
+        seconds: started.map_or(0.0, |started| started.elapsed().as_secs_f64()),
+        levels,
+        devices: shell.devices.lock().unwrap().names(),
+        checks,
+        silent_for,
+        microphone_gone: *shell.microphone_gone.lock().unwrap(),
+        transcript_follows: shell.settings.lock().unwrap().after != settings::After::Nothing,
+        meeting,
+        confidential,
+        announcement,
+    }
+}
+
+/// The microphone chosen and what the system offers, as the small window's list shows them (D74).
+#[derive(serde::Serialize)]
+struct Microphones {
+    chosen: Option<recording::Listed>,
+    list: Vec<recording::Listed>,
+    /// The list could not be read: said, Auto still there.
+    unread: bool,
+}
+
+/// What capture lists now, on demand: nothing watches for a device, so that one arriving opens nothing.
+/// Asynchronous: it waits on a program, up to some seconds.
+#[tauri::command]
+async fn microphones_listed(app: AppHandle) -> Microphones {
+    // The choice as it is when asked: the page knows a choice made since, and keeps its own (D74).
+    let settings = app.state::<Shell>().settings();
+    let program = program("kitokey-capture", "KITOKEY_CAPTURE");
+    let list = tauri::async_runtime::spawn_blocking(move || recording::microphones(&program)).await;
+    let list = list.unwrap_or_else(|error| Err(std::io::Error::other(error.to_string())));
+    let chosen = settings.microphone.map(|name| recording::Listed {
+        description: settings.microphone_description.unwrap_or_else(|| name.clone()),
+        name,
+    });
+    if let Err(error) = &list {
+        tracing::warn!(detail = %error, "shell.microphones_unread");
+    }
+    Microphones {
+        chosen,
+        unread: list.is_err(),
+        list: list.unwrap_or_default(),
+    }
+}
+
+/// The microphone the next recordings take: one capture listed, or none for Auto.
+#[tauri::command]
+fn microphone_chosen(shell: State<'_, Shell>, name: Option<String>, description: Option<String>) -> Result<(), Told> {
+    let _saving = shell.saving.lock().unwrap();
+    let mut settings = shell.read_or_told()?;
+    settings.microphone = name;
+    settings.microphone_description = description.filter(|_| settings.microphone.is_some());
+    shell.write_or_told(&settings)?;
+    tracing::info!(auto = settings.microphone.is_none(), "shell.microphone_chosen");
+    *shell.settings.lock().unwrap() = settings;
+    Ok(())
+}
+
+/// « Vérifier le son » opened (D88): capture listens, the microphone the user chose or Auto, for the
+/// window that asked. Never beside a recording — its meters are the bar's —: refused then, nothing opened.
+#[tauri::command]
+async fn sound_check_open(app: AppHandle, window: tauri::WebviewWindow) -> SoundCheckOpened {
+    let shell = app.state::<Shell>();
+    let microphone = shell.settings().microphone;
+    let program = program("kitokey-capture", "KITOKEY_CAPTURE");
+    let opened = sound_check::open(&shell.recording, &shell.sound_check, window.label(), || {
+        sound_check::SoundCheck::start(&program, microphone.as_deref())
+    });
+    let before = match opened {
+        Ok(before) => before,
+        // A recording runs; or the panel closed while its listening started — stopped already.
+        Err(sound_check::Refused::Recording | sound_check::Refused::Closed) => return SoundCheckOpened { opened: false },
+        Err(sound_check::Refused::NotStarted(error)) => {
+            tracing::error!(detail = %error, "shell.sound_check_failed");
+            return SoundCheckOpened { opened: false };
+        }
+    };
+    tracing::info!(auto = microphone.is_none(), "shell.sound_check_opened");
+    if let Some(before) = before {
+        before.stop();
+    }
+    // A panel that no longer asks — its page gone — leaves nothing open.
+    let watched = app.clone();
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            let shell = watched.state::<Shell>();
+            let mut slot = shell.sound_check.lock().unwrap();
+            if !slot.is_open() {
+                return;
+            }
+            if let Some(gone) = slot.abandoned(SOUND_CHECK_UNASKED) {
+                drop(slot);
+                tracing::info!("shell.sound_check_abandoned");
+                gone.stop();
+                return;
+            }
+        }
+    });
+    SoundCheckOpened { opened: true }
+}
+
+/// Whether the panel's capture listens: not while a recording runs, nor when it could not be started.
+#[derive(serde::Serialize)]
+struct SoundCheckOpened {
+    opened: bool,
+}
+
+/// How long a panel may go without asking what is heard before it is taken for gone: it asks ten times a second.
+const SOUND_CHECK_UNASKED: Duration = Duration::from_secs(2);
+
+/// What the panel shows now (D88): each side's device and level, a headset's, the test sound heard, and
+/// whether a call holds a microphone — no test sound then, it would reach the call.
+#[derive(serde::Serialize)]
+struct SoundChecked {
+    open: bool,
+    heard: sound_check::Heard,
+    call: bool,
+}
+
+#[tauri::command]
+fn sound_check_now(shell: State<'_, Shell>) -> SoundChecked {
+    let heard = shell.sound_check.lock().unwrap().asked();
+    SoundChecked {
+        open: heard.is_some(),
+        heard: heard.unwrap_or_default(),
+        call: !shell.holders.lock().unwrap().is_empty(),
+    }
+}
+
+/// A test sound is asked (D88): refused while a call holds a microphone; otherwise the meeting's side
+/// is listened to for it from now on.
+#[tauri::command]
+fn sound_check_mark(shell: State<'_, Shell>) -> SoundCheckMarked {
+    let call = !shell.holders.lock().unwrap().is_empty();
+    let marked = shell.sound_check.lock().unwrap().mark(call);
+    tracing::info!(marked, call, "shell.sound_check_test");
+    SoundCheckMarked { marked }
+}
+
+/// Whether the test sound may play: never while a call holds a microphone, nor with nothing listening.
+#[derive(serde::Serialize)]
+struct SoundCheckMarked {
+    marked: bool,
+}
+
+/// The panel closed (D88): capture stops listening, and has ended when this answers.
+#[tauri::command]
+async fn sound_check_close(app: AppHandle) {
+    let _ = tauri::async_runtime::spawn_blocking(move || sound_check_stopped(&app)).await;
+}
+
+/// Ends the listening, if any, and waits for it: before a recording starts, and when the panel closes.
+fn sound_check_stopped(app: &AppHandle) {
+    let check = app.state::<Shell>().sound_check.lock().unwrap().take();
+    if let Some(check) = check {
+        check.stop();
+        tracing::info!("shell.sound_check_closed");
+    }
+}
+
+/// From the full window to the small one, at rest or recording (D35). Asynchronous, as is
+/// `full_window`: each hides or closes the window that asked, which its own call, run where the
+/// windows are, would wait for.
+#[tauri::command]
+async fn small_window(app: AppHandle) {
+    show_small(&app);
+}
+
+/// The bar asks to be as tall as what it shows (D90): its row alone, its options opened, a line
+/// added; its width the same.
+#[tauri::command]
+fn bar_fit(window: tauri::WebviewWindow, height: f64) {
+    if window.label() == "small" && height.is_finite() {
+        // Its size bounded to the one asked: the user does not resize the bar, its content does.
+        let size = tauri::LogicalSize::new(BAR.0, height.clamp(BAR.1, BAR_TALLEST));
+        let _ = window.set_min_size(Some(tauri::LogicalSize::new(BAR.0, BAR.1)));
+        let _ = window.set_max_size(Some(tauri::LogicalSize::new(BAR.0, BAR_TALLEST)));
+        let _ = window.set_size(size);
+        let _ = window.set_min_size(Some(size));
+        let _ = window.set_max_size(Some(size));
+    }
+}
+
+/// The bar's handle, or its row, pressed (D90): the system moves the bar as the pointer goes.
+#[tauri::command]
+fn bar_drag(window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.start_dragging();
+    }
+}
+
+/// « Masquer la barre » (D90): hidden, a recording going on; it comes back on the user's gesture
+/// alone — the tray's « Afficher la barre d’enregistrement » or « Ouvrir Kitokey » —, never by itself.
+#[tauri::command]
+fn bar_hide(app: AppHandle, window: tauri::WebviewWindow) {
+    if window.label() == "small" {
+        let _ = window.hide();
+        bar_shown(&app, false);
+        tracing::info!("shell.bar_hidden");
+    }
+}
+
+/// From the small window to the full one, on one of its pages when named: a meeting, the
+/// list, the settings (D35).
+#[tauri::command]
+async fn full_window(app: AppHandle, page: Option<String>) {
+    match page.filter(|page| page.starts_with("#/")) {
+        Some(page) => open_window_at(&app, &page),
+        None => show_full(&app),
+    }
+}
+
+/// The header's button: starts a recording, or stops the one running — as the tray and the
+/// shortcut do. Answers once a start is decided, started or refused, without the window's thread
+/// waiting on it (D83).
+#[tauri::command]
+async fn record(app: AppHandle) {
+    if let Some(start) = toggle_recording(&app) {
+        let _ = tauri::async_runtime::spawn_blocking(move || start.join()).await;
+    }
+}
+
+/// The folder of a session the window names (`sessions::folder`).
+fn session_folder(shell: &Shell, name: &str) -> Result<PathBuf, Told> {
+    sessions::folder(&shell.settings().sessions, name).ok_or_else(|| shell.told(Failure::NoMeeting, format!("{name} is no session")))
+}
+
+/// One meeting, as its page shows it.
+#[derive(serde::Serialize)]
+struct Opened {
+    session: Listed,
+    transcript: Read<Transcript>,
+    minutes: Read<Minutes>,
+    /// The developer mode is on: the page offers a diagnostic of this meeting (D29).
+    developer: bool,
+    /// Where the page plays it from: its tracks as one sound, from the loopback server — never
+    /// a path (D26, ADR-0009); none when its audio went to the trash or holds no track.
+    listen: Option<String>,
+    context: ContextShown,
+    confidential: ConfidentialShown,
+    /// The language it says it is spoken in, if it says one, and those offered first (D65).
+    language: Option<String>,
+    languages: Vec<(&'static str, &'static str)>,
+    /// The settings' language for meetings, none: detected — what « as in Settings » means.
+    meeting_language: Option<String>,
+    /// SpeechAnalyzer hears (D42): it detects none, and hears French and English alone — the
+    /// system's language when neither the meeting nor the settings name one (D64, D65).
+    apple: bool,
+    system_language: &'static str,
+    /// The steps whose own model is gone (D91): Settings' choice makes them, said on the page.
+    models_gone: Vec<meeting_models::Step>,
+    /// The last summary a redo replaced, kept beside it (D113): when it was made, and by what.
+    previous_minutes: Option<Previous>,
+    /// The names the user gave its two sides (#1205); none where the meeting cannot hold them — before
+    /// session-audio/v3 —: the page then offers no naming.
+    speakers: Option<SpeakersShown>,
+    /// The last transcript a redo replaced, the same way (D113).
+    previous_transcript: Option<Previous>,
+    /// The summary shown was made on the other version of the transcript, not the one shown (#1070):
+    /// the page says so beside it, never presenting it as this one's.
+    minutes_other_version: bool,
+}
+
+/// When each file of a meeting's two versions was made (D113, #1070): the transcript shown and the one
+/// kept, the summary shown and the one kept — none where the file is absent or says no time.
+struct Versions {
+    transcript: Option<chrono::DateTime<chrono::FixedOffset>>,
+    transcript_kept: Option<chrono::DateTime<chrono::FixedOffset>>,
+    minutes: Option<chrono::DateTime<chrono::FixedOffset>>,
+    minutes_kept: Option<chrono::DateTime<chrono::FixedOffset>>,
+}
+
+fn versions(folder: &Path, sections: [&str; 3]) -> Versions {
+    let at = |made: Option<String>| made.and_then(|made| chrono::DateTime::parse_from_rfc3339(&made).ok());
+    let of_transcript = |read: Read<Transcript>| match read {
+        Read::Present(made) => at(made.made),
+        _ => None,
+    };
+    let of_minutes = |read: Read<Minutes>| match read {
+        Read::Present(made) => at(made.made),
+        _ => None,
+    };
+    Versions {
+        transcript: of_transcript(meeting::transcript(folder)),
+        transcript_kept: of_transcript(meeting::previous(folder)),
+        minutes: of_minutes(minutes::minutes(folder, sections)),
+        minutes_kept: of_minutes(minutes::previous(folder, sections, &[])),
+    }
+}
+
+/// Whether a summary made at `summary` was made on the transcript made at `transcript`, the other
+/// version of it made at `other` (#1070): after it, and before the other when the other came later.
+fn made_on(
+    summary: chrono::DateTime<chrono::FixedOffset>,
+    transcript: chrono::DateTime<chrono::FixedOffset>,
+    other: Option<chrono::DateTime<chrono::FixedOffset>>,
+) -> bool {
+    summary >= transcript && !other.is_some_and(|other| other > transcript && summary >= other)
+}
+
+impl Versions {
+    /// A transcript and the summary made from it are one version (#1070, the coordinator's decision,
+    /// 2026-11-21): going back swaps both pairs when each summary was made on its transcript.
+    fn paired(&self) -> bool {
+        match (self.transcript, self.transcript_kept, self.minutes, self.minutes_kept) {
+            (Some(shown), Some(kept), Some(minutes), Some(minutes_kept)) => {
+                made_on(minutes, shown, Some(kept)) && made_on(minutes_kept, kept, Some(shown))
+            }
+            _ => false,
+        }
+    }
+
+    /// The summary shown was made on the transcript kept, not on the one shown.
+    fn minutes_on_other(&self) -> bool {
+        match (self.transcript, self.transcript_kept, self.minutes) {
+            (Some(shown), Some(kept), Some(minutes)) => made_on(minutes, kept, Some(shown)) && !made_on(minutes, shown, Some(kept)),
+            _ => false,
+        }
+    }
+}
+
+/// A version kept beside the one shown (D113), as its page names it.
+#[derive(serde::Serialize)]
+struct Previous {
+    made: Option<String>,
+    provider: Option<String>,
+    model: Option<String>,
+}
+
+/// The two sides' names as the page shows them (#1205): the user's own words, none where a side keeps the page's.
+#[derive(serde::Serialize)]
+struct SpeakersShown {
+    me: Option<String>,
+    others: Option<String>,
+}
+
+impl From<Speakers> for SpeakersShown {
+    fn from(kept: Speakers) -> Self {
+        SpeakersShown {
+            me: kept.me,
+            others: kept.others,
+        }
+    }
+}
+
+#[tauri::command]
+fn opened(shell: State<'_, Shell>, name: String) -> Result<Opened, Told> {
+    let gone = || shell.told(Failure::MeetingGone, format!("{name} is no session"));
+    let folder = sessions::folder(&shell.settings().sessions, &name).ok_or_else(gone)?;
+    let recorded = shell.recorded.lock().unwrap().clone();
+    let session = sessions::list(&shell.settings().sessions, recorded.as_deref())
+        .into_iter()
+        .find(|listed| listed.folder == folder)
+        .ok_or_else(gone)?;
+    // The last minutes a redo replaced (D113), named by id as the page names v5's sections.
+    let said = words::window(shell.language());
+    let kept_minutes = minutes::previous(
+        &folder,
+        said.minutes_sections,
+        &minutes::named_by_id(said.minutes_sections, said.structure_sections),
+    );
+    Ok(Opened {
+        session,
+        transcript: meeting::transcript(&folder),
+        minutes: read_minutes(&folder, shell.language()),
+        developer: shell.settings().developer,
+        listen: playable(&shell, &folder),
+        context: context_of(&shell, &folder),
+        confidential: confidential_of(&shell, &folder),
+        language: spoken::read(&folder),
+        languages: spoken::OFFERED.to_vec(),
+        meeting_language: shell.settings().meeting_language,
+        apple: shell.settings().engine == Engine::SpeechAnalyzer,
+        system_language: shell.system.code(),
+        models_gone: gone_of(&shell.settings(), &folder),
+        previous_minutes: match kept_minutes {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.provider,
+                model: kept.model,
+            }),
+            _ => None,
+        },
+        speakers: speakers::offered(&folder).then(|| SpeakersShown::from(speakers::read(&folder))),
+        previous_transcript: match meeting::previous(&folder) {
+            Read::Present(kept) => Some(Previous {
+                made: kept.made,
+                provider: kept.engine,
+                model: kept.model,
+            }),
+            _ => None,
+        },
+        minutes_other_version: versions(&folder, words::window(shell.language()).minutes_sections).minutes_on_other(),
+    })
+}
+
+/// The names the user gives a meeting's two sides (#1205), kept in its `speakers.json`: each trimmed, a blank one
+/// giving the side back its word; the names as kept are returned for the page to show. No name is logged.
+#[tauri::command]
+fn speakers_named(shell: State<'_, Shell>, name: String, me: Option<String>, others: Option<String>) -> Result<SpeakersShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let kept = speakers::write(&folder, &Speakers { me, others }).map_err(|error| {
+        // A name the page's fields never let through, or a meeting before v3 the page offers no naming for; else the folder.
+        let failure = match error.kind() {
+            std::io::ErrorKind::InvalidInput | std::io::ErrorKind::Unsupported => Failure::Unexpected,
+            _ => Failure::MeetingFile,
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(me = kept.me.is_some(), others = kept.others.is_some(), "shell.speakers_named");
+    Ok(SpeakersShown::from(kept))
+}
+
+/// The steps whose own model a meeting chose and cannot have now (D91).
+fn gone_of(settings: &Settings, folder: &Path) -> Vec<meeting_models::Step> {
+    let chosen = meeting_models::read(folder);
+    meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings)).gone
+}
+
+/// The language a meeting is spoken in, said on its page (D65): a code written, or none removed —
+/// the settings' default then. Its next transcript is heard in it.
+#[tauri::command]
+fn language_set(shell: State<'_, Shell>, name: String, language: Option<String>) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    spoken::mark(&folder, language.as_deref().filter(|code| !code.trim().is_empty())).map_err(|error| {
+        // A code the page's list never offers; else the folder.
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(language = language.as_deref().unwrap_or("none"), "shell.language_set");
+    Ok(())
+}
+
+/// What a meeting chose for itself (D91), and the steps whose choice is gone: Settings' choice
+/// makes them, and the page says so.
+#[derive(serde::Serialize)]
+struct OwnModels {
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+}
+
+#[tauri::command]
+fn meeting_models_shown(shell: State<'_, Shell>, name: String) -> Result<OwnModels, Told> {
+    let folder = session_folder(&shell, &name)?;
+    let chosen = meeting_models::read(&folder);
+    Ok(OwnModels {
+        chosen,
+        gone: gone_of(&shell.settings(), &folder),
+    })
+}
+
+/// What « Avancé » offers (D91), for a meeting or — none named — the next recording: Settings'
+/// choice first, then the Whisper models of this computer, SpeechAnalyzer where Settings hear by it,
+/// the service Settings set, and Ollama's models here. A meeting said confidential is offered no
+/// service: it is made here alone, whatever is chosen (D60).
+#[derive(serde::Serialize)]
+struct ModelsOffered {
+    engine: Engine,
+    /// Settings' Whisper model, by its file's name.
+    model: String,
+    transcription_provider: Option<String>,
+    transcription_model: Option<String>,
+    minutes_provider: Option<String>,
+    minutes_model: Option<String>,
+    whisper: Vec<String>,
+    apple: bool,
+    service: Option<(String, String)>,
+    ollama_address: String,
+    ollama: Vec<String>,
+    confidential: bool,
+    chosen: meeting_models::Models,
+    gone: Vec<meeting_models::Step>,
+    /// What the meeting chose and is not used while it is said confidential: a service.
+    unused: Vec<meeting_models::Step>,
+    /// Settings could not be read: what is offered comes from those last read, and this says why.
+    unreadable: Option<Told>,
+    /// What « Auto » is, for each job, whatever is chosen: the engine card says it (D122).
+    auto_hearing: engines::Hearing,
+    auto_writing: engines::Writing,
+}
+
+/// Read off the window's thread: Ollama asked for its models may take its two seconds, and a meeting's
+/// page asks it as it opens (D93) — never the window frozen meanwhile.
+#[tauri::command]
+async fn models_offered(app: AppHandle, name: Option<String>) -> Result<ModelsOffered, Told> {
+    let reading = app.clone();
+    tauri::async_runtime::spawn_blocking(move || models_offered_now(&reading.state::<Shell>(), name))
+        .await
+        .map_err(|error| app.state::<Shell>().told(Failure::Unexpected, error))?
+}
+
+fn models_offered_now(shell: &Shell, name: Option<String>) -> Result<ModelsOffered, Told> {
+    // Settings unreadable: offered from those in memory, and said — the panel still opens.
+    let (settings, unreadable) = match shell.reread() {
+        Ok(settings) => (settings, None),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
+    };
+    let (mut chosen, gone, confidential) = match &name {
+        Some(name) => {
+            let folder = session_folder(shell, name)?;
+            (
+                meeting_models::read(&folder),
+                gone_of(&settings, &folder),
+                confidential::marked(&folder),
+            )
+        }
+        // The next recording: Settings' choice alone — the bar chooses no engine (D122, D125).
+        None => (meeting_models::Models::default(), Vec::new(), false),
+    };
+    let file_name = |path: &Path| path.file_name().map(|name| name.to_string_lossy().into_owned());
+    let base = ollama();
+    let ollama_listed = providers::ollama_listed(&base);
+    let ollama_models = ollama_listed.clone().unwrap_or_default();
+    let auto_writing = engines::writing(&base, || ollama_listed);
+    // Said confidential: no service named anywhere (D60) — Settings' entry says who makes it here,
+    // and a service the meeting chose is not shown chosen: it is said unused while it is confidential.
+    let mut unused = Vec::new();
+    let (engine, hearing, writing) = if confidential {
+        if matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. })) {
+            chosen.transcription = None;
+            unused.push(meeting_models::Step::Transcription);
+        }
+        if chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider)) {
+            chosen.minutes = None;
+            unused.push(meeting_models::Step::Minutes);
+        }
+        let engine = match settings.engine {
+            Engine::SpeechAnalyzer => Engine::SpeechAnalyzer,
+            _ => Engine::Whisper,
+        };
+        let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
+        let here = confidential::writer(named, &base, || Some(ollama_models.clone())).ok();
+        (engine, None, here)
+    } else {
+        (
+            settings.engine,
+            settings.transcription_provider.clone().zip(settings.transcription_model.clone()),
+            settings.minutes_provider.clone().zip(settings.minutes_model.clone()),
+        )
+    };
+    let (transcription_provider, transcription_model) = hearing.clone().unzip();
+    let (minutes_provider, minutes_model) = writing.unzip();
+    let whisper: Vec<String> = settings::whisper_models(&models_folder(), &settings)
+        .iter()
+        .filter_map(|path| file_name(path))
+        .collect();
+    Ok(ModelsOffered {
+        engine,
+        model: file_name(&settings.model).unwrap_or_default(),
+        auto_hearing: engines::hearing(&whisper),
+        auto_writing,
+        whisper,
+        apple: settings.engine == Engine::SpeechAnalyzer,
+        service: hearing,
+        ollama_address: providers::ollama_address(&base),
+        ollama: ollama_models,
+        transcription_provider,
+        transcription_model,
+        minutes_provider,
+        minutes_model,
+        confidential,
+        chosen,
+        gone,
+        unused,
+        unreadable,
+    })
+}
+
+/// The models a meeting is made with from now on, chosen in « Avancé » (D91): written whole, a
+/// part none being Settings' choice — none at all, the file removed. Settings are not touched.
+#[tauri::command]
+fn meeting_models_chosen(shell: State<'_, Shell>, name: String, chosen: meeting_models::Models) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Said confidential: made here alone, so no service is ever chosen for it (D60).
+    let service = matches!(chosen.transcription, Some(meeting_models::Hearing::Service { .. }))
+        || chosen.minutes.as_ref().is_some_and(|writer| !providers::local(&writer.provider));
+    if service && confidential::marked(&folder) {
+        return Err(shell.told(Failure::Unexpected, "a meeting said confidential is sent to no service"));
+    }
+    meeting_models::write(&folder, &chosen).map_err(|error| {
+        // A choice the contract refuses, which « Avancé » never offers; else the folder.
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    // Which steps are the meeting's own; their models are no word of a meeting, but stay out all the same.
+    tracing::info!(
+        transcription = chosen.transcription.is_some(),
+        minutes = chosen.minutes.is_some(),
+        "shell.meeting_models_chosen"
+    );
+    Ok(())
+}
+
+/// The name typed on a meeting's page (D70): written, or blank removed — its minutes' title or its
+/// date then. The name itself is never logged.
+#[tauri::command]
+fn title_saved(shell: State<'_, Shell>, name: String, title: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    named::write(&folder, &title).map_err(|error| {
+        // A text the page's field never lets through; else the folder.
+        let failure = if error.kind() == std::io::ErrorKind::InvalidInput {
+            Failure::Unexpected
+        } else {
+            Failure::MeetingFile
+        };
+        shell.told(failure, error)
+    })?;
+    tracing::info!(given = !named::blank(&title), "shell.title_set");
+    Ok(())
+}
+
+/// Whether a meeting is said confidential, and what had left before it was (D60).
+#[derive(serde::Serialize)]
+struct ConfidentialShown {
+    on: bool,
+    left: Vec<Left>,
+}
+
+fn confidential_of(shell: &Shell, folder: &Path) -> ConfidentialShown {
+    let on = confidential::marked(folder);
+    let mut left = shell.left.lock().unwrap().get(folder).cloned().unwrap_or_default();
+    let read = confidential::left(&meeting::transcript(folder), &read_minutes(folder, shell.language()));
+    for said in read {
+        confidential::add(&mut left, said.what, &said.host);
+    }
+    // Its summary sent to a destination, by its name (D110, PDR-0007 §4).
+    if let Some(meeting) = folder.file_name().and_then(|name| name.to_str()) {
+        for sent in sending::of(&sending::record(&sends_file()), meeting) {
+            confidential::add(&mut left, What::Summary, &sent.destination);
+        }
+    }
+    ConfidentialShown {
+        on,
+        left: if on { left } else { Vec::new() },
+    }
+}
+
+/// « Réunion confidentielle » turned on or off (D60): the file written or removed whole. Turned
+/// on, nothing more leaves: a making that sends is ended and made again here, an agreement asked
+/// is no longer, minutes a service wrote are written again here — what had already left kept to
+/// be said, with its host. Turned off, the settings choose again, for what is made next.
+#[tauri::command]
+fn confidential_set(app: AppHandle, shell: State<'_, Shell>, name: String, on: bool) -> Result<ConfidentialShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    confidential::mark(&folder, on).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    tracing::info!(on, "shell.confidential");
+    if !on {
+        // Waiting for Ollama no longer: the page offers them again, made as the settings say.
+        shell.ollama_waiting.lock().unwrap().remove(&folder);
+        return Ok(confidential_of(&shell, &folder));
+    }
+    let mut left = confidential::left(&meeting::transcript(&folder), &read_minutes(&folder, shell.language()));
+    // The transcript a service is making: ended, made again here first in line.
+    let running = shell.transcription.lock().unwrap();
+    let hearing = shell.hearing.lock().unwrap().as_deref() == Some(folder.as_path());
+    let heard_elsewhere = shell.hearing_host.lock().unwrap().clone().filter(|_| hearing);
+    if let (Some(host), Some(transcription)) = (heard_elsewhere, running.as_ref()) {
+        confidential::add(&mut left, What::Sound, &host);
+        shell.heard_here.lock().unwrap().insert(folder.clone());
+        let mut waiting = shell.waiting.lock().unwrap();
+        waiting.retain(|(queued, ..)| *queued != folder);
+        waiting.push_front((folder.clone(), Some(Again::Settings), Cancel::default()));
+        drop(waiting);
+        tracing::info!(host = %host, "shell.confidential_ended");
+        transcription.end();
+    }
+    drop(running);
+    // The minutes a service is writing: ended, made again here first in line.
+    let writing = shell.writing_minutes.lock().unwrap().as_deref() == Some(folder.as_path());
+    let written_elsewhere = shell.minutes_host.lock().unwrap().clone().filter(|_| writing);
+    if let Some(host) = &written_elsewhere {
+        confidential::add(&mut left, What::Transcript, host);
+        shell.written_here.lock().unwrap().insert(folder.clone());
+        tracing::info!(host = %host, "shell.confidential_ended");
+        if let Some(making) = shell.minuting.lock().unwrap().as_ref() {
+            making.end();
+        }
+    }
+    {
+        let mut kept = shell.left.lock().unwrap();
+        let said = kept.entry(folder.clone()).or_default();
+        for one in left {
+            confidential::add(said, one.what, &one.host);
+        }
+    }
+    // Its agreement asked: no longer — made here instead. Its minutes a service wrote: written
+    // again here, the ones there kept until the new ones are whole.
+    let awaiting = shell.awaiting.lock().unwrap().iter().any(|(aside, _)| *aside == folder);
+    let queued = shell.minutes_waiting.lock().unwrap().iter().any(|queued| queued.folder == folder);
+    let by_service = matches!(
+        read_minutes(&folder, shell.language()),
+        Read::Present(minutes) if minutes.provider.as_deref().is_some_and(|provider| provider != "local")
+    );
+    if awaiting {
+        shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
+        shell.asked_again.lock().unwrap().remove(&folder);
+    }
+    if !writing && !queued && (awaiting || by_service) {
+        write_minutes_from(&app, folder.clone(), None, None, true, Cancel::default());
+    }
+    Ok(confidential_of(&shell, &folder))
+}
+
+/// A meeting's context, as the field shows it (D59).
+#[derive(serde::Serialize)]
+struct ContextShown {
+    text: String,
+    /// Its transcript or minutes were made with another: *Refaire la transcription* is offered.
+    changed: bool,
+    /// Made again with it, its minutes follow the transcript: its button names them too (D113).
+    minutes_after: bool,
+}
+
+/// Whether a transcript made again with the context brings minutes after it: when the meeting has
+/// some, or the settings make them (D59) — what the context's button names (D113).
+fn minutes_after(folder: &Path, after: After) -> bool {
+    folder.join("minutes.md").is_file() || after == After::Minutes
+}
+
+fn context_of(shell: &Shell, folder: &Path) -> ContextShown {
+    let text = context::read(folder);
+    let transcript = meeting::transcript(folder);
+    let minutes = read_minutes(folder, shell.language());
+    ContextShown {
+        changed: context::changed(text.as_deref(), &transcript, &minutes),
+        text: text.unwrap_or_default(),
+        minutes_after: minutes_after(folder, shell.settings().after),
+    }
+}
+
+/// The meeting's transcript or minutes are being made: their making read its context as it began.
+fn making(shell: &Shell, folder: &Path) -> bool {
+    shell.hearing.lock().unwrap().as_deref() == Some(folder) || shell.writing_minutes.lock().unwrap().as_deref() == Some(folder)
+}
+
+#[tauri::command]
+fn context_shown(shell: State<'_, Shell>, name: String) -> Result<ContextShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    Ok(context_of(&shell, &folder))
+}
+
+/// The field written (D59): kept whole as the meeting's `context.txt` — the meeting being
+/// recorded once its folder holds its session —; refused while a making of it runs, or its
+/// transcript is left unfinished.
+#[tauri::command]
+fn context_saved(shell: State<'_, Shell>, name: String, text: String) -> Result<ContextShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if let Some(closed) = context::closed(making(&shell, &folder), &meeting::transcript(&folder)) {
+        return Err(shell.told(closed.failure(), format!("the context cannot change now: {closed:?}")));
+    }
+    context::write(&folder, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    Ok(context_of(&shell, &folder))
+}
+
+/// The context kept for the next recording (D91), as the bar shows it at rest.
+#[derive(serde::Serialize)]
+struct NextContext {
+    text: String,
+}
+
+#[tauri::command]
+fn next_context(shell: State<'_, Shell>) -> NextContext {
+    NextContext {
+        text: shell.next_context.lock().unwrap().clone(),
+    }
+}
+
+/// Where the context kept for the next recording is, beside the settings: Kitokey started again
+/// still has it (D91).
+fn next_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("next-context.txt"))
+}
+
+/// Where the recording running is kept, beside the settings, while it runs (#773).
+fn recording_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("recording.json"))
+}
+
+/// A recording a Kitokey ended before this one left running (#773) — its shell killed, the
+/// computer's session closed under it —: shown as the recording in progress, counted from its
+/// session's start, and stopped by the same gestures; its transcript follows its stop as usual.
+/// Its levels, devices and silences went with the output of the shell that read them: none said.
+fn found(app: &AppHandle) {
+    let Some(found) = recording_file().and_then(|file| recording::find(&file, seconds_now())) else {
+        return;
+    };
+    let shell = app.state::<Shell>();
+    tracing::info!(
+        session = %found.folder.file_name().unwrap_or_default().to_string_lossy(),
+        seconds = found.seconds,
+        stopping = found.stopping,
+        "shell.recording_found"
+    );
+    *shell.recording.lock().unwrap() = Some(found.recording);
+    *shell.stopping.lock().unwrap() = found.stopping;
+    *shell.recorded.lock().unwrap() = Some(found.folder);
+    let since = Instant::now().checked_sub(Duration::from_secs_f64(found.seconds));
+    *shell.meter.lock().unwrap() = (Some(since.unwrap_or_else(Instant::now)), [0.0, 0.0]);
+    show(app, if found.stopping { Shown::Stopping } else { Shown::Recording });
+    small_recording(app, true);
+    let (app, said) = (app.clone(), found.said);
+    std::thread::spawn(move || listen(&app, &said, None, true));
+}
+
+/// The bar's field at rest written (D91): kept for the next recording, under D59's 400 characters.
+/// Never closed by a making: no meeting is made from it before it starts. Refused while a recording
+/// runs — a key typed as the tray or the shortcut starts one would be the meeting after's —, what
+/// is kept staying as it is.
+#[tauri::command]
+fn next_context_kept(shell: State<'_, Shell>, text: String) -> Result<(), Told> {
+    let mut next = shell.next_context.lock().unwrap();
+    if shell.recording.lock().unwrap().is_some() {
+        return Err(shell.told(Failure::Busy, "a recording runs: no context is kept for the next"));
+    }
+    let file = next_file().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for settings"))?;
+    context::keep_next(&file, &text).map_err(|error| shell.told(Failure::MeetingFile, error))?;
+    *next = text;
+    Ok(())
+}
+
+/// The context's button, *Refaire la transcription* (D59, D113): the transcript made again by whoever
+/// the settings name to hear, then the minutes by whoever they name to write — each kept in place until
+/// the new one is whole, put back if it is not.
+#[tauri::command]
+fn context_redo(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Err(shell.told(Failure::Busy, format!("{name} is being recorded")));
+    }
+    if let Some(closed) = context::closed(making(&shell, &folder), &meeting::transcript(&folder)) {
+        return Err(shell.told(closed.failure(), format!("{name} cannot be made again now: {closed:?}")));
+    }
+    // One that cannot begin — no model, the program missing — says why on its page.
+    retranscribe_or_say(&app, folder, Again::Settings, Cancel::default());
+    Ok(())
+}
+
+/// A meeting's tracks, offered to the window's player by the loopback server as one sound — these
+/// files, read only, and no other: an earlier meeting's are no longer served (ADR-0008, ADR-0009).
+fn playable(shell: &Shell, folder: &Path) -> Option<String> {
+    let tracks = meeting::tracks(folder);
+    let mut served = shell.served.lock().unwrap();
+    if served.is_none() && !tracks.is_empty() {
+        match player::Served::start() {
+            Ok(started) => *served = Some(started),
+            Err(error) => tracing::error!(detail = %error, "shell.player_refused"),
+        }
+    }
+    served
+        .as_ref()?
+        .offer_placed(tracks.into_iter().map(|track| (track.path, track.runs)).collect())
+}
+
+/// A meeting's waveform per voice (#1201): each track's peaks, read away from the window's thread — two hours
+/// of tracks in about 4 s, once — then kept in its `derived/` (`peaks`). None while it records, or when no
+/// track reads: the page then draws who spoke from its transcript. Numbers only, 0 to 255 of full scale.
+#[derive(serde::Serialize)]
+struct Waveform {
+    seconds: f64,
+    local: Option<Vec<u8>>,
+    remote: Option<Vec<u8>>,
+}
+
+#[tauri::command]
+async fn peaks_of(shell: State<'_, Shell>, name: String) -> Result<Option<Waveform>, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if shell.recording.lock().unwrap().is_some() && shell.recorded.lock().unwrap().as_deref() == Some(folder.as_path()) {
+        return Ok(None);
+    }
+    let read = tauri::async_runtime::spawn_blocking(move || kitokey_shell::peaks::of(&folder))
+        .await
+        .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    Ok(read.map(|peaks| Waveform {
+        seconds: peaks.seconds,
+        local: peaks.local,
+        remote: peaks.remote,
+    }))
+}
+
+/// A meeting's diagnostic, for the page to copy: every program's log lines of its makings, then
+/// each track's level — nothing of the meeting, which no line holds (D29).
+#[tauri::command]
+async fn diagnostic(shell: State<'_, Shell>, name: String) -> Result<String, Told> {
+    if !shell.settings().developer {
+        return Err(shell.told(Failure::Unexpected, "the developer mode is off"));
+    }
+    let session = session_folder(&shell, &name)?;
+    let folder = log::folder().ok_or_else(|| shell.told(Failure::Unexpected, "this system names no folder for logs"))?;
+    // Each track's level beside the logs: whether a side was heard at all, in numbers (D39) —
+    // read away from the window's thread, an hour of tracks taking a second.
+    tauri::async_runtime::spawn_blocking(move || {
+        let lines = log::diagnostic(&folder, &name);
+        let levels = kitokey_shell::levels::levels(&session);
+        if lines.is_empty() { levels } else { format!("{lines}\n{levels}") }
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))
+}
+
+/// A failure of the window's page, as it reports its own (D29): an error, its kind and where in
+/// the page's code — never its sentence ([`log::page_failed`]).
+#[tauri::command]
+fn page_failed(kind: String, file: String, line: u32, column: u32) {
+    log::page_failed(&kind, &file, line, column);
+}
+
+/// Opens the logs' folder in the system's file manager, made when nothing was logged yet.
+#[tauri::command]
+fn open_logs(shell: State<'_, Shell>) -> Result<(), Told> {
+    let folder = log::folder().ok_or_else(|| shell.told(Failure::FolderNotOpened, "this system names no folder for logs"))?;
+    std::fs::create_dir_all(&folder).map_err(|error| shell.told(Failure::FolderNotOpened, error))?;
+    opening(&shell, &folder)
+}
+
+/// What the agreement page shows before a meeting first leaves for a host (D11's fifth board):
+/// to whom, with which model, and what goes — the transcript, its length and how many words; the
+/// context the user attached, how many words —; the audio stays. And the models that would write
+/// the minutes on this computer instead.
+#[derive(serde::Serialize)]
+struct Agreement {
+    host: String,
+    model: String,
+    seconds: f64,
+    words: usize,
+    context_words: Option<usize>,
+    ollama: Vec<String>,
+}
+
+#[tauri::command]
+async fn agreement_shown(shell: State<'_, Shell>, name: String) -> Result<Agreement, Told> {
+    let folder = session_folder(&shell, &name)?;
+    // Said confidential: nothing is sent, nothing is asked (D60).
+    if confidential::marked(&folder) {
+        return Err(shell.told(Failure::Confidential, format!("{name} is confidential: nothing is sent")));
+    }
+    let settings = shell.read_or_told()?;
+    let (Some(provider), Some(model)) = (settings.minutes_provider, settings.minutes_model) else {
+        return Err(shell.told(Failure::NoneChosen, "no one is chosen to write the minutes"));
+    };
+    let meeting::Read::Present(transcript) = meeting::transcript(&folder) else {
+        return Err(shell.told(Failure::NoTranscript, format!("{name} has no transcript to send")));
+    };
+    let words = |text: &str| text.split_whitespace().count();
+    let listed = sessions::list(&settings.sessions, None)
+        .into_iter()
+        .find(|listed| listed.folder == folder);
+    let said_until = transcript.segments.iter().map(|segment| segment.end).fold(0.0, f64::max);
+    let base = ollama();
+    let ollama = tauri::async_runtime::spawn_blocking(move || providers::ollama_models(&base))
+        .await
+        .unwrap_or_default();
+    Ok(Agreement {
+        host: providers::host(&provider).unwrap_or(provider),
+        model,
+        seconds: listed.and_then(|listed| listed.seconds).unwrap_or(said_until),
+        words: transcript.segments.iter().map(|segment| words(&segment.text)).sum(),
+        context_words: std::fs::read_to_string(folder.join("context.txt"))
+            .ok()
+            .map(|context| words(&context))
+            .filter(|&n| n > 0),
+        ollama,
+    })
+}
+
+/// The user's word: this meeting is sent; and, when they ticked it, the host is agreed to for the
+/// next ones, kept in the settings.
+#[tauri::command]
+fn agreed(app: AppHandle, shell: State<'_, Shell>, name: String, host: String, remember: bool) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Err(shell.told(Failure::Confidential, format!("{name} is confidential: nothing is sent")));
+    }
+    // The word given is for the host the page showed: chosen otherwise meanwhile, nothing goes.
+    let read = shell.read_or_told()?;
+    let named = read.minutes_provider.clone().zip(read.minutes_model.clone());
+    let now = read.minutes_provider.as_deref().and_then(providers::host);
+    if now.as_deref() != Some(host.as_str()) {
+        return Err(shell.told(Failure::ProviderChanged, format!("the minutes are no longer written by {host}")));
+    }
+    if remember {
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        // Kept only for the host shown, as the file still names it.
+        if settings.minutes_provider.as_deref().and_then(providers::host).as_deref() != Some(host.as_str()) {
+            return Err(shell.told(Failure::ProviderChanged, format!("the minutes are no longer written by {host}")));
+        }
+        settings.minutes_agreed = Some(host.clone());
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+    }
+    let again = shell
+        .asked_again
+        .lock()
+        .unwrap()
+        .remove(&folder)
+        .filter(|asked| asked.named == named)
+        .map(|asked| asked.choice);
+    write_minutes(&app, folder, Some(&host), again);
+    look_again(&app);
+    Ok(())
+}
+
+/// Written on this computer instead: Ollama's model chosen for these minutes and the next ones;
+/// nothing is agreed to, nothing leaves.
+#[tauri::command]
+fn local_instead(app: AppHandle, shell: State<'_, Shell>, name: String, model: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    if model.trim().is_empty() {
+        return Err(shell.told(Failure::ModelUnnamed, "no model is named"));
+    }
+    {
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        settings.minutes_provider = Some(providers::ollama_address(&ollama()));
+        settings.minutes_model = Some(model.trim().to_string());
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+    }
+    make_minutes(&app, folder);
+    look_again(&app);
+    Ok(())
+}
+
+/// What a meeting's actions' *by when* name (D115): the day they are read against — the meeting's own, as its
+/// folder names it, or the one the user set — and each one's date, or none when it names none without a guess.
+#[derive(serde::Serialize)]
+struct Resolved {
+    day: String,
+    dates: Vec<Option<String>>,
+}
+
+#[tauri::command]
+fn dates_resolved(name: String, whens: Vec<String>, day: Option<String>) -> Option<Resolved> {
+    let day = match day {
+        Some(day) => chrono::NaiveDate::parse_from_str(&day, "%Y-%m-%d").ok()?,
+        None => dates::reference_day(&name)?,
+    };
+    let dated = |when: &String| dates::resolve(when, day).map(|date| date.format("%Y-%m-%d").to_string());
+    Some(Resolved {
+        day: day.format("%Y-%m-%d").to_string(),
+        dates: whens.iter().map(dated).collect(),
+    })
+}
+
+/// One ticked date, as the page shows it: its day, the action's what and who, its passage, the meeting's name.
+#[derive(serde::Deserialize)]
+struct Ticked {
+    date: String,
+    what: String,
+    who: Option<String>,
+    passage: Option<String>,
+    meeting: String,
+}
+
+/// Opens Google Calendar's own screen on a ticked date, the event pre-filled and unsaved (D115): nothing leaves
+/// before this gesture, and never a confidential meeting's words (PDR-0007): its dates go to an `.ics` alone.
+#[tauri::command]
+fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<(), Told> {
+    if confidential::marked(&session_folder(&shell, &name)?) {
+        return Err(shell.told(Failure::LinkNotOpened, "a confidential meeting is given no link"));
+    }
+    let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    let event = dates::Event {
+        date,
+        what: &item.what,
+        who: item.who.as_deref(),
+        passage: item.passage.as_deref(),
+        meeting: &item.meeting,
+    };
+    browsing(&shell, &dates::google(&event))
+}
+
+/// Where the ticked dates go as an `.ics`, chosen in the system's own dialog, its name the meeting's; none when the
+/// user closes it (D115). Allowed for a confidential meeting: the file stays on this computer (PDR-0007).
+#[tauri::command]
+async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.ics", named(&folder)))
+        .add_filter("iCalendar", &["ics"]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
+/// whole day, its title and notes as the page shows them, its UID stable for the meeting and the action.
+#[tauri::command]
+fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<exporting::Dated>) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me,
+        others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: Some(&dates),
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::ics(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, tag, &input)
+        .inspect(|()| tracing::info!(dates = dates.len(), "shell.dates_saved"))
+        .map_err(|why| shell.told(Failure::DatesNotSaved, why))
+}
+
+/// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
+/// writes down the address it is handed and opens nothing.
+fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
+    let opener = std::env::var_os("KITOKEY_BROWSER").map(PathBuf::from).unwrap_or_else(|| {
+        PathBuf::from(if cfg!(target_os = "macos") {
+            "open"
+        } else if cfg!(windows) {
+            "explorer"
+        } else {
+            "xdg-open"
+        })
+    });
+    let mut started = std::process::Command::new(opener)
+        .arg(address)
+        .spawn()
+        .map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
+    std::thread::spawn(move || started.wait());
+    Ok(())
+}
+
+/// Opens a session's folder in the system's file manager.
+#[tauri::command]
+fn open_folder(shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    opening(&shell, &session_folder(&shell, &name)?)
+}
+
+/// Opens a folder in the system's file manager.
+fn opening(shell: &Shell, folder: &Path) -> Result<(), Told> {
+    let opener = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(windows) {
+        "explorer"
+    } else {
+        "xdg-open"
+    };
+    // Waited for on a thread of its own, so that nothing of it is left in the system's table.
+    let mut started = std::process::Command::new(opener)
+        .arg(folder)
+        .spawn()
+        .map_err(|error| shell.told(Failure::FolderNotOpened, error))?;
+    std::thread::spawn(move || started.wait());
+    Ok(())
+}
+
+/// One of the models to download: its file, its size, its host, what it is good for — none when
+/// this build has no sentence for it —, whether it is here.
+#[derive(serde::Serialize)]
+struct Offered {
+    file: &'static str,
+    bytes: u64,
+    host: &'static str,
+    good: Option<&'static str>,
+    here: bool,
+}
+
+/// The models Settings offer: the list shipped, or the one read again on the user's gesture
+/// until Kitokey quits (D40, ADR-0010).
+fn offered() -> Vec<registry::Listed> {
+    offered_list().read().unwrap().clone()
+}
+
+fn offered_list() -> &'static std::sync::RwLock<Vec<registry::Listed>> {
+    static LIST: std::sync::OnceLock<std::sync::RwLock<Vec<registry::Listed>>> = std::sync::OnceLock::new();
+    LIST.get_or_init(|| std::sync::RwLock::new(registry::shipped()))
+}
+
+/// Where the list is read again from — or, for whoever tries Kitokey, `KITOKEY_REGISTRY`.
+fn registry_address() -> String {
+    std::env::var("KITOKEY_REGISTRY").unwrap_or_else(|_| registry::ADDRESS.to_owned())
+}
+
+/// Reads the list again, on the user's click in Settings — its host shown on the button. Taken,
+/// signed by the key built in, it is offered until Kitokey quits; refused, the list offered
+/// stays, and the page says so. With no key built in the page offers no click (D56).
+#[tauri::command]
+async fn registry_refresh() -> Result<(), ()> {
+    let address = registry_address();
+    let host = registry::host(&address).to_owned();
+    let read = tauri::async_runtime::spawn_blocking(move || registry::fetch(&address, registry::PUBLIC_KEY)).await;
+    match read.unwrap_or_else(|error| Err(error.to_string())) {
+        Ok(listed) => {
+            tracing::info!(host = %host, models = listed.len(), "shell.registry_read");
+            *offered_list().write().unwrap() = listed;
+            Ok(())
+        }
+        Err(detail) => {
+            tracing::warn!(host = %host, detail = %detail, "shell.registry_refused");
+            Err(())
+        }
+    }
+}
+
+/// A Whisper model the settings page offers.
+#[derive(serde::Serialize)]
+struct Model {
+    path: PathBuf,
+    name: String,
+    bytes: u64,
+}
+
+/// What the settings page shows: the choices as they stand, the models on this computer, and
+/// why the file is not written when it could not be read.
+#[derive(serde::Serialize)]
+struct SettingsShown {
+    /// The shortcut's keys as the desktop granted them, and whether its keyboard settings, where
+    /// they change, can be opened from here.
+    shortcut: Option<String>,
+    shortcut_settings: bool,
+    sessions: PathBuf,
+    /// The same, as people write it: from their home, with a tilde.
+    sessions_said: String,
+    /// The folder every summary is written to too, said so; none, none (D109).
+    export_said: Option<String>,
+    after: After,
+    reminder: bool,
+    /// A call another application starts is offered to be recorded (D30).
+    offer: bool,
+    /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it; on
+    /// Windows, the package's startup task, as Windows holds it (D84).
+    autostart: bool,
+    /// Whether the switch is offered: not on Windows outside a package, which has no task.
+    autostart_offered: bool,
+    /// Where a summary can be sent (D110): names, kinds, addresses as shown — never one whole.
+    destinations: Vec<kitokey_shell::destinations::Destination>,
+    /// The version this program says, as `--version` does: shown at the foot of « Général » (#1089).
+    version: &'static str,
+    /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
+    autostart_held: Option<autostart::Held>,
+    keep_audio: KeepAudio,
+    model: PathBuf,
+    /// Who hears: the model above, Apple's SpeechAnalyzer (D42), or a service the user named (D43),
+    /// its address, model and the host agreed to; its key never: the keyring holds it.
+    engine: Engine,
+    transcription_provider: Option<String>,
+    transcription_model: Option<String>,
+    transcription_agreed: Option<String>,
+    models: Vec<Model>,
+    /// The short list of models to download, each said by what it is good for (D37), and the
+    /// host it is read again from on the user's gesture (D40).
+    offered: Vec<Offered>,
+    registry_host: String,
+    /// The services that hear, offered by name (D63).
+    hearing: Vec<providers::Hearing>,
+    /// The language meetings are spoken in, none: detected; and those offered first (D65).
+    meeting_language: Option<String>,
+    languages: Vec<(&'static str, &'static str)>,
+    /// The language Kitokey speaks, chosen by the user (D64): `fr`, `en`; none, the system's.
+    language: Option<&'static str>,
+    developer: bool,
+    log: Log,
+    /// Every window's look (D98).
+    appearance: Appearance,
+    unreadable: Option<Told>,
+    /// What is left of the trial, said on a trial licence alone, read anew (D83).
+    trial: Option<String>,
+}
+
+/// The folder Kitokey keeps its models in: the default model's.
+fn models_folder() -> PathBuf {
+    Settings::default().model.parent().map(PathBuf::from).unwrap_or_default()
+}
+
+/// Settings' start-with-the-session switch: on or off, whether it is offered, and who holds it.
+/// The desktop's entry where there is one (D32); else the package's startup task (D84), none
+/// outside a package, a task that cannot be read not offered and said in the log.
+fn startup_shown() -> (bool, bool, Option<autostart::Held>) {
+    if let Some(entry) = autostart::file() {
+        return (autostart::on(&entry), true, None);
+    }
+    match autostart::task() {
+        Ok(Some(task)) => {
+            let (on, held) = autostart::shown(task);
+            (on, true, held)
+        }
+        Ok(None) => (false, false, None),
+        Err(detail) => {
+            tracing::warn!(%detail, "shell.startup_task_unread");
+            (false, false, None)
+        }
+    }
+}
+
+/// Async, so off the main thread: the licence (D83) and, on Windows, the startup task (D84) are
+/// each waited for up to 5 s, which would hold the window's messages.
+#[tauri::command]
+async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<SettingsShown, Told> {
+    let (autostart, autostart_offered, autostart_held) = startup_shown();
+    let (settings, unreadable) = match shell.reread() {
+        Ok(settings) => (settings, None),
+        Err(why) => (shell.settings(), Some(shell.told(Failure::SettingsLocked(why.refused), why))),
+    };
+    let models = settings::whisper_models(&models_folder(), &settings)
+        .into_iter()
+        .map(|path| Model {
+            // One outside Kitokey's folder says where it is: two files may share a name.
+            name: match path.parent() {
+                Some(parent) if parent != models_folder() => path.display().to_string(),
+                _ => path.file_name().map(|name| name.to_string_lossy().into_owned()).unwrap_or_default(),
+            },
+            bytes: std::fs::metadata(&path).map_or(0, |data| data.len()),
+            path,
+        })
+        .collect();
+    let trial =
+        licence::left(&shell.licence(owner(&app)), &settings.sessions, seconds_now()).map(|left| words::trial_left(left, shell.language()));
+    Ok(SettingsShown {
+        shortcut: shell.shortcut.lock().unwrap().clone(),
+        shortcut_settings: keyboard_settings().is_some(),
+        sessions_said: from_home_said(&settings.sessions),
+        export_said: settings.export.as_deref().map(from_home_said),
+        sessions: settings.sessions,
+        after: settings.after,
+        reminder: settings.reminder,
+        offer: settings.offer,
+        autostart,
+        autostart_offered,
+        destinations: settings.destinations.clone(),
+        version: VERSION,
+        autostart_held,
+        keep_audio: settings.keep_audio,
+        model: settings.model,
+        engine: settings.engine,
+        transcription_provider: settings.transcription_provider.clone(),
+        transcription_model: settings.transcription_model.clone(),
+        transcription_agreed: settings.transcription_agreed.clone(),
+        models,
+        registry_host: registry::host(&registry_address()).to_owned(),
+        hearing: providers::hearing(),
+        meeting_language: settings.meeting_language.clone(),
+        languages: spoken::OFFERED.to_vec(),
+        offered: offered()
+            .iter()
+            .enumerate()
+            .map(|(index, listed)| Offered {
+                file: model::file(&listed.published),
+                bytes: published_at(index).bytes,
+                host: published_at(index).host,
+                good: listed.good.map(|good| words::offered_good(shell.language(), good)),
+                here: models_folder().join(model::file(&listed.published)).is_file(),
+            })
+            .collect(),
+        language: settings.language.map(Language::code),
+        developer: settings.developer,
+        log: settings.log,
+        appearance: settings.appearance,
+        unreadable,
+        trial,
+    })
+}
+
+/// A folder as people write it: from their home, with a tilde.
+fn from_home_said(folder: &Path) -> String {
+    match dirs::home_dir().and_then(|home| folder.strip_prefix(home).ok().map(PathBuf::from)) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => folder.display().to_string(),
+    }
+}
+
+/// One choice the page changed.
+#[derive(serde::Deserialize)]
+struct Change {
+    sessions: Option<PathBuf>,
+    after: Option<After>,
+    reminder: Option<bool>,
+    offer: Option<bool>,
+    autostart: Option<bool>,
+    keep_audio: Option<KeepAudio>,
+    model: Option<PathBuf>,
+    /// Apple's SpeechAnalyzer, or Whisper again (D42); a model chosen is Whisper's.
+    engine: Option<Engine>,
+    developer: Option<bool>,
+    log: Option<Log>,
+    /// The language meetings are spoken in (D65): a code, or empty for « detected ».
+    meeting_language: Option<String>,
+    /// The sidebar folded or not (D61).
+    folded: Option<bool>,
+    /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
+    language: Option<String>,
+    /// Every window's look (D98).
+    appearance: Option<Appearance>,
+    /// The folder every summary is written to too (D109): a path, or empty for none.
+    export: Option<String>,
+}
+
+/// Writes a change to the settings file, then holds it: the next recording follows it. Nothing
+/// is written over a file that could not be read, and a model is only one found on this computer.
+#[tauri::command]
+fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Result<(), Told> {
+    let apple = change.engine == Some(Engine::SpeechAnalyzer);
+    // The change goes onto what the file says now: what the user changed by hand stays.
+    let _saving = shell.saving.lock().unwrap();
+    let mut settings = shell.read_or_told()?;
+    // A folder for the sessions: a whole path, made when it is not there yet.
+    if let Some(sessions) = change.sessions {
+        if sessions.as_os_str().is_empty() {
+            return Err(shell.told(Failure::FolderUnnamed, "no folder is named"));
+        }
+        let sessions = settings::from_home(sessions);
+        if !sessions.is_absolute() {
+            return Err(shell.told(Failure::FolderNotWhole, "no whole path, from the root or from ~"));
+        }
+        std::fs::create_dir_all(&sessions).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
+        settings.sessions = sessions;
+    }
+    // The export folder (D109): a whole path, made when it is not there yet; empty, none.
+    if let Some(export) = change.export {
+        settings.export = match export.trim() {
+            "" => None,
+            written => {
+                let folder = settings::from_home(PathBuf::from(written));
+                if !folder.is_absolute() {
+                    return Err(shell.told(Failure::FolderNotWhole, "no whole path, from the root or from ~"));
+                }
+                std::fs::create_dir_all(&folder).map_err(|error| shell.told(Failure::FolderUnmade, error))?;
+                Some(folder)
+            }
+        };
+    }
+    if let Some(after) = change.after {
+        settings.after = after;
+    }
+    if let Some(reminder) = change.reminder {
+        settings.reminder = reminder;
+    }
+    if let Some(offer) = change.offer {
+        settings.offer = offer;
+    }
+    // The entry first: the settings say what Kitokey wrote of it, once it is written.
+    if let Some(on) = change.autostart {
+        match autostart::file() {
+            Some(entry) => autostart::set(&entry, on).map_err(|error| shell.told(Failure::Autostart, error))?,
+            None => autostart::turn(on).map_err(|error| shell.told(Failure::Autostart, error))?,
+        }
+        settings.autostart = Some(on);
+    }
+    if let Some(developer) = change.developer {
+        settings.developer = developer;
+    }
+    if let Some(language) = change.meeting_language {
+        settings.meeting_language = match language.trim() {
+            "" => None,
+            text => Some(spoken::code(text).ok_or_else(|| shell.told(Failure::Unexpected, "no language's code"))?),
+        };
+    }
+    if let Some(log) = change.log {
+        settings.log = log;
+    }
+    if let Some(folded) = change.folded {
+        settings.folded = folded;
+    }
+    if let Some(appearance) = change.appearance {
+        settings.appearance = appearance;
+    }
+    let spoken = settings.language;
+    if let Some(language) = change.language {
+        settings.language = match language.trim() {
+            "" => None,
+            code => Some(Language::named(code).ok_or_else(|| shell.told(Failure::Unexpected, "no language Kitokey speaks"))?),
+        };
+    }
+    // The same bounds as the file's: a value read refuses is never written.
+    if let Some(KeepAudio::Days(days)) = change.keep_audio
+        && !(1..=36_500).contains(&days)
+    {
+        return Err(shell.told(Failure::Unexpected, format!("{days} is no number of days to keep audio")));
+    }
+    if let Some(keep) = change.keep_audio {
+        settings.keep_audio = keep;
+    }
+    if let Some(model) = change.model {
+        if !settings::whisper_models(&models_folder(), &settings).contains(&model) {
+            return Err(shell.told(Failure::ModelAbsent, "no model on this computer"));
+        }
+        settings.model = model;
+        settings.engine = Engine::Whisper;
+    }
+    if let Some(engine) = change.engine {
+        settings.engine = engine;
+    }
+    shell.write_or_told(&settings)?;
+    let relabelled = settings.language != spoken;
+    *shell.settings.lock().unwrap() = settings;
+    // Another language, spoken at once: the tray's menu; the window draws itself again (D64).
+    if relabelled {
+        relabel(&app);
+    }
+    // Meetings that waited for the default Whisper model are heard now by SpeechAnalyzer (D42).
+    if apple {
+        transcribe_next(&app);
+    }
+    Ok(())
+}
+
+/// Sends to the system's trash the audio of the sessions kept longer than the settings say — never
+/// deleted, restored from the trash —, and says so once. A session's folder that is a link the
+/// user put in the sessions' folder is followed, as the list follows it. A refusal is said once,
+/// and again only when its reason changes: `refused` is the last one said.
+fn expire(app: &AppHandle, refused: &mut Option<Refusal>) {
+    let shell = app.state::<Shell>();
+    let Ok(settings) = shell.reread() else { return };
+    let KeepAudio::Days(days) = settings.keep_audio else { return };
+    let gone = sessions::expired_audio(&settings.sessions, days, seconds_now());
+    if gone.is_empty() {
+        return;
+    }
+    let meetings: std::collections::HashSet<_> = gone
+        .iter()
+        .filter_map(|path| path.strip_prefix(&settings.sessions).ok()?.components().next())
+        .collect();
+    let outcome = trash::delete_all(&gone)
+        .map(|()| (meetings.len(), days))
+        .map_err(|error| refusal(&error));
+    let said_already = matches!((outcome, *refused), (Err(why), Some(said)) if why == said);
+    *refused = outcome.err();
+    if !said_already {
+        tell(app, &words::audio_trashed(shell.language(), &outcome));
+    }
+}
+
+/// The desktop's keyboard settings, where a global shortcut is changed: GNOME's, when it is there.
+fn keyboard_settings() -> Option<PathBuf> {
+    // Another desktop's settings do not change what its portal granted.
+    if !cfg!(target_os = "linux") || !desktop::gnome(&std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default()) {
+        return None;
+    }
+    let path = std::env::var_os("PATH")?;
+    std::env::split_paths(&path)
+        .map(|folder| folder.join("gnome-control-center"))
+        .find(|program| program.is_file())
+}
+
+/// Opens the desktop's keyboard settings: the shortcut is the desktop's to change.
+#[tauri::command]
+fn shortcut_settings(shell: State<'_, Shell>) -> Result<(), Told> {
+    let program =
+        keyboard_settings().ok_or_else(|| shell.told(Failure::KeyboardSettings, "no keyboard settings to open on this desktop"))?;
+    let mut started = std::process::Command::new(program)
+        .arg("keyboard")
+        .spawn()
+        .map_err(|error| shell.told(Failure::KeyboardSettings, error))?;
+    std::thread::spawn(move || started.wait());
+    Ok(())
+}
+
+/// A folder chosen in the system's own dialog, opened where the sessions are; none when the user
+/// closes it.
+#[tauri::command]
+async fn choose_folder(app: AppHandle) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let shell = app.state::<Shell>();
+    let from = shell.reread().unwrap_or_else(|_| shell.settings()).sessions;
+    let chosen = app.dialog().file().set_directory(from).blocking_pick_folder()?;
+    chosen.into_path().ok()
+}
+
+/// Ollama on this computer — or, for whoever tries Kitokey, where `KITOKEY_OLLAMA` says.
+fn ollama() -> String {
+    std::env::var("KITOKEY_OLLAMA").unwrap_or_else(|_| providers::OLLAMA.to_string())
+}
+
+/// Who can write the minutes, and who does: the page never receives a key, only whether one is
+/// kept for the chosen provider.
+#[derive(serde::Serialize)]
+struct MinutesShown {
+    ollama: Vec<String>,
+    /// Whether Ollama answers here: one with no model is not one missing (D37).
+    ollama_answers: bool,
+    ollama_address: String,
+    /// The local model recommended for the minutes, said so when Ollama holds it (#261).
+    recommended: &'static str,
+    online: Vec<OnlineOffered>,
+    provider: Option<String>,
+    model: Option<String>,
+    key_kept: bool,
+    /// Whether the address saved is this machine — read as the agreement reads it: what is sent
+    /// there never leaves it, and the page says so whatever the model.
+    provider_local: bool,
+}
+
+#[tauri::command]
+async fn minutes_shown(shell: State<'_, Shell>) -> Result<MinutesShown, Told> {
+    let settings = shell.reread().unwrap_or_else(|_| shell.settings());
+    let kept = settings
+        .minutes_provider
+        .as_deref()
+        .and_then(providers::host)
+        .and_then(|host| keys::key(&host).ok().flatten())
+        .is_some();
+    // Ollama is asked away from the window and the tray: one that does not answer holds neither.
+    let base = ollama();
+    let models = tauri::async_runtime::spawn_blocking(move || providers::ollama_listed(&base))
+        .await
+        .ok()
+        .flatten();
+    let provider_local = settings.minutes_provider.as_deref().is_some_and(providers::local);
+    Ok(MinutesShown {
+        provider_local,
+        ollama_answers: models.is_some(),
+        ollama: models.unwrap_or_default(),
+        ollama_address: providers::ollama_address(&ollama()),
+        recommended: providers::RECOMMENDED,
+        online: providers::online(),
+        provider: settings.minutes_provider,
+        model: settings.minutes_model,
+        key_kept: kept,
+    })
+}
+
+/// Who writes the minutes, chosen: a provider's address, a model, and — for one that asks for it —
+/// a key, kept in the system's keyring and nowhere else.
+#[tauri::command]
+async fn minutes_saved(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    provider: String,
+    model: String,
+    key: Option<String>,
+) -> Result<Option<Told>, Told> {
+    // Held until the file is written, never across the keyring's wait.
+    let (host, key) = {
+        let _saving = shell.saving.lock().unwrap();
+        // The choice goes onto what the file says now; a file that cannot be read is not written over,
+        // and no key is kept for a choice that is not saved: the file first, then the key.
+        let mut settings = shell.read_or_told()?;
+        let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+        if model.trim().is_empty() {
+            return Err(shell.told(Failure::ModelUnnamed, "no model is named"));
+        }
+        let key = key.map(|key| key.trim().to_string()).filter(|key| !key.is_empty());
+        if key.is_some()
+            && let Some(why) = shell.keyring.lock().unwrap().clone()
+        {
+            return Err(shell.told(Failure::Keyring, format!("the system's keyring could not be opened ({why})")));
+        }
+        settings.minutes_provider = Some(provider.trim().to_string());
+        settings.minutes_model = Some(model.trim().to_string());
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+        (host, key)
+    };
+    // Saved: the key now, away from the window and the tray — the keyring may ask the user first.
+    // Refused, the choice stays saved and the page says only the key was not kept.
+    let not_kept = match key {
+        Some(key) => {
+            let kept = tauri::async_runtime::spawn_blocking(move || keys::keep(&host, &key)).await;
+            kept.map_err(|error| error.to_string())
+                .and_then(|kept| kept)
+                .err()
+                .map(|why| shell.told(Failure::Keyring, why))
+        }
+        None => None,
+    };
+    look_again(&app);
+    Ok(not_kept)
+}
+
+/// What `kitokey-send --check` said of an address (`contracts/posting/v1`): checked, refused, or no answer.
+enum Judged {
+    Checked,
+    Refused,
+    Failed(String),
+}
+
+/// Asks `kitokey-send --check` whether an address would be refused: the address on its input,
+/// never among its arguments, which every user of the machine can read (`posting/v1`).
+fn judged(address: &str, name: &str) -> Judged {
+    use std::io::Write as _;
+    let started = std::process::Command::new(program("kitokey-send", "KITOKEY_SEND"))
+        .arg("--check")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+    let mut child = match started {
+        Ok(child) => child,
+        Err(error) => return Judged::Failed(format!("kitokey-send could not start ({error})")),
+    };
+    let input = serde_json::json!({ "address": address, "name": name }).to_string();
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input.as_bytes());
+    }
+    let Ok(output) = child.wait_with_output() else {
+        return Judged::Failed("kitokey-send could not be waited for".into());
+    };
+    let last = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .last()
+        .unwrap_or_default()
+        .to_string();
+    let event: serde_json::Value = serde_json::from_str(&last).unwrap_or_default();
+    match (event["event"].as_str(), event["code"].as_str()) {
+        (Some("checked"), _) if output.status.success() => Judged::Checked,
+        (Some("failed"), Some("address.refused")) => Judged::Refused,
+        // Its sentence never holds the address (`posting/v1`): it may go to the log.
+        _ => Judged::Failed(
+            String::from_utf8_lossy(&output.stderr)
+                .lines()
+                .last()
+                .unwrap_or("kitokey-send said nothing")
+                .to_string(),
+        ),
+    }
+}
+
+/// Adds a destination (D110, PDR-0007 §1, §6): its name a person reads, once; its address judged by
+/// kitokey-send first — refused, nothing is kept —, then kept in the keyring, then the settings name
+/// it, its address shown only as its host and the end of its path. The address is never logged.
+#[tauri::command]
+async fn destination_added(app: AppHandle, shell: State<'_, Shell>, kind: String, name: String, address: String) -> Result<(), Told> {
+    use kitokey_shell::destinations::{self, Destination, Kind};
+    let kind = Kind::named(&kind).ok_or_else(|| shell.told(Failure::Unexpected, "no destination's kind"))?;
+    let name = destinations::name(&name).ok_or_else(|| shell.told(Failure::DestinationUnnamed, "no destination's name"))?;
+    let address = address.trim().to_string();
+    if address.is_empty() || address.contains(['\n', '\r']) {
+        return Err(shell.told(Failure::DestinationRefused, "no address"));
+    }
+    if shell.settings().destinations.iter().any(|kept| kept.name == name) {
+        return Err(shell.told(Failure::DestinationNamed, "a destination already has this name"));
+    }
+    if let Some(why) = shell.keyring.lock().unwrap().clone() {
+        return Err(shell.told(Failure::Keyring, format!("the system's keyring could not be opened ({why})")));
+    }
+    // Away from the window's thread: the program, then the keyring, which may ask the user first.
+    let (judging, named) = (address.clone(), name.clone());
+    match tauri::async_runtime::spawn_blocking(move || judged(&judging, &named)).await {
+        Ok(Judged::Checked) => {}
+        Ok(Judged::Refused) => return Err(shell.told(Failure::DestinationRefused, "the address is refused")),
+        Ok(Judged::Failed(why)) => return Err(shell.told(Failure::ProgramNotStarted, why)),
+        Err(error) => return Err(shell.told(Failure::Unexpected, error)),
+    }
+    let destination = Destination {
+        name: name.clone(),
+        kind,
+        shown: destinations::shown(&address),
+    };
+    // Under the settings' lock, the name looked at again before the keyring is written: two adds
+    // of one name never write over each other's address (#1129).
+    let adding = app.clone();
+    let added = tauri::async_runtime::spawn_blocking(move || {
+        let shell = adding.state::<Shell>();
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        destinations::add(&mut settings.destinations, destination, &address).map_err(|not| match not {
+            destinations::NotAdded::Named => shell.told(Failure::DestinationNamed, "a destination already has this name"),
+            destinations::NotAdded::Keyring(why) => shell.told(Failure::Keyring, why),
+        })?;
+        if let Err(told) = shell.write_or_told(&settings) {
+            // Not named in the file: not kept in the keyring either.
+            let _ = destinations::forget(&name);
+            return Err(told);
+        }
+        *shell.settings.lock().unwrap() = settings;
+        Ok(())
+    })
+    .await;
+    added.map_err(|error| shell.told(Failure::Unexpected, error))??;
+    look_again(&app);
+    Ok(())
+}
+
+/// Where each send is recorded: `sends.json` beside the settings, the shell's own (D110, `sending`).
+fn sends_file() -> PathBuf {
+    settings::file().map_or_else(|| PathBuf::from("sends.json"), |file| file.with_file_name("sends.json"))
+}
+
+/// What a meeting's page offers to send (D110, PDR-0007 §2–§4): nothing for a meeting said confidential, with
+/// no summary, or with no destination set up; else each destination by its name, and whether it was ever sent
+/// to — before its first send, the page says what leaves and where. Its sends, listed; its last send to each
+/// destination with what came of it, said again whenever the page is drawn. Never an address.
+#[derive(serde::Serialize)]
+struct SendingShown {
+    offered: bool,
+    /// Said confidential: each send is asked once more on the page, and confirmed to kitokey-send (D119).
+    confidential: bool,
+    destinations: Vec<DestinationOffered>,
+    sends: Vec<sending::Sent>,
+    last: Vec<sending::Sent>,
+}
+
+#[derive(serde::Serialize)]
+struct DestinationOffered {
+    name: String,
+    /// Its kind, for its mark in the panel (#1238).
+    kind: kitokey_shell::destinations::Kind,
+    first: bool,
+}
+
+fn sending_shown(shell: &Shell, folder: &Path) -> SendingShown {
+    let record = sending::record(&sends_file());
+    let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default();
+    let destinations: Vec<DestinationOffered> = shell
+        .settings()
+        .destinations
+        .iter()
+        .map(|kept| DestinationOffered {
+            name: kept.name.clone(),
+            kind: kept.kind,
+            first: !sending::ever(&record, &kept.name),
+        })
+        .collect();
+    let summary = matches!(read_minutes(folder, shell.language()), Read::Present(_));
+    SendingShown {
+        offered: summary && !destinations.is_empty(),
+        confidential: confidential::marked(folder),
+        destinations,
+        sends: sending::of(&record, meeting).into_iter().cloned().collect(),
+        last: sending::last(&record, meeting).into_iter().cloned().collect(),
+    }
+}
+
+#[tauri::command]
+fn sending_of(shell: State<'_, Shell>, name: String) -> Result<SendingShown, Told> {
+    let folder = session_folder(&shell, &name)?;
+    Ok(sending_shown(&shell, &folder))
+}
+
+/// The outcome of one send, and what the page offers after it.
+#[derive(serde::Serialize)]
+struct SentShown {
+    #[serde(flatten)]
+    outcome: sending::Outcome,
+    sending: SendingShown,
+    /// The switch as it now reads: a confirmed send of a confidential meeting is said under it (D119).
+    confidential: ConfidentialShown,
+}
+
+/// How long the shell waits for kitokey-send: longer than its own 30 s for an answer (`posting/v1`), so that it
+/// says first; past it, the send is said as one that may have arrived, never sent again (OPS1, OPS2).
+const SEND_DEADLINE: std::time::Duration = std::time::Duration::from_secs(45);
+
+/// Sends a meeting's summary to a destination, on the user's gesture (D110, PDR-0007): a confidential meeting
+/// only when the user confirmed it, that once (D119, PDR-0007 §4 amended) — unconfirmed, refused here before the
+/// program is started, as the program would; confirmed, said to it (`confirmed_confidential`) —; the address read from the
+/// keyring and given on kitokey-send's input with the meeting's name, never among its arguments; one try, its
+/// outcome recorded, whatever it is. The address is never logged, nor the destination's answer.
+#[tauri::command]
+async fn summary_sent(
+    app: AppHandle,
+    shell: State<'_, Shell>,
+    name: String,
+    destination: String,
+    confirmed: Option<bool>,
+) -> Result<SentShown, Told> {
+    use kitokey_shell::destinations;
+    let folder = session_folder(&shell, &name)?;
+    let confidential = confidential::marked(&folder);
+    if confidential && confirmed != Some(true) {
+        return Ok(SentShown {
+            outcome: sending::Outcome::confidential(),
+            sending: sending_shown(&shell, &folder),
+            confidential: confidential_of(&shell, &folder),
+        });
+    }
+    let kept = shell
+        .settings()
+        .destinations
+        .iter()
+        .find(|kept| kept.name == destination)
+        .cloned()
+        .ok_or_else(|| shell.told(Failure::Unexpected, "no such destination"))?;
+    let meeting = named::read(&folder).unwrap_or_else(|| name.clone());
+    let (kind, at) = (kept.kind.as_str(), folder.clone());
+    tracing::info!(kind, "shell.summary_sending");
+    let outcome = tauri::async_runtime::spawn_blocking(move || -> Result<sending::Outcome, String> {
+        let address = destinations::address(&kept.name)?.ok_or_else(|| "the destination's address is not in the keyring".to_string())?;
+        Ok(sent(&at, kind, &address, &meeting, confidential))
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?
+    .map_err(|why| shell.told(Failure::Keyring, why))?;
+    // Each send kept with what came of it, a failure too: « perhaps arrived » is said again on a page drawn
+    // again, so that nobody sends twice. A record that cannot be written never hides what came of the send:
+    // a summary that left, said « not sent », would be sent twice. Logged, the outcome said all the same.
+    let meeting = folder.file_name().and_then(|name| name.to_str()).unwrap_or_default().to_string();
+    let at = chrono::Local::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, false);
+    if let Err(error) = sending::keep(
+        &sends_file(),
+        &meeting,
+        sending::Sent {
+            destination: destination.clone(),
+            at,
+            outcome: outcome.clone(),
+        },
+    ) {
+        tracing::warn!(error = %error, "shell.send_unrecorded");
+    }
+    match &outcome {
+        sending::Outcome::Sent => tracing::info!("shell.summary_sent"),
+        sending::Outcome::Failed { code, .. } => tracing::warn!(code = code.as_deref().unwrap_or("none"), "shell.summary_not_sent"),
+    }
+    look_again(&app);
+    Ok(SentShown {
+        outcome,
+        sending: sending_shown(&shell, &folder),
+        confidential: confidential_of(&shell, &folder),
+    })
+}
+
+/// Starts kitokey-send for one send (`posting/v1`): the meeting's folder and the destination's kind as its
+/// arguments, the address and the meeting's name on its input — and, for a confidential meeting the user
+/// confirmed, `confirmed_confidential: true` (D118, D119); waits for it within `SEND_DEADLINE`.
+fn sent(folder: &Path, kind: &str, address: &str, meeting: &str, confirmed_confidential: bool) -> sending::Outcome {
+    use std::io::Write as _;
+    let none = sending::Outcome::Failed {
+        code: None,
+        retry_after: None,
+    };
+    let started = std::process::Command::new(program("kitokey-send", "KITOKEY_SEND"))
+        .arg(folder)
+        .args(["--kind", kind])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn();
+    let Ok(mut child) = started else {
+        return none;
+    };
+    let mut input = serde_json::json!({ "address": address, "name": meeting });
+    if confirmed_confidential {
+        input["confirmed_confidential"] = serde_json::Value::Bool(true);
+    }
+    let input = input.to_string();
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(input.as_bytes());
+    }
+    let begun = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if begun.elapsed() < SEND_DEADLINE => std::thread::sleep(std::time::Duration::from_millis(100)),
+            // Past the deadline: it may have arrived; never sent again (posting/v1, « Once »).
+            Ok(None) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return sending::Outcome::Failed {
+                    code: Some("destination.silent".into()),
+                    retry_after: None,
+                };
+            }
+            Err(_) => return none,
+        }
+    }
+    match child.wait_with_output() {
+        Ok(output) => sending::read(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => none,
+    }
+}
+
+/// Forgets a destination: its address out of the keyring first, then out of the settings; the
+/// keyring refusing, it stays listed, to be removed again (#1129).
+#[tauri::command]
+async fn destination_forgotten(app: AppHandle, shell: State<'_, Shell>, name: String) -> Result<(), Told> {
+    let forgetting = app.clone();
+    let forgotten = tauri::async_runtime::spawn_blocking(move || {
+        let shell = forgetting.state::<Shell>();
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        kitokey_shell::destinations::remove(&mut settings.destinations, &name).map_err(|why| shell.told(Failure::Keyring, why))?;
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+        Ok(())
+    })
+    .await;
+    forgotten.map_err(|error| shell.told(Failure::Unexpected, error))??;
+    look_again(&app);
+    Ok(())
+}
+
+/// A service set up for the summary, with every model it lists (D96).
+#[derive(serde::Serialize)]
+struct ServiceOffered {
+    /// As Settings name it: OpenRouter, OpenAI, Mistral.
+    name: &'static str,
+    address: String,
+    models: Vec<String>,
+}
+
+/// The services Refaire offers beyond Settings' own (D96): those that write the summary, those
+/// that transcribe.
+#[derive(serde::Serialize, Default)]
+struct ServicesOffered {
+    minutes: Vec<ServiceOffered>,
+    transcription: Vec<ServiceOffered>,
+}
+
+/// What Refaire offers beyond Settings' own (D96): each online service whose key is kept — the
+/// summary's under its host, the transcription's under its own account —, with every model it
+/// lists; one that does not answer is left out. A meeting said confidential is offered none
+/// (D60). Read off the window's thread: the keyring may ask the user first.
+#[tauri::command]
+async fn services_offered(shell: State<'_, Shell>, name: String) -> Result<ServicesOffered, Told> {
+    let folder = session_folder(&shell, &name)?;
+    if confidential::marked(&folder) {
+        return Ok(ServicesOffered::default());
+    }
+    tauri::async_runtime::spawn_blocking(|| {
+        let mut hearing: Vec<ServiceOffered> = Vec::new();
+        for service in providers::hearing() {
+            if hearing.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&transcription::key_account(&host)).ok().flatten() else {
+                continue;
+            };
+            match providers::hearing_models(&service, Some(&key)) {
+                Ok(models) if !models.is_empty() => hearing.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address.clone(),
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        let mut offered: Vec<ServiceOffered> = Vec::new();
+        for service in providers::online() {
+            // One address once: a stand-in may answer for every service.
+            if offered.iter().any(|known| known.address == service.address) {
+                continue;
+            }
+            let Some(host) = providers::host(&service.address) else {
+                continue;
+            };
+            let Some(key) = keys::key(&host).ok().flatten() else {
+                continue;
+            };
+            match providers::service_models(&service.address, false, Some(&key)) {
+                Ok(models) if !models.is_empty() => offered.push(ServiceOffered {
+                    name: service.name,
+                    address: service.address,
+                    models,
+                }),
+                Ok(_) => {}
+                Err(cause) => tracing::warn!(cause = ?cause, "shell.services_unread"),
+            }
+        }
+        ServicesOffered {
+            minutes: offered,
+            transcription: hearing,
+        }
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))
+}
+
+/// A service's models for the summary, asked with the key the user typed — or the one kept for its
+/// host —: the key tested at once (D95). Only the ids come back; nothing is kept, the key never
+/// logged. Refused, the cause in the Tester's own sentence.
+#[tauri::command]
+async fn minutes_models(shell: State<'_, Shell>, provider: String, key: Option<String>) -> Result<Vec<String>, Told> {
+    let host = providers::host(provider.trim()).ok_or_else(|| shell.told(Failure::BadAddress, "no provider's address"))?;
+    let key_checked = providers::online()
+        .iter()
+        .any(|service| service.address == provider.trim() && service.key_checked);
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&host).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::service_models(provider.trim(), key_checked, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
+}
+
+/// Who hears, when a service does (D43): its address and model saved, the user's agreement to its
+/// host with them, its key kept in the keyring under the transcription's own account. A host on
+/// this computer needs no agreement. Nothing is sent here.
+#[tauri::command]
+async fn transcription_saved(
+    shell: State<'_, Shell>,
+    provider: String,
+    model: String,
+    key: Option<String>,
+    agreed: bool,
+) -> Result<Option<Told>, Told> {
+    let (host, key) = {
+        let _saving = shell.saving.lock().unwrap();
+        let mut settings = shell.read_or_told()?;
+        let (host, agreed_to) = transcription::service_named(&provider, &model, agreed).map_err(|refused| match refused {
+            transcription::Refused::Address => shell.told(Failure::BadAddress, "no service's address"),
+            transcription::Refused::Model => shell.told(Failure::ModelUnnamed, "no model is named"),
+            // The page asks for the word first.
+            transcription::Refused::NotAgreed(host) => shell.told(Failure::Unexpected, format!("{host} is not agreed to")),
+        })?;
+        let key = key.map(|key| key.trim().to_string()).filter(|key| !key.is_empty());
+        if key.is_some()
+            && let Some(why) = shell.keyring.lock().unwrap().clone()
+        {
+            return Err(shell.told(Failure::Keyring, format!("the system's keyring could not be opened ({why})")));
+        }
+        settings.engine = Engine::Service;
+        settings.transcription_provider = Some(provider.trim().to_string());
+        settings.transcription_model = Some(model.trim().to_string());
+        settings.transcription_agreed = agreed_to;
+        shell.write_or_told(&settings)?;
+        *shell.settings.lock().unwrap() = settings;
+        tracing::info!(host = %host, "shell.transcription_service_saved");
+        (host, key)
+    };
+    let not_kept = match key {
+        Some(key) => {
+            let account = transcription::key_account(&host);
+            let kept = tauri::async_runtime::spawn_blocking(move || keys::keep(&account, &key)).await;
+            kept.map_err(|error| error.to_string())
+                .and_then(|kept| kept)
+                .err()
+                .map(|why| shell.told(Failure::Keyring, why))
+        }
+        None => None,
+    };
+    Ok(not_kept)
+}
+
+/// A hearing service's models, asked with the key the user typed — or the one kept for its host
+/// under the transcription's account —: the key tested at once (D95), as the summary's is. Only the
+/// ids come back; nothing is kept, the key never logged. Refused, the cause in the Tester's sentence.
+#[tauri::command]
+async fn transcription_models(shell: State<'_, Shell>, index: usize, key: Option<String>) -> Result<Vec<String>, Told> {
+    let service = providers::hearing()
+        .into_iter()
+        .nth(index)
+        .ok_or_else(|| shell.told(Failure::Unexpected, "no such service"))?;
+    let host = providers::host(&service.address).unwrap_or_default();
+    let listed = tauri::async_runtime::spawn_blocking(move || {
+        let key = key
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+            .or_else(|| keys::key(&transcription::key_account(&host)).ok().flatten());
+        tracing::info!(host = %host, key = key.is_some(), "shell.models_asking");
+        providers::hearing_models(&service, key.as_deref())
+    })
+    .await
+    .map_err(|error| shell.told(Failure::Unexpected, error))?;
+    listed.map_err(|cause| {
+        tracing::warn!(cause = ?cause, "shell.models_refused");
+        words::test_caused(cause, "", shell.language(), shell.settings().developer)
+    })
+}
+
+/// *Tester* for who hears: `kitokey-transcription --test` sends a sound of its own to the service
+/// saved, its key in the environment; refused, the program's own sentence.
+#[tauri::command]
+async fn transcription_tested(shell: State<'_, Shell>) -> Result<(), Told> {
+    let failed = |told: Told| words::test_refused(told, shell.language());
+    let settings = shell.read_or_told().map_err(failed)?;
+    let (Some(provider), Some(model)) = (settings.transcription_provider, settings.transcription_model) else {
+        return Err(failed(shell.told(Failure::NoneChosen, "no service is chosen yet")));
+    };
+    let hearing = program("kitokey-transcription", "KITOKEY_TRANSCRIPTION");
+    let output = tauri::async_runtime::spawn_blocking(move || {
+        let host = providers::host(&provider).unwrap_or_default();
+        let key = keys::key(&transcription::key_account(&host)).ok().flatten();
+        tracing::info!(host = %host, model = %model, key = key.is_some(), "shell.transcription_testing");
+        let mut command = std::process::Command::new(&hearing);
+        command.args(["--test", "--provider", &provider, "--model", &model]);
+        command.env_remove("KITOKEY_PROVIDER_KEY");
+        if let Some(key) = key {
+            command.env("KITOKEY_PROVIDER_KEY", key);
+        }
+        command.output()
+    })
+    .await
+    .map_err(|error| failed(shell.told(Failure::Unexpected, error)))?
+    .map_err(|error| failed(shell.told(Failure::ProgramNotStarted, error)))?;
+    if output.status.success() {
+        tracing::info!("shell.transcription_tested");
+        return Ok(());
+    }
+    let said = summarising::last_said(&String::from_utf8_lossy(&output.stderr), "kitokey-transcription", output.status);
+    tracing::warn!(detail = %said, "shell.transcription_test_failed");
+    Err(test_told(&shell, &output, &said))
+}
+
+/// What a test that failed tells: the cause on its output's last line (D72), read by its code alone;
+/// a code unknown, or none: the sentence for no cause.
+fn test_told(shell: &Shell, output: &std::process::Output, said: &str) -> Told {
+    match summarising::test_cause(&String::from_utf8_lossy(&output.stdout)) {
+        Some(cause) => words::test_caused(cause, said, shell.language(), shell.settings().developer),
+        None => words::test_refused(shell.said(Failure::TestRefused, said), shell.language()),
+    }
+}
+
+/// *Tester*: asks `kitokey-summary` whether the model saved answers — one sentence of its own,
+/// nothing of a meeting —, the key going from the keyring to its environment, never its
+/// arguments. Refused, what its code names, or the program's own sentence.
+#[tauri::command]
+async fn minutes_tested(shell: State<'_, Shell>) -> Result<(), Told> {
+    let failed = |told: Told| words::test_refused(told, shell.language());
+    let settings = shell.read_or_told().map_err(failed)?;
+    let (Some(provider), Some(model)) = (settings.minutes_provider, settings.minutes_model) else {
+        return Err(failed(shell.told(Failure::NoneChosen, "no model is chosen yet")));
+    };
+    let summary = program("kitokey-summary", "KITOKEY_SUMMARY");
+    let ran = tauri::async_runtime::spawn_blocking(move || {
+        let key = providers::host(&provider).and_then(|host| keys::key(&host).ok().flatten());
+        let (trace, making) = log::making();
+        let _making = making.enter();
+        tracing::info!(
+            host = providers::host(&provider).unwrap_or_default(),
+            model,
+            key = key.is_some(),
+            "shell.testing"
+        );
+        let mut command = std::process::Command::new(&summary);
+        command
+            .args(["--test", "--provider", &provider, "--model", &model])
+            .env("KITOKEY_TRACE", &trace);
+        command.env_remove("KITOKEY_PROVIDER_KEY");
+        if let Some(key) = key {
+            command.env("KITOKEY_PROVIDER_KEY", key);
+        }
+        let output = command.output();
+        match &output {
+            Ok(output) if output.status.success() => tracing::info!("shell.tested"),
+            Ok(output) => {
+                tracing::error!(detail = %String::from_utf8_lossy(&output.stderr).trim(), status = ?output.status, "shell.test_failed")
+            }
+            Err(error) => tracing::error!(detail = %error, "shell.test_failed"),
+        }
+        output
+    })
+    .await
+    .map_err(|error| failed(shell.told(Failure::Unexpected, error)))?;
+    match ran {
+        Ok(output) if output.status.success() => Ok(()),
+        Ok(output) => Err(test_told(
+            &shell,
+            &output,
+            &summarising::last_said(&String::from_utf8_lossy(&output.stderr), "kitokey-summary", output.status),
+        )),
+        Err(error) => Err(failed(shell.said(
+            Failure::ProgramNotStarted,
+            &format!("kitokey-summary could not be started ({error})"),
+        ))),
+    }
+}
+
+/// Why the trash refused, as the user is told it: the system's own wording names a file and
+/// changes with it.
+fn refusal(error: &trash::Error) -> Refusal {
+    #[cfg(target_os = "linux")]
+    use std::io::ErrorKind;
+    match error {
+        // The freedesktop trash's own error: the other systems' trash says no such thing.
+        #[cfg(target_os = "linux")]
+        trash::Error::FileSystem { source, .. } => match source.kind() {
+            ErrorKind::PermissionDenied | ErrorKind::ReadOnlyFilesystem => Refusal::NotAllowed,
+            ErrorKind::StorageFull | ErrorKind::QuotaExceeded => Refusal::NoSpace,
+            _ => Refusal::Other,
+        },
+        trash::Error::CouldNotAccess { .. } => Refusal::NotAllowed,
+        _ => Refusal::Other,
+    }
+}
+
+/// Has a session's minutes written by whoever the settings name. Nothing leaves this machine for
+/// a host the user has not agreed to: the window is opened to ask, and nothing is sent until then.
+fn make_minutes(app: &AppHandle, folder: PathBuf) {
+    write_minutes(app, folder, None, None);
+}
+
+/// Minutes asked while others were being written, as they were asked.
+struct Queued {
+    folder: PathBuf,
+    agreed: Option<String>,
+    chosen: Option<(String, String)>,
+    /// Its own token, from the line to its end (D92).
+    cancel: Cancel,
+}
+
+/// A making of minutes is over: its meeting free, its failure kept for its page, and the next
+/// one asked meanwhile started — those that cannot start yet (an agreement to give) left as said.
+fn minutes_ended(app: &AppHandle, folder: &Path, failed: Option<(String, Option<summarising::Cause>)>, own: Option<&str>) {
+    let shell = app.state::<Shell>();
+    // What says it is being written goes first, the meeting freed last: nothing started in
+    // between is left without its model, nor the tray's entry greyed off.
+    let by = shell.minutes_by.lock().unwrap().take();
+    shell.minutes_host.lock().unwrap().take();
+    if failed.is_none() {
+        measured(&shell, Step::Minutes, folder, by.map(|(model, _, since)| (model, since)));
+    }
+    if let Some((why, cause)) = failed {
+        let why = if why.trim().is_empty() {
+            "kitokey-summary stopped without saying why".to_string()
+        } else {
+            why
+        };
+        shell
+            .minutes_failed
+            .lock()
+            .unwrap()
+            .insert(folder.to_path_buf(), (why, cause, own.map(str::to_string)));
+    } else {
+        *shell.minutes_made.lock().unwrap().entry(folder.to_path_buf()).or_default() += 1;
+    }
+    minutes_next(app);
+}
+
+/// The meeting whose minutes ended freed, and the next one asked meanwhile started.
+fn minutes_next(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    minuting(app, false);
+    {
+        // Freed with its token, under the one lock: « Annuler » after this finds none.
+        let mut writing = shell.writing_minutes.lock().unwrap();
+        writing.take();
+        shell.minutes_token.lock().unwrap().take();
+    }
+    if *shell.leaving.lock().unwrap() {
+        return;
+    }
+    loop {
+        // Taken from the line under its lock, and said taken: « Annuler » meanwhile withdraws it.
+        let next = {
+            let mut waiting = shell.minutes_waiting.lock().unwrap();
+            let next = waiting.pop_front();
+            *shell.promoted_minutes.lock().unwrap() = next.as_ref().map(|next| (next.folder.clone(), next.cancel.clone()));
+            next
+        };
+        let Some(next) = next else {
+            return;
+        };
+        // Started, or set aside (an agreement to give, a reason it cannot): the next one then.
+        let token = next.cancel.clone();
+        write_minutes_from(app, next.folder, next.agreed.as_deref(), next.chosen, true, next.cancel);
+        free(&shell.promoted_minutes, &token);
+        if shell.writing_minutes.lock().unwrap().is_some() {
+            return;
+        }
+    }
+}
+
+/// Minutes ended because their meeting was said confidential (D60): no failure kept nor told —
+/// they are made again here, first in line.
+fn minutes_ended_here(app: &AppHandle, folder: &Path) {
+    let shell = app.state::<Shell>();
+    shell.written_here.lock().unwrap().remove(folder);
+    let mut waiting = shell.minutes_waiting.lock().unwrap();
+    waiting.retain(|queued| queued.folder != folder);
+    waiting.push_front(Queued {
+        folder: folder.to_path_buf(),
+        agreed: None,
+        chosen: None,
+        cancel: Cancel::default(),
+    });
+    drop(waiting);
+    shell.minutes_by.lock().unwrap().take();
+    shell.minutes_host.lock().unwrap().take();
+    minutes_next(app);
+}
+
+/// Minutes the user cancelled (D92): said stopped on their page, the ones there kept, nothing
+/// told; the next ones asked meanwhile started.
+fn minutes_cancelled(app: &AppHandle, folder: &Path) {
+    let shell = app.state::<Shell>();
+    shell.minutes_by.lock().unwrap().take();
+    shell.minutes_host.lock().unwrap().take();
+    shell.stopped.lock().unwrap().insert(folder.to_path_buf(), "minutes");
+    minutes_next(app);
+}
+
+/// What is being made in the background, for the pages (D25): the minutes being written, by
+/// what and for how long, those waiting their turn, the transcript being made and those waiting,
+/// and why a meeting's last minutes were not written.
+#[derive(serde::Serialize)]
+struct Makings {
+    minutes: Option<Making>,
+    minutes_waiting: Vec<String>,
+    transcript: Option<Hearing>,
+    /// Between their transcript and their summary, not yet in line (D92).
+    between: Vec<String>,
+    transcripts_waiting: Vec<String>,
+    /// The line waits for the default Whisper model, offered in the menu, or coming.
+    model_needed: bool,
+    model_coming: bool,
+    /// The window's offer of it: its size and host, the size said as the window says sizes (D36).
+    model_offer_bytes: u64,
+    model_offer_host: &'static str,
+    /// Any model being fetched, and how far (D37).
+    model_fetching: Option<Fetching>,
+    /// A making not made, by its meeting's name: what its program said of it in developer mode,
+    /// else nothing — the page says it in plain words (D29).
+    transcripts_failed: HashMap<String, String>,
+    transcripts_made: HashMap<String, u64>,
+    failed: HashMap<String, String>,
+    /// The minutes' cause and its gesture, in the user's language, when one was named (D29).
+    failed_said: HashMap<String, String>,
+    awaiting: HashMap<String, String>,
+    made: HashMap<String, u64>,
+    /// Confidential meetings whose minutes wait for Ollama, and why (D60); the model it would fetch.
+    ollama_waiting: HashMap<String, Wait>,
+    ollama_recommended: &'static str,
+    /// What the user last cancelled of a meeting, by its name: `transcript` or `minutes` (D92).
+    stopped: HashMap<String, &'static str>,
+    /// The minutes left of a meeting's making, by its name, from the speeds measured here: none
+    /// measured for one of its steps, or thirty seconds or less, none (D92).
+    left: HashMap<String, u64>,
+    /// Every summary is written to a folder too (D109); those not written there, by their meeting.
+    export: bool,
+    not_exported: Vec<String>,
+}
+
+#[derive(serde::Serialize)]
+struct Fetching {
+    file: String,
+    held: u64,
+    bytes: u64,
+}
+
+#[derive(serde::Serialize)]
+struct Hearing {
+    name: String,
+    model: String,
+    seconds: u64,
+    /// Its summary follows it (D92).
+    then: bool,
+}
+
+#[derive(serde::Serialize)]
+struct Making {
+    name: String,
+    model: String,
+    host: String,
+    seconds: u64,
+}
+
+fn named(folder: &Path) -> String {
+    folder
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+fn makings(shell: State<'_, Shell>) -> Makings {
+    let developer = shell.settings().developer;
+    let said = |why: &String| words::shown_detail(why, developer);
+    // Read under one hold: a second hold of the same lock in the struct below would never be
+    // given, its first still held to the statement's end.
+    let fetched = shell.fetched.lock().unwrap().clone();
+    let (failed, failed_said) = {
+        let failures = shell.minutes_failed.lock().unwrap();
+        let failed = failures.iter().map(|(folder, (why, ..))| (named(folder), said(why))).collect();
+        // Failed by the meeting's own model: named, and chosen again where it was chosen — the
+        // sentence its notification says too (D91).
+        let causes = failures
+            .iter()
+            .filter_map(|(folder, (_, cause, own))| Some((named(folder), words::cause_said((*cause)?, own.as_deref(), shell.language()))))
+            .collect();
+        (failed, causes)
+    };
+    // Read in the order a meeting goes through them — its transcript, between the two steps, its
+    // summary —, each set before the one before is cleared: a meeting made is never read in none (D92).
+    let transcript = shell
+        .hearing
+        .lock()
+        .unwrap()
+        .as_deref()
+        .zip(shell.hearing_by.lock().unwrap().clone())
+        .map(|(folder, (model, since))| Hearing {
+            name: named(folder),
+            model,
+            seconds: since.elapsed().as_secs(),
+            then: *shell.hearing_then.lock().unwrap(),
+        });
+    let between = shell.between.lock().unwrap().iter().map(|folder| named(folder)).collect();
+    let writing = shell.writing_minutes.lock().unwrap().clone();
+    let by = shell.minutes_by.lock().unwrap().clone();
+    let settings = shell.settings();
+    let left = time_left(&shell, &settings);
+    let (transcripts_waiting, model_needed) = {
+        let waiting = shell.waiting.lock().unwrap();
+        let names = waiting.iter().map(|(folder, ..)| named(folder)).collect();
+        let needed = default_model_missing(&settings) || waiting.iter().any(|(folder, ..)| default_model_missing_for(&settings, folder));
+        (names, needed)
+    };
+    Makings {
+        minutes: writing.zip(by).map(|(folder, (model, host, since))| Making {
+            name: named(&folder),
+            model,
+            host,
+            seconds: since.elapsed().as_secs(),
+        }),
+        minutes_waiting: shell
+            .minutes_waiting
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|queued| named(&queued.folder))
+            .collect(),
+        transcript,
+        between,
+        transcripts_waiting,
+        model_needed,
+        // The default model coming, not another: one fetch at a time, said as such (D37).
+        model_coming: fetched.as_ref().is_some_and(|(file, ..)| file == model::file(&model::DEFAULT)),
+        model_fetching: fetched.map(|(file, held, bytes)| Fetching { file, held, bytes }),
+        model_offer_bytes: published().bytes,
+        model_offer_host: published().host,
+        transcripts_failed: shell
+            .transcripts_failed
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, why)| (named(folder), said(why)))
+            .collect(),
+        transcripts_made: shell
+            .transcripts_made
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, times)| (named(folder), *times))
+            .collect(),
+        failed,
+        failed_said,
+        made: shell
+            .minutes_made
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, times)| (named(folder), *times))
+            .collect(),
+        awaiting: shell
+            .awaiting
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, host)| (named(folder), host.clone()))
+            .collect(),
+        ollama_waiting: shell
+            .ollama_waiting
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, wait)| (named(folder), *wait))
+            .collect(),
+        ollama_recommended: providers::RECOMMENDED,
+        stopped: shell
+            .stopped
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(folder, what)| (named(folder), *what))
+            .collect(),
+        left,
+        export: settings.export.is_some(),
+        not_exported: shell.not_exported.lock().unwrap().keys().map(|folder| named(folder)).collect(),
+    }
+}
+
+/// Where the speeds measured here are kept: beside the settings (D92).
+fn speeds_file() -> Option<PathBuf> {
+    settings::file().map(|file| file.with_file_name("speeds.json"))
+}
+
+/// A step written, measured: the seconds it took for each second of its meeting's audio, kept for its
+/// model — nothing of the meeting (D92). Unwritten, the speed stays for this run alone.
+fn measured(shell: &Shell, step: Step, folder: &Path, by: Option<(String, Instant)>) {
+    let (Some((model, since)), Some(audio)) = (by, sessions::length(folder)) else {
+        return;
+    };
+    let mut kept = shell.speeds.lock().unwrap();
+    kept.measured(step, &model, since.elapsed().as_secs_f64(), audio);
+    if let Some(file) = speeds_file()
+        && let Err(error) = speeds::write(&file, &kept)
+    {
+        tracing::info!(detail = %error, "shell.speeds_unwritten");
+    }
+}
+
+/// A step still ahead of a meeting: which, by what model, and the seconds it has run, if begun.
+type Ahead = (Step, String, Option<f64>);
+
+/// The minutes left of each meeting being made, from its length and the speeds measured here: its
+/// step running less what it has run, and its summary when one follows (D92). One step with no speed
+/// kept, or the model of its summary not known yet — a confidential meeting's is chosen as it starts —:
+/// no number, never half of one.
+fn time_left(shell: &Shell, settings: &Settings) -> HashMap<String, u64> {
+    let kept = shell.speeds.lock().unwrap().clone();
+    let next = |folder: &Path| {
+        if confidential::marked(folder) {
+            return None;
+        }
+        let listed = settings::whisper_models(&models_folder(), settings);
+        meeting_models::applied(settings, &meeting_models::read(folder), &listed)
+            .settings
+            .minutes_model
+    };
+    let mut making: Vec<(PathBuf, Option<Vec<Ahead>>)> = Vec::new();
+    let hearing = shell.hearing.lock().unwrap().clone();
+    let hearing_by = shell.hearing_by.lock().unwrap().clone();
+    let then = *shell.hearing_then.lock().unwrap();
+    if let (Some(folder), Some((model, since))) = (hearing, hearing_by) {
+        let heard = (Step::Transcript, model, Some(since.elapsed().as_secs_f64()));
+        let steps = if then {
+            next(&folder).map(|minutes| vec![heard, (Step::Minutes, minutes, None)])
+        } else {
+            Some(vec![heard])
+        };
+        making.push((folder, steps));
+    }
+    let between: Vec<PathBuf> = shell.between.lock().unwrap().iter().cloned().collect();
+    for folder in between {
+        let steps = next(&folder).map(|minutes| vec![(Step::Minutes, minutes, None)]);
+        making.push((folder, steps));
+    }
+    let writing = shell.writing_minutes.lock().unwrap().clone();
+    let minutes_by = shell.minutes_by.lock().unwrap().clone();
+    if let (Some(folder), Some((model, _, since))) = (writing, minutes_by) {
+        making.push((folder, Some(vec![(Step::Minutes, model, Some(since.elapsed().as_secs_f64()))])));
+    }
+    making
+        .into_iter()
+        .filter_map(|(folder, steps)| {
+            let steps = steps?;
+            let steps: Vec<(Step, &str, Option<f64>)> = steps.iter().map(|(step, model, ran)| (*step, model.as_str(), *ran)).collect();
+            let minutes = speeds::said(kept.left(&steps, sessions::length(&folder)?)?)?;
+            Some((named(&folder), minutes))
+        })
+        .collect()
+}
+
+/// Minutes made again with a model, asked before the user agreed to send them.
+struct AskedAgain {
+    choice: (String, String),
+    named: Option<(String, String)>,
+}
+
+/// Who writes the minutes changed, or a host agreed for the next ones: the meetings set aside
+/// are looked at again, in the line — made now, or still waiting for the word, said anew.
+fn look_again(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    let aside: Vec<PathBuf> = shell.awaiting.lock().unwrap().drain(..).map(|(folder, _)| folder).collect();
+    let named = shell
+        .reread()
+        .ok()
+        .and_then(|settings| settings.minutes_provider.zip(settings.minutes_model));
+    for folder in aside {
+        let chosen = shell
+            .asked_again
+            .lock()
+            .unwrap()
+            .remove(&folder)
+            .filter(|asked| asked.named == named)
+            .map(|asked| asked.choice);
+        write_minutes_from(app, folder, None, chosen, true, Cancel::default());
+    }
+}
+
+/// The same, `agreed_now` naming the host the user just agreed to send this meeting to, once:
+/// the gate is passed only if that is still the host the settings name as it is read here.
+fn write_minutes(app: &AppHandle, folder: PathBuf, agreed_now: Option<&str>, chosen: Option<(String, String)>) {
+    write_minutes_from(app, folder.clone(), agreed_now, chosen, false, Cancel::default());
+    // Its summary written, in line, or set aside: no longer between the two steps (D92).
+    app.state::<Shell>().between.lock().unwrap().remove(&folder);
+}
+
+/// `from_line`: taken from the line, where nobody asked just now — an agreement it needs is set
+/// aside and said on its page, never a window opened over what the user is doing.
+fn write_minutes_from(
+    app: &AppHandle,
+    folder: PathBuf,
+    agreed_now: Option<&str>,
+    chosen: Option<(String, String)>,
+    from_line: bool,
+    cancel: Cancel,
+) {
+    let shell = app.state::<Shell>();
+    let writing = shell.writing_minutes.lock().unwrap();
+    if let Some(being) = writing.as_ref() {
+        // One at a time: asked meanwhile, it waits its turn — said on its page —, once.
+        // A Refaire… of the one being written (a model named) waits too, never asked for it
+        // again otherwise; asked again while waiting, the newer choice is the one made.
+        let mut waiting = shell.minutes_waiting.lock().unwrap();
+        if let Some(queued) = waiting.iter_mut().find(|queued| queued.folder == folder) {
+            if chosen.is_some() {
+                queued.chosen = chosen;
+            }
+        } else if *being != folder || chosen.is_some() {
+            // In line now: no longer set aside, and an earlier choice made for it is not the one.
+            shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
+            shell.asked_again.lock().unwrap().remove(&folder);
+            waiting.push_back(Queued {
+                folder,
+                agreed: agreed_now.map(str::to_string),
+                chosen,
+                cancel,
+            });
+        }
+        return;
+    }
+    let again = chosen.is_some();
+    let asked_again = chosen.clone();
+    drop(writing);
+    shell.minutes_tried.lock().unwrap().insert(folder.clone(), chosen.clone());
+    // Not started: said on the meeting's page, and in a notification (D25) — the one that ends a
+    // meeting made after a stop, then, its transcript's own not told: its meeting named, and only
+    // where no window of Kitokey has the focus (D92).
+    let told = |notice: Notice| tell_made(app, &notice, &folder, false);
+    let refused = |why: String| {
+        shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
+        shell.minutes_failed.lock().unwrap().insert(folder.clone(), (why, None, None));
+    };
+    let settings = match shell.reread() {
+        Ok(settings) => settings,
+        Err(why) => {
+            refused(why.detail);
+            return told(words::trouble(&Trouble::Settings(why.refused), shell.language()));
+        }
+    };
+    let named = settings.minutes_provider.clone().zip(settings.minutes_model.clone());
+    // Made again with another model, this time only; or by whoever the meeting chose, else the settings.
+    let made_with = own(&settings, &folder);
+    let wanted = chosen.or(made_with.minutes_provider.zip(made_with.minutes_model));
+    // Said confidential: on this computer alone, whatever was named — Ollama silent or holding no
+    // model, they wait, said, and nothing is asked nor sent (D60).
+    let wanted = if confidential::marked(&folder) {
+        let base = ollama();
+        match confidential::writer(wanted, &base, || providers::ollama_listed(&base)) {
+            Ok(choice) => {
+                shell.ollama_waiting.lock().unwrap().remove(&folder);
+                tracing::info!(model = %choice.1, "shell.confidential_written");
+                Some(choice)
+            }
+            Err(wait) => {
+                shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
+                shell.asked_again.lock().unwrap().remove(&folder);
+                shell.minutes_failed.lock().unwrap().remove(&folder);
+                shell.ollama_waiting.lock().unwrap().insert(folder.clone(), wait);
+                tracing::info!(wait = ?wait, "shell.confidential_waits");
+                if from_line {
+                    return;
+                }
+                let said = words::Minutes::OllamaWaits {
+                    silent: wait == Wait::Silent,
+                };
+                return told(words::minutes(&said, shell.language()));
+            }
+        }
+    } else if wanted.is_none() {
+        // None named: « Auto », on this computer only, when it is ready (D122).
+        let base = ollama();
+        engines::writer(None, &engines::writing(&base, || providers::ollama_listed(&base)))
+    } else {
+        wanted
+    };
+    let (provider, model) = match wanted {
+        Some(choice) => choice,
+        None => {
+            refused("no one is chosen to write the minutes, in the settings".into());
+            if from_line {
+                return;
+            }
+            told(words::minutes(&words::Minutes::Unchosen, shell.language()));
+            return open_window_at(app, "#/settings");
+        }
+    };
+    if !matches!(meeting::transcript(&folder), meeting::Read::Present(transcript) if transcript.complete) {
+        refused("this meeting has no whole transcript".into());
+        return told(words::minutes(&words::Minutes::NoTranscript, shell.language()));
+    }
+    let Some(host) = providers::host(&provider) else {
+        let why = format!("{provider} is no provider's address");
+        tracing::warn!(detail = %why, "shell.minutes_refused");
+        refused(why);
+        return told(words::minutes(&words::Minutes::NoProvider(provider), shell.language()));
+    };
+    if agreed_now != Some(host.as_str()) && !providers::local(&provider) && settings.minutes_agreed.as_deref() != Some(host.as_str()) {
+        let mut awaiting = shell.awaiting.lock().unwrap();
+        awaiting.retain(|(aside, _)| *aside != folder);
+        awaiting.push((folder.clone(), host.clone()));
+        drop(awaiting);
+        // Made again with a model chosen on the page: once agreed, with that model, as asked.
+        let mut asked = shell.asked_again.lock().unwrap();
+        match asked_again {
+            Some(choice) => asked.insert(folder.clone(), AskedAgain { choice, named }),
+            None => asked.remove(&folder),
+        };
+        drop(asked);
+        if from_line {
+            return;
+        }
+        told(words::minutes(&words::Minutes::Waiting(host), shell.language()));
+        let name = folder
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        return open_window_at(app, &format!("#/agree/{name}"));
+    }
+    let mut writing = shell.writing_minutes.lock().unwrap();
+    if writing.is_some() {
+        // Another started meanwhile, between the reading and now: this one waits its turn.
+        drop(writing);
+        return write_minutes_from(app, folder, agreed_now, again.then_some((provider, model)), from_line, cancel);
+    }
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return;
+    }
+    // Begun, its token with it under the lock « Annuler » reads it under.
+    *writing = Some(folder.clone());
+    *shell.minutes_token.lock().unwrap() = Some(cancel.clone());
+    drop(writing);
+    // Started: out of the line, its agreement given, its last failure gone.
+    shell.minutes_waiting.lock().unwrap().retain(|queued| queued.folder != folder);
+    shell.awaiting.lock().unwrap().retain(|(aside, _)| *aside != folder);
+    *shell.minutes_by.lock().unwrap() = Some((model.clone(), host.clone(), Instant::now()));
+    // The meeting's own model, chosen in « Avancé » (D91): a failure names it, and where it is chosen.
+    let own_model = meeting_models::read(&folder)
+        .minutes
+        .is_some_and(|own| own.provider == provider && own.model == model)
+        .then(|| model.clone());
+    *shell.minutes_host.lock().unwrap() = (!providers::local(&provider)).then(|| host.clone());
+    shell.minutes_failed.lock().unwrap().remove(&folder);
+    shell.stopped.lock().unwrap().remove(&folder);
+    minuting(app, true);
+    let app = app.clone();
+    // The keyring may ask the user first: never on the window's and the tray's thread.
+    std::thread::spawn(move || {
+        let shell = app.state::<Shell>();
+        let key = keys::key(&host).ok().flatten();
+        // The minutes there stay until the new ones are whole: copied aside under a name of their
+        // own, they go to the trash once replaced, and the copy is dropped — the minutes still in
+        // place — when the making fails.
+        // Nothing there, nothing to keep; there and not set aside, nothing is made.
+        let previous = match sessions::set_aside(&folder.join("minutes.md"), false) {
+            Ok(previous) => Some(previous),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                let why = format!("the minutes there could not be set aside ({error}): nothing was made");
+                tracing::error!(detail = %why, "shell.minutes_failed");
+                minutes_ended(&app, &folder, Some((why, Some(summarising::Cause::Unwritable))), None);
+                let failed = words::Minutes::failed(Some(summarising::Cause::Unwritable), again);
+                return tell(&app, &words::minutes(&failed, shell.language()));
+            }
+        };
+        // Said confidential since it was asked: nothing is sent — ended here, made again here (D60).
+        let here =
+            || !providers::local(&provider) && (confidential::marked(&folder) || shell.written_here.lock().unwrap().contains(&folder));
+        let started = if here() {
+            Err(std::io::Error::other("the meeting was said confidential"))
+        } else if cancel.cancelled() {
+            // Cancelled while the keyring was asked: never started (D92).
+            Err(std::io::Error::other("cancelled"))
+        } else {
+            Summarising::start(
+                &program("kitokey-summary", "KITOKEY_SUMMARY"),
+                &folder,
+                &provider,
+                &model,
+                key.as_deref(),
+            )
+        };
+        let events = match started {
+            Ok((making, events)) => {
+                // Said confidential as it started: ended at once.
+                if here() {
+                    making.end();
+                }
+                // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+                cancel.hold(making.stopper());
+                *shell.minuting.lock().unwrap() = Some(making);
+                events
+            }
+            Err(_) if cancel.cancelled() => {
+                if let Some(previous) = &previous {
+                    let _ = std::fs::remove_file(previous);
+                }
+                return minutes_cancelled(&app, &folder);
+            }
+            Err(_) if here() => {
+                if let Some(previous) = &previous {
+                    let _ = std::fs::remove_file(previous);
+                }
+                return minutes_ended_here(&app, &folder);
+            }
+            Err(error) => {
+                if let Some(previous) = &previous {
+                    let _ = std::fs::remove_file(previous);
+                }
+                minutes_ended(&app, &folder, Some((error.to_string(), None)), None);
+                return tell(&app, &words::minutes(&words::Minutes::failed(None, again), shell.language()));
+            }
+        };
+        let made = events
+            .iter()
+            .find_map(|event| match event {
+                summarising::Event::Ended(made) => Some(made),
+                summarising::Event::Sending { .. } => None,
+            })
+            .unwrap_or(summarising::Made::Failed(String::new(), None));
+        shell.minuting.lock().unwrap().take();
+        // Cancelled by the user (D92), and not written meanwhile: no failure, nothing told.
+        let cancelled = cancel.cancelled() && matches!(made, summarising::Made::Failed(..));
+        let ended_here = matches!(made, summarising::Made::Failed(..)) && !cancelled && here();
+        // Replaced, the earlier minutes are kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, they stay where they were set aside, and it is said.
+        let mut kept_beside = None;
+        if let Some(previous) = previous {
+            match made {
+                summarising::Made::Written(_) if keep_previous(&folder, &previous, minutes::PREVIOUS).is_err() => {
+                    kept_beside = previous.file_name().map(|name| name.to_string_lossy().into_owned());
+                }
+                summarising::Made::Written(_) => {}
+                summarising::Made::Failed(..) => {
+                    let _ = std::fs::remove_file(&previous);
+                }
+            }
+        }
+        if cancelled {
+            return minutes_cancelled(&app, &folder);
+        }
+        if ended_here {
+            return minutes_ended_here(&app, &folder);
+        }
+        // Written all the same, said confidential as it ended: written again here, next.
+        if shell.written_here.lock().unwrap().remove(&folder) {
+            shell.minutes_waiting.lock().unwrap().push_front(Queued {
+                folder: folder.clone(),
+                agreed: None,
+                chosen: None,
+                cancel: Cancel::default(),
+            });
+        }
+        if matches!(made, summarising::Made::Written(_)) {
+            export_written(&shell, &folder);
+        }
+        minutes_ended(
+            &app,
+            &folder,
+            match &made {
+                summarising::Made::Failed(why, cause) => Some((why.clone(), *cause)),
+                summarising::Made::Written(_) => None,
+            },
+            own_model.as_deref(),
+        );
+        // Written all the same after « Annuler »: kept, being whole, and nothing told (D92).
+        if *shell.leaving.lock().unwrap() || cancel.cancelled() {
+            return;
+        }
+        let written = matches!(made, summarising::Made::Written(_));
+        let said = match made {
+            summarising::Made::Written(_) if kept_beside.is_some() => words::Minutes::ReadyKeptBeside(kept_beside.unwrap_or_default()),
+            summarising::Made::Written(_) => words::Minutes::Ready,
+            summarising::Made::Failed(_, cause) => words::Minutes::failed_by(cause, again, own_model.as_deref(), shell.language()),
+        };
+        // Ready, a click opens the meeting (D44); failed, it is said — once, naming the meeting,
+        // where no window of Kitokey has the focus (D92).
+        tell_made(&app, &words::minutes(&said, shell.language()), &folder, written);
+    });
+}
+
+/// A version a redo replaced, set aside at `aside`, kept beside the new one under `name` in place of
+/// the trash (D113): the one kept there before goes to the trash first, so that one alone is kept.
+fn keep_previous(folder: &Path, aside: &Path, name: &str) -> std::io::Result<()> {
+    let kept = folder.join(name);
+    if kept.exists() {
+        trash::delete(&kept).map_err(std::io::Error::other)?;
+    }
+    std::fs::rename(aside, kept)
+}
+
+/// « Revenir à la version précédente » (D113): the version shown and the one kept swap, so the
+/// same gesture brings back the one left; a person's corrections are in each file, kept with it.
+/// Refused while the meeting is being made.
+#[tauri::command]
+fn previous_back(shell: State<'_, Shell>, name: String, step: String) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let (shown, kept) = match step.as_str() {
+        "minutes" => (folder.join("minutes.md"), folder.join(minutes::PREVIOUS)),
+        "transcript" => (folder.join("transcript.jsonl"), folder.join(meeting::PREVIOUS)),
+        _ => return Err(shell.told(Failure::Unexpected, "no step of that name")),
+    };
+    if making(&shell, &folder) {
+        return Err(shell.told(Failure::Busy, format!("{name} is being made")));
+    }
+    // A transcript and the summary made from it are one version (#1070): they go back together.
+    let paired = step == "transcript" && versions(&folder, words::window(shell.language()).minutes_sections).paired();
+    let unwritten = |error: std::io::Error| shell.told(Failure::MeetingFile, error);
+    swap(&shown, &kept).map_err(unwritten)?;
+    // The summary not swapped, the transcript goes back as it was: never one half of a version.
+    if paired && let Err(error) = swap(&folder.join("minutes.md"), &folder.join(minutes::PREVIOUS)) {
+        let _ = swap(&shown, &kept);
+        return Err(unwritten(error));
+    }
+    tracing::info!(step, paired, "shell.previous_back");
+    Ok(())
+}
+
+/// The version shown and the one kept beside it trade places, through a third name; on a failure,
+/// each is put back where it was.
+fn swap(shown: &Path, kept: &Path) -> std::io::Result<()> {
+    let between = kept.with_extension("swap");
+    std::fs::rename(kept, &between)?;
+    if let Err(error) = std::fs::rename(shown, kept) {
+        let _ = std::fs::rename(&between, kept);
+        return Err(error);
+    }
+    if let Err(error) = std::fs::rename(&between, shown) {
+        let _ = std::fs::rename(kept, shown);
+        let _ = std::fs::rename(&between, kept);
+        return Err(error);
+    }
+    Ok(())
+}
+
+/// « Exporter chaque compte rendu » (D109): the summary just written, written to the folder chosen
+/// too, by `kitokey-export` (`exporting/v1`), named by its meeting's folder; never a confidential
+/// meeting's, a folder chosen being one a service may copy (D60). Not written there, it is said on
+/// its page until it is.
+fn export_written(shell: &Shell, folder: &Path) {
+    let Some(chosen) = shell.settings().export else {
+        return;
+    };
+    if confidential::marked(folder) {
+        return;
+    }
+    // The example tried is an invented meeting: nothing of it in the user's folder (D126).
+    if shell.examples.lock().unwrap().contains(folder) {
+        return;
+    }
+    let language = shell.language();
+    let said = words::exported(language);
+    let name = meeting_said(folder, language);
+    let to = chosen.join(format!("{}.md", named(folder)));
+    // Each side by the name the user gave it (#1205), else the page's word.
+    let kept = speakers::read(folder);
+    let (me, others) = kept.sides(said.me, said.others);
+    let input = exporting::Input {
+        to: &to,
+        name: &name,
+        transcript: said.transcript,
+        me,
+        others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: None,
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    match exporting::markdown(&program("kitokey-export", "KITOKEY_EXPORT"), folder, tag, &input) {
+        Ok(()) => {
+            tracing::info!("shell.exported");
+            shell.not_exported.lock().unwrap().remove(folder);
+        }
+        Err(why) => {
+            tracing::warn!(detail = %why, "shell.export_failed");
+            shell.not_exported.lock().unwrap().insert(folder.to_path_buf(), why);
+        }
+    }
+}
+
+/// The minutes' entry while they are written, and after.
+fn minuting(app: &AppHandle, now: bool) {
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let shell = app.state::<Shell>();
+        let labels = words::menu(shell.language());
+        let _ = shell.minutes.set_text(if now { labels.minuting } else { labels.minutes });
+        let _ = shell.minutes.set_enabled(!now);
+    });
+}
+
+/// Opens the full window on one of its pages, in place of the small one (D35).
+fn open_window_at(app: &AppHandle, page: &str) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval(format!("location.hash = {}", serde_json::to_string(page).unwrap_or_default()));
+        return show_full(app);
+    }
+    left(app, settings::Window::Full);
+    if let Some(small) = app.get_webview_window("small") {
+        let _ = small.close();
+    }
+    build_full(app, page);
+}
+
+/// Shows a notification. A desktop that shows none is no reason to stop anything.
+fn tell(app: &AppHandle, notice: &Notice) {
+    let _ = app.notification().builder().title(&notice.title).body(&notice.body).show();
+}
+
+/// A meeting's minutes, their sections named as the page names them in `language`: v1 to v4's
+/// three by their place, v5's by their ids (D111).
+fn read_minutes(folder: &Path, language: Language) -> Read<minutes::Minutes> {
+    let words = words::window(language);
+    minutes::minutes_named(
+        folder,
+        words.minutes_sections,
+        &minutes::named_by_id(words.minutes_sections, words.structure_sections),
+    )
+}
+
+/// Puts the tray in a state: its entry's words, whether it answers, and its icon.
+fn show(app: &AppHandle, shown: Shown) {
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let shell = app.state::<Shell>();
+        let labels = words::menu(shell.language());
+        let (label, enabled, icon, tooltip) = match shown {
+            Shown::Idle => (labels.start, true, &include_bytes!("../icons/tray.png")[..], "Kitokey"),
+            Shown::Recording => (
+                labels.stop,
+                true,
+                &include_bytes!("../icons/tray-recording.png")[..],
+                labels.recording,
+            ),
+            Shown::Stopping => (
+                labels.stopping,
+                false,
+                &include_bytes!("../icons/tray-recording.png")[..],
+                labels.recording,
+            ),
+        };
+        let _ = shell.toggle.set_text(label);
+        let _ = shell.toggle.set_enabled(enabled);
+        // A transcript is asked for at rest only, and one at a time.
+        let free = shown == Shown::Idle && shell.transcription.lock().unwrap().is_none();
+        let _ = shell.transcribe.set_enabled(free);
+        if let Some(tray) = app.tray_by_id(TRAY) {
+            let _ = tray.set_icon(Image::from_bytes(icon).ok());
+            let _ = tray.set_tooltip(Some(tooltip));
+        }
+    });
+}
+
+/// A step's program: beside this one, as an installation puts it — or, for whoever builds
+/// Kitokey, where its variable says (`KITOKEY_CAPTURE`, `KITOKEY_TRANSCRIPTION`), or on the path.
+fn program(name: &str, variable: &str) -> PathBuf {
+    let name = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+    let beside = std::env::current_exe().ok().and_then(|own| Some(own.parent()?.join(&name)));
+    std::env::var_os(variable)
+        .map(PathBuf::from)
+        .or_else(|| beside.filter(|path| path.is_file()))
+        .unwrap_or_else(|| PathBuf::from(name))
+}
+
+/// Starts a recording when there is none, stops it when there is one: the menu's entry and
+/// the global shortcut both come here. A stop is done here and never judged; a start is decided on
+/// a thread of its own, which is returned: the licence it reads may wait on the Store, and the
+/// window's thread, where the tray, the shortcut and the window call this, never waits on it (D83).
+fn toggle_recording(app: &AppHandle) -> Option<std::thread::JoinHandle<()>> {
+    let shell = app.state::<Shell>();
+    // The window the Store's dialogs belong to, asked before any lock is held (D83).
+    let owner = owner(app);
+    let mut pressed = shell.pressed.lock().unwrap();
+    if pressed.is_some_and(|last| last.elapsed() < Duration::from_millis(500)) {
+        return None;
+    }
+    *pressed = Some(Instant::now());
+    let mut recording = shell.recording.lock().unwrap();
+    if let Some(running) = recording.as_mut() {
+        // Told once: a recording that is stopping is not told again. A stop that cannot be
+        // said means the program is already ending: its end is told by what it says.
+        if !std::mem::replace(&mut *shell.stopping.lock().unwrap(), true) {
+            let _ = running.stop();
+            show(app, Shown::Stopping);
+        }
+        return None;
+    }
+    let app = app.clone();
+    Some(std::thread::spawn(move || start_recording(&app, owner)))
+}
+
+/// A recording started, unless the trial refuses it — off the window's thread (`toggle_recording`).
+fn start_recording(app: &AppHandle, owner: licence::Owner) {
+    let shell = app.state::<Shell>();
+    // The settings as the file says them now: the user may have changed it by hand.
+    let _ = shell.reread();
+    let Settings { sessions, microphone, .. } = shell.settings();
+    // Every start comes here — the window's, the tray's, the shortcut's, a call's offer —: the
+    // trial is judged once, on the licence read now (D83), no lock held while the Store answers.
+    let licence = shell.licence(owner);
+    let mut recording = shell.recording.lock().unwrap();
+    // Started meanwhile, by another start decided first: left as it is.
+    if recording.is_some() {
+        return;
+    }
+    if shell.refuses(&licence, &sessions) {
+        tracing::info!("shell.recording_refused");
+        drop(recording);
+        // Said in the full window, which the small one has no room for: brought forward, or opened,
+        // on this gesture of the user — once the command that asked has answered.
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || show_full(&handle));
+        return;
+    }
+    // Never listening during a recording (`recording/v1`): the panel's capture ends first (D88).
+    sound_check_stopped(app);
+    if let Err(error) = sessions::writable(&sessions) {
+        tracing::error!(detail = %error, "shell.sessions_refused");
+        return tell(
+            app,
+            &words::trouble(&Trouble::NoFolder(sessions.display().to_string()), shell.language()),
+        );
+    }
+    let started = Recording::start(&program("kitokey-capture", "KITOKEY_CAPTURE"), &sessions, microphone.as_deref());
+    match started {
+        Ok((running, said)) => {
+            *recording = Some(running);
+            show(app, Shown::Recording);
+            let app = app.clone();
+            // On a trial licence, the meeting is counted as made here (PDR-0005).
+            let trial = (licence == Ok(Licence::Trial)).then_some(sessions);
+            std::thread::spawn(move || listen(&app, &said, trial.as_deref(), false));
+        }
+        Err(error) => tell(app, &words::trouble(&Trouble::NoRecorder(error.to_string()), shell.language())),
+    }
+}
+
+/// Tells the user what a recording says, until it has ended; then the tray is at rest again.
+/// `found`: a recording found running (#773), started already, which says nothing but its end.
+fn listen(app: &AppHandle, said: &Receiver<Said>, trial: Option<&Path>, found: bool) {
+    let shell = app.state::<Shell>();
+    let mut started = found;
+    let mut stopped = None;
+    // What the devices are: what is said of one gone, or back, depends on the other.
+    let mut sides = words::Sides::default();
+    for event in said {
+        started |= matches!(event, Said::Started(..));
+        shell.devices.lock().unwrap().heard(&event);
+        shell.checks.lock().unwrap().heard(&event);
+        match &event {
+            Said::MicrophoneGone => *shell.microphone_gone.lock().unwrap() = true,
+            Said::MicrophoneBack => *shell.microphone_gone.lock().unwrap() = false,
+            _ => {}
+        }
+        if let Said::Started(folder, ..) = &event {
+            if let (Some(meetings), Some(name)) = (trial, folder.file_name().and_then(|name| name.to_str()))
+                && let Err(error) = trial::made(meetings, name)
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.trial_not_counted");
+            }
+            // The context typed before the start, the meeting's own once its folder holds its session
+            // (D91) — written before the bar is told of the meeting, which then reads it there.
+            let mut next = shell.next_context.lock().unwrap();
+            match context::taken(folder, &mut next) {
+                Ok(()) => {
+                    if let Some(Err(error)) = next_file().map(|file| context::keep_next(&file, "")) {
+                        tracing::error!(kind = ?error.kind(), "shell.context_not_cleared");
+                    }
+                }
+                Err(error) => tracing::error!(kind = ?error.kind(), "shell.context_not_taken"),
+            }
+            drop(next);
+            // Kept beside the settings while it runs: a Kitokey started again finds it (#773).
+            let kept = shell
+                .recording
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|running| recording::Kept::of(running.id(), folder));
+            if let (Some(file), Some(kept)) = (recording_file(), kept)
+                && let Err(error) = recording::keep(&file, &kept)
+            {
+                tracing::warn!(kind = ?error.kind(), "shell.recording_not_kept");
+            }
+            *shell.recorded.lock().unwrap() = Some(folder.clone());
+            // Another recording: the one before is no longer said by the bar (D92).
+            shell.last.lock().unwrap().take();
+            *shell.meter.lock().unwrap() = (Some(Instant::now()), [0.0, 0.0]);
+            small_recording(app, true);
+        }
+        if let Said::Level(source, level) = &event {
+            shell.meter.lock().unwrap().1[usize::from(*source == Source::Others)] = *level;
+        }
+        let notice = match &event {
+            // Ended before it had started: nothing was recorded, and that is the trouble.
+            Said::Failed(why) if !started => Some(words::trouble(&Trouble::NoRecorder(why.clone()), shell.language())),
+            // A window of Kitokey seen: the stop is there already, no notification says it (D44).
+            Said::Stopped(folder, _) if window_seen(app) => {
+                if shell.settings().after != settings::After::Nothing {
+                    stopped = Some(folder.clone());
+                }
+                None
+            }
+            Said::Stopped(folder, _) if shell.settings().after != settings::After::Nothing => {
+                stopped = Some(folder.clone());
+                words::of(&event, shell.settings().reminder, shell.language()).map(|notice| Notice {
+                    body: format!("{} {}", notice.body, words::follows(shell.language())),
+                    ..notice
+                })
+            }
+            _ => sides.told(&event, shell.settings().reminder, shell.language()),
+        };
+        if let Some(notice) = notice {
+            tell(app, &notice);
+        }
+    }
+    if let Some(Err(error)) = recording_file().map(|file| recording::forget(&file)) {
+        tracing::warn!(kind = ?error.kind(), "shell.recording_not_forgotten");
+    }
+    shell.recorded.lock().unwrap().take();
+    *shell.meter.lock().unwrap() = (None, [0.0, 0.0]);
+    *shell.devices.lock().unwrap() = recording::Devices::default();
+    *shell.checks.lock().unwrap() = recording::Checks::default();
+    *shell.microphone_gone.lock().unwrap() = false;
+    // The small window comes back to rest, below the other windows again (D35).
+    small_recording(app, false);
+    let ended = shell.recording.lock().unwrap().take();
+    *shell.stopping.lock().unwrap() = false;
+    show(app, Shown::Idle);
+    if *shell.leaving.lock().unwrap() {
+        app.exit(0);
+    }
+    // Its output is closed: the program is ending. It is waited for here, however long it
+    // takes, so that nothing of it is left in the system's table of programs.
+    if let Some(ended) = ended {
+        ended.wait();
+    }
+    // Quitting, the stop's transcript is not begun: it is made from the menu next time.
+    if let Some(folder) = stopped.filter(|_| !*shell.leaving.lock().unwrap()) {
+        // Kept before its transcript is in line, however soon it ends: said by the bar at rest (D92).
+        *shell.last.lock().unwrap() = Some((folder.clone(), false));
+        transcribe(app, folder, Cancel::default());
+    }
+}
+
+/// Puts a session in line for its transcript, once — made again as a *Refaire…* asked, the
+/// newer ask kept when it is asked again.
+fn wait(shell: &Shell, folder: PathBuf, again: Option<Again>, cancel: Cancel) {
+    let mut waiting = shell.waiting.lock().unwrap();
+    match waiting.iter_mut().find(|(queued, ..)| *queued == folder) {
+        Some((_, chosen, _)) if again.is_some() => *chosen = again,
+        Some(_) => {}
+        None => waiting.push_back((folder, again, cancel)),
+    }
+}
+
+/// A transcript begun: what makes it, said on its page; its last failure gone.
+fn hearing(shell: &Shell, folder: &Path, hearer: &Hearer) {
+    *shell.hearing.lock().unwrap() = Some(folder.to_path_buf());
+    *shell.hearing_by.lock().unwrap() = Some((hearer.name(), Instant::now()));
+    *shell.hearing_host.lock().unwrap() = match hearer {
+        // A service on this computer sends nothing away (D60).
+        Hearer::Service { provider, .. } if !providers::local(provider) => providers::host(provider),
+        _ => None,
+    };
+    shell.transcripts_failed.lock().unwrap().remove(folder);
+    shell.stopped.lock().unwrap().remove(folder);
+}
+
+/// How a transcript's making ended, for what follows it.
+#[derive(PartialEq)]
+enum Heard {
+    /// Written, or failed: told, and what follows it made.
+    Ended,
+    /// Ended because its meeting was said confidential, to be made again here: no failure (D60).
+    Here,
+    /// Cancelled by the user (D92): no failure, nothing told, nothing made after it.
+    Cancelled,
+}
+
+/// A transcript ended: counted when written, its reason kept when not — said on its page —, or
+/// said stopped when its own token was cancelled.
+fn heard(shell: &Shell, folder: &Path, made: &Made, cancelled: bool) -> Heard {
+    shell.hearing.lock().unwrap().take();
+    let by = shell.hearing_by.lock().unwrap().take();
+    shell.hearing_host.lock().unwrap().take();
+    if matches!(made, Made::Written(_)) {
+        measured(shell, Step::Transcript, folder, by);
+    }
+    let here = shell.heard_here.lock().unwrap().remove(folder);
+    // Written all the same, as it was cancelled: written it is — never a whole one thrown away.
+    let cancelled = cancelled && !matches!(made, Made::Written(_));
+    if cancelled {
+        shell.stopped.lock().unwrap().insert(folder.to_path_buf(), "transcript");
+    }
+    match made {
+        Made::Written(_) => *shell.transcripts_made.lock().unwrap().entry(folder.to_path_buf()).or_default() += 1,
+        Made::Failed(_) if here || cancelled => {}
+        Made::Failed(why) => {
+            let why = if why.trim().is_empty() {
+                "kitokey-transcription stopped without saying why"
+            } else {
+                why
+            };
+            shell
+                .transcripts_failed
+                .lock()
+                .unwrap()
+                .insert(folder.to_path_buf(), why.to_string());
+        }
+    }
+    match (cancelled, here) {
+        (true, _) => Heard::Cancelled,
+        (false, true) => Heard::Here,
+        (false, false) => Heard::Ended,
+    }
+}
+
+/// The next transcript in line, once one ends: made, or made again with the model a Refaire…
+/// chose; one that cannot begin says why on its page, and the next one is taken.
+fn transcribe_next(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    // At most once each: one that cannot begin is said on its page, and the next one is taken.
+    let mut tries = shell.waiting.lock().unwrap().len();
+    while tries > 0 {
+        tries -= 1;
+        // Taken from the line under its lock, one at a time, in order. The default model missing,
+        // those made with it wait where they are — offered once already —, and the first
+        // Refaire… behind them, its model there, is made.
+        let settings = shell.settings();
+        let next = {
+            let mut waiting = shell.waiting.lock().unwrap();
+            let at = waiting.iter().position(|(folder, again, _)| {
+                matches!(again, Some(Again::Model(_))) || !default_model_missing_for(&own(&settings, folder), folder)
+            });
+            let next = at.and_then(|at| waiting.remove(at));
+            // Said taken, with its token: « Annuler » meanwhile cancels it (D92).
+            *shell.promoted_transcript.lock().unwrap() = next.as_ref().map(|(folder, _, token)| (folder.clone(), token.clone()));
+            next
+        };
+        let Some((folder, again, token)) = next else {
+            return;
+        };
+        match again {
+            None => transcribe(app, folder, token.clone()),
+            Some(again) => retranscribe_or_say(app, folder, again, token.clone()),
+        }
+        free(&shell.promoted_transcript, &token);
+        if shell.transcription.lock().unwrap().is_some() {
+            return;
+        }
+    }
+}
+
+/// Made again as a Refaire… asked; one that cannot begin says why on its page.
+fn retranscribe_or_say(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) {
+    if let Err((_, why)) = retranscribe(app, folder.clone(), again, cancel) {
+        app.state::<Shell>().transcripts_failed.lock().unwrap().insert(folder, why);
+    }
+}
+
+/// *Refaire…* on a transcript: made again with the model picked, this time only — or, the context
+/// changed, by whoever the settings name to hear, the minutes made again after it (D59). The
+/// transcript there stays in place until the new one is whole — set aside for the run, since the
+/// program goes on from a transcript it finds —, then goes to the system's trash; a run that
+/// fails, or that Kitokey ends as it quits, puts it back.
+fn retranscribe(app: &AppHandle, folder: PathBuf, again: Again, cancel: Cancel) -> Result<(), (Failure, String)> {
+    let shell = app.state::<Shell>();
+    let mut running = shell.transcription.lock().unwrap();
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return Ok(());
+    }
+    if running.is_some() {
+        // One at a time: it waits its turn, said on its page — the one being made too.
+        drop(running);
+        wait(&shell, folder, Some(again), cancel);
+        return Ok(());
+    }
+    shell.transcripts_tried.lock().unwrap().insert(folder.clone(), Some(again.clone()));
+    let read = shell.reread().map_err(|why| (Failure::SettingsUnread(why.refused), why.detail))?;
+    // The models this computer lists, as Settings name theirs: a Refaire… may pick Settings' own.
+    let listed = settings::whisper_models(&models_folder(), &read);
+    let settings = own(&read, &folder);
+    let (hearer, key) = match &again {
+        Again::Model(model) if !listed.contains(model) => {
+            return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
+        }
+        Again::Model(model) => (Hearer::Model(model.clone()), None),
+        Again::Settings | Again::Own => hearer_now(&shell, &settings, &folder),
+    };
+    if let Hearer::Model(model) = &hearer
+        && !model.is_file()
+    {
+        // Made again by the settings' Whisper, its default model missing: it waits for it and the
+        // model is offered, as for a first transcript.
+        if matches!(again, Again::Settings | Again::Own) && *model == Settings::default().model {
+            drop(running);
+            wait(&shell, folder, Some(again), cancel);
+            if !*shell.fetching.lock().unwrap() {
+                offer(app);
+            }
+            return Ok(());
+        }
+        return Err((Failure::ModelAbsent, "no model on this computer".to_string()));
+    }
+    // Made again with the context: its minutes too, when it had some or the settings make them.
+    // Made again with the context: its minutes too, when it had some or the settings make them. Made
+    // again by Refaire…, the transcript alone: its summary is kept, as the panel says (the decider, D113).
+    let minutes_after = again == Again::Settings && minutes_after(&folder, settings.after);
+    // Set aside under a name of its own, never written over; put back if the new one is not made.
+    let current = folder.join("transcript.jsonl");
+    let previous = match sessions::set_aside(&current, true) {
+        Ok(previous) => Some(previous),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => {
+            return Err((
+                Failure::MeetingFile,
+                format!("the transcript there could not be set aside ({error}): nothing was made"),
+            ));
+        }
+    };
+    // The language the meeting says it is spoken in, else the settings' (D65).
+    let spoken = spoken::read(&folder).or_else(|| settings.meeting_language.clone());
+    let started = Transcription::start_with(
+        &program("kitokey-transcription", "KITOKEY_TRANSCRIPTION"),
+        &folder,
+        &hearer,
+        key.as_deref(),
+        spoken.as_deref(),
+    );
+    let (transcription, made) = match started {
+        Ok(started) => started,
+        Err(error) => {
+            if let Some(previous) = &previous {
+                let _ = std::fs::rename(previous, &current);
+            }
+            return Err((Failure::ProgramNotStarted, error.to_string()));
+        }
+    };
+    // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+    cancel.hold(transcription.stopper());
+    *running = Some(transcription);
+    *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
+    // Who puts the earlier transcript back, or trashes it: this run's end, or Kitokey quitting —
+    // whichever comes first takes it, the other finds nothing.
+    *shell.redoing.lock().unwrap() = previous.clone().map(|previous| (current.clone(), previous));
+    hearing(&shell, &folder, &hearer);
+    *shell.hearing_then.lock().unwrap() = minutes_after;
+    drop(running);
+    transcribing(app, true);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let made = made.recv().unwrap_or(Made::Failed(String::new()));
+        let shell = app.state::<Shell>();
+        // Written, its summary following: between the two steps before the transcript is said ended (D92).
+        let chained = minutes_after && matches!(made, Made::Written(_)) && !cancel.cancelled();
+        if chained {
+            shell.between.lock().unwrap().insert(folder.clone());
+        }
+        // Ended and said so at once: none begun in between loses what it says of itself.
+        let mut running = shell.transcription.lock().unwrap();
+        running.take();
+        shell.transcript_token.lock().unwrap().take();
+        let here = heard(&shell, &folder, &made, cancel.cancelled());
+        drop(running);
+        transcribing(&app, false);
+        // Replaced, the earlier transcript is kept beside as the previous version, the one kept before
+        // going to the trash (D113) — refused, it stays where it was set aside, and it is said; not
+        // replaced, it is put back — failing that, it is said where it is.
+        let mut kept_beside = None;
+        let redoing = shell.redoing.lock().unwrap().take();
+        // Cancelled with none whole before it: what it began is no version, nor taken up by the
+        // next model's making (D92).
+        if here == Heard::Cancelled && redoing.is_none() {
+            let _ = std::fs::remove_file(folder.join("transcript.jsonl"));
+        }
+        if let Some((current, previous)) = redoing {
+            let name = previous.file_name().map(|name| name.to_string_lossy().into_owned());
+            let written = matches!(made, Made::Written(_));
+            if let Some(not_put_back) = sessions::settle(&current, &previous, written, |previous| {
+                keep_previous(&folder, previous, meeting::PREVIOUS)
+            }) {
+                kept_beside = name.map(|name| (name, not_put_back));
+            }
+        }
+        if *shell.leaving.lock().unwrap() {
+            return;
+        }
+        // Ended for its meeting said confidential: made again here, first in line. Cancelled:
+        // nothing told — the earlier one not put back excepted —, nothing made after it.
+        if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&folder);
+            if let (Heard::Cancelled, Some((name, not_put_back))) = (&here, kept_beside) {
+                tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
+            }
+            return transcribe_next(&app);
+        }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
+            return transcribe_next(&app);
+        }
+        // Made again and ready, its click opens the meeting as after a stop (D44); the minutes
+        // made after it, theirs alone says it (D92).
+        match &made {
+            Made::Written(_) if minutes_after => {}
+            Made::Written(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, true),
+            Made::Failed(_) => tell_made(&app, &words::made(&made, shell.language()), &folder, false),
+        }
+        if let Some((name, not_put_back)) = kept_beside {
+            tell(&app, &words::transcript_kept_beside(shell.language(), &name, not_put_back));
+        }
+        // The minutes made again from the new transcript, by whoever the settings name now: the
+        // ones there stay until the new ones are whole (`write_minutes_from`).
+        if minutes_after && matches!(made, Made::Written(_)) {
+            let named = shell
+                .reread()
+                .ok()
+                .map(|settings| own(&settings, &folder))
+                .and_then(|settings| settings.minutes_provider.zip(settings.minutes_model));
+            write_minutes(&app, folder, None, named);
+        }
+        // The transcripts waiting in line go on, as after any other.
+        transcribe_next(&app);
+    });
+    Ok(())
+}
+
+/// Settings as a meeting is made with them: its own models where it chose some (D91), Settings'
+/// choice for the rest and where its own is gone — logged, and said on its page.
+fn own(settings: &Settings, folder: &Path) -> Settings {
+    let chosen = meeting_models::read(folder);
+    let applied = meeting_models::applied(settings, &chosen, &settings::whisper_models(&models_folder(), settings));
+    if !applied.gone.is_empty() {
+        tracing::info!(gone = ?applied.gone, "shell.meeting_model_gone");
+    }
+    applied.settings
+}
+
+/// Who hears now, as the settings name it — Apple's SpeechAnalyzer while this Mac offers it, a
+/// service once agreed to (D42, D43) —, and the service's key: what a transcript is made with.
+fn hearer_now(shell: &Shell, settings: &Settings, folder: &Path) -> (Hearer, Option<String>) {
+    // Apple's SpeechAnalyzer needs no model file: its own is on the Mac (D42). Chosen and no
+    // longer offered here — an older macOS, the program gone —, Whisper hears, and it is logged.
+    let language = shell.system.code();
+    let apple_ready = || {
+        let program = program("kitokey-speech", "KITOKEY_SPEECH");
+        speech::status(&program, language).is_some_and(|status| status.offered && status.installed)
+    };
+    // Said confidential: on this computer alone, whatever the settings name — no key, nothing sent (D60).
+    if confidential::marked(folder) {
+        let hearer = confidential::hearer(settings, language, apple_ready);
+        tracing::info!(engine = %hearer.name(), "shell.confidential_heard");
+        return (hearer, None);
+    }
+    let hearer = Hearer::of(settings, language, apple_ready);
+    if settings.engine == Engine::SpeechAnalyzer && matches!(hearer, Hearer::Model(_)) {
+        tracing::warn!("shell.speech_unavailable");
+    }
+    // A service not agreed to yet sends nothing: Whisper hears, and it is logged (D43).
+    if settings.engine == Engine::Service && matches!(hearer, Hearer::Model(_)) {
+        tracing::warn!("shell.service_not_agreed");
+    }
+    // Its key from the keyring, under the transcription's own account: never the minutes'.
+    let key = match &hearer {
+        Hearer::Service { provider, .. } => {
+            providers::host(provider).and_then(|host| keys::key(&transcription::key_account(&host)).ok().flatten())
+        }
+        _ => None,
+    };
+    (hearer, key)
+}
+
+/// Makes the transcript of a session — after the one being made, if there is one. What is
+/// missing — the model, the program — is said in one sentence, and on its page; the recording is
+/// never touched. Whether it began.
+fn transcribe(app: &AppHandle, folder: PathBuf, cancel: Cancel) {
+    let shell = app.state::<Shell>();
+    let mut running = shell.transcription.lock().unwrap();
+    // Cancelled before it began: nothing begins (D92).
+    if cancel.cancelled() {
+        return;
+    }
+    if running.is_some() {
+        wait(&shell, folder, None, cancel);
+        return;
+    }
+    shell.transcripts_tried.lock().unwrap().insert(folder.clone(), None);
+    let _ = shell.reread();
+    let settings = own(&shell.settings(), &folder);
+    let model = &settings.model;
+    let (hearer, key) = hearer_now(&shell, &settings, &folder);
+    if matches!(hearer, Hearer::Model(_)) && !model.is_file() {
+        // The default model is offered, its size and host shown; one the user named is theirs.
+        if *model == Settings::default().model {
+            wait(&shell, folder, None, cancel);
+            // Already coming: the session waits for it, and nothing is offered twice.
+            if !*shell.fetching.lock().unwrap() {
+                offer(app);
+            }
+            return;
+        } else {
+            let trouble = Trouble::NoModel(model.display().to_string());
+            shell
+                .transcripts_failed
+                .lock()
+                .unwrap()
+                .insert(folder.clone(), format!("{} is no model on this computer", model.display()));
+            // The meeting's last step, failed: told as its end is (D92).
+            tell_made(app, &words::trouble(&trouble, shell.language()), &folder, false);
+        }
+        return;
+    }
+    // The language the meeting says it is spoken in, else the settings' (D65).
+    let spoken = spoken::read(&folder).or_else(|| settings.meeting_language.clone());
+    let started = Transcription::start_with(
+        &program("kitokey-transcription", "KITOKEY_TRANSCRIPTION"),
+        &folder,
+        &hearer,
+        key.as_deref(),
+        spoken.as_deref(),
+    );
+    let (transcription, made) = match started {
+        Ok(started) => started,
+        Err(error) => {
+            shell.transcripts_failed.lock().unwrap().insert(folder.clone(), error.to_string());
+            let notice = words::trouble(&Trouble::NoTranscriber(error.to_string()), shell.language());
+            return tell_made(app, &notice, &folder, false);
+        }
+    };
+    // Held by its token: cancelled meanwhile, it is stopped at once (D92).
+    cancel.hold(transcription.stopper());
+    *running = Some(transcription);
+    *shell.transcript_token.lock().unwrap() = Some(cancel.clone());
+    hearing(&shell, &folder, &hearer);
+    // Its summary follows, as the settings say now: the page's one bar has two parts (D92).
+    let example = shell.examples.lock().unwrap().contains(&folder);
+    *shell.hearing_then.lock().unwrap() = example || settings.after == settings::After::Minutes;
+    transcribing(app, true);
+    let heard_folder = folder;
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let made = made.recv().unwrap_or(Made::Failed(String::new()));
+        let shell = app.state::<Shell>();
+        // The minutes follow, when the settings say so — as they are now. Written, they do: between
+        // the two steps before the transcript is said ended (D92).
+        let follows = matches!(made, Made::Written(_))
+            && !cancel.cancelled()
+            && (example || shell.reread().is_ok_and(|settings| settings.after == settings::After::Minutes));
+        if follows {
+            shell.between.lock().unwrap().insert(heard_folder.clone());
+        }
+        let mut running = shell.transcription.lock().unwrap();
+        running.take();
+        shell.transcript_token.lock().unwrap().take();
+        let here = heard(&shell, &heard_folder, &made, cancel.cancelled());
+        drop(running);
+        transcribing(&app, false);
+        // Cancelled: what it began is no version, nor taken up by the next model's making (D92).
+        if here == Heard::Cancelled {
+            let _ = std::fs::remove_file(heard_folder.join("transcript.jsonl"));
+        }
+        // Ended by Kitokey as it quits: nothing to tell, it goes on next time.
+        if *shell.leaving.lock().unwrap() {
+            return;
+        }
+        // Ended for its meeting said confidential: made again here, first in line; cancelled,
+        // nothing told, nothing made after it.
+        if here != Heard::Ended {
+            shell.between.lock().unwrap().remove(&heard_folder);
+            return transcribe_next(&app);
+        }
+        // Written all the same after « Annuler »: kept, being whole, but nothing follows it — no
+        // notification, no minutes made with a model the user was changing (D92).
+        if cancel.cancelled() {
+            return transcribe_next(&app);
+        }
+        let notice = words::made(&made, shell.language());
+        match made {
+            Made::Written(folder) => {
+                // The minutes follow, when the settings said so as it ended; then their
+                // notification alone says the meeting is made (D44, D92).
+                if follows {
+                    make_minutes(&app, folder);
+                } else {
+                    tell_made(&app, &notice, &folder, true);
+                }
+            }
+            Made::Failed(_) => tell_made(&app, &notice, &heard_folder, false),
+        }
+        transcribe_next(&app);
+    });
+}
+
+/// The default model as published — or, for whoever tries Kitokey, as `KITOKEY_MODEL_PUBLISHED`
+/// says: its address, its size in bytes and its SHA-256, separated by spaces.
+fn published() -> Published {
+    published_at(0)
+}
+
+/// One of the models offered, as published — or as `KITOKEY_MODEL_PUBLISHED` says, its
+/// entries separated by `;` in the order of the list offered.
+fn published_at(index: usize) -> Published {
+    // The list may have been read again since the index was taken: none there is the default.
+    let listed = offered().get(index).map_or(model::DEFAULT, |listed| listed.published);
+    published_named(index).unwrap_or(listed)
+}
+
+/// What `KITOKEY_MODEL_PUBLISHED` says of one of the models offered, if it says it.
+fn published_named(index: usize) -> Option<Published> {
+    std::env::var("KITOKEY_MODEL_PUBLISHED").ok().and_then(|named| {
+        let named = named.split(';').nth(index)?.to_owned();
+        let [address, bytes, sha256] = named.split(' ').collect::<Vec<_>>()[..] else {
+            return None;
+        };
+        let leaked = |text: &str| -> &'static str { Box::leak(text.to_owned().into_boxed_str()) };
+        let host = address.split('/').nth(2).unwrap_or(address);
+        Some(Published {
+            address: leaked(address),
+            host: leaked(host),
+            bytes: bytes.parse().ok()?,
+            sha256: leaked(sha256),
+        })
+    })
+}
+
+/// Puts the entry that fetches the model in the menu, and says why: nothing is fetched yet.
+fn offer(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    let wanted = published();
+    let size = model::size(wanted.bytes);
+    tell(app, &words::model_needed(shell.language(), &size, wanted.host));
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let shell = app.state::<Shell>();
+        let _ = shell.download.set_text(words::download(shell.language(), &size, wanted.host));
+        let _ = shell.download.set_enabled(true);
+        if !shell
+            .menu
+            .items()
+            .unwrap_or_default()
+            .iter()
+            .any(|item| item.id() == shell.download.id())
+        {
+            let _ = shell.menu.insert(&shell.download, 3);
+        }
+    });
+}
+
+/// What Apple's SpeechAnalyzer offers on this Mac, in the system's language (D42, D64): asked of
+/// `kitokey-speech` beside the shell, away from the window; none where it is not.
+#[tauri::command]
+async fn speech_shown(shell: State<'_, Shell>) -> Result<Option<speech::Status>, ()> {
+    let language = shell.system.code();
+    let program = program("kitokey-speech", "KITOKEY_SPEECH");
+    Ok(tauri::async_runtime::spawn_blocking(move || speech::status(&program, language))
+        .await
+        .ok()
+        .flatten())
+}
+
+/// Apple's model of the system's language (D64), fetched by macOS from Apple on the user's click (D42);
+/// then SpeechAnalyzer is who hears. A refusal is logged with what the program said, and said
+/// on the page in a sentence of its own.
+#[tauri::command]
+async fn speech_installed(shell: State<'_, Shell>) -> Result<(), ()> {
+    // One download at a time: a second click while macOS fetches it asks nothing more.
+    static INSTALLING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if INSTALLING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return Err(());
+    }
+    let language = shell.system.code();
+    let program = program("kitokey-speech", "KITOKEY_SPEECH");
+    tracing::info!(language, "shell.speech_install");
+    let installed = tauri::async_runtime::spawn_blocking(move || speech::install(&program, language)).await;
+    INSTALLING.store(false, std::sync::atomic::Ordering::SeqCst);
+    match installed.map_err(|error| error.to_string()).and_then(|done| done) {
+        Ok(()) => {
+            tracing::info!(language, "shell.speech_installed");
+            Ok(())
+        }
+        Err(detail) => {
+            tracing::warn!(detail = %detail, "shell.speech_install_failed");
+            Err(())
+        }
+    }
+}
+
+/// The default Whisper model is the one heard with, and not on this computer: offered (D36). Not
+/// when Apple's SpeechAnalyzer hears (D42), nor for a model the user named — theirs.
+fn default_model_missing(settings: &Settings) -> bool {
+    settings.engine == Engine::Whisper && settings.model == Settings::default().model && !settings.model.is_file()
+}
+
+/// The same for one meeting: a confidential one is heard by Whisper where a service is named (D60).
+fn default_model_missing_for(settings: &Settings, folder: &Path) -> bool {
+    let whisper = match settings.engine {
+        Engine::Whisper => true,
+        Engine::Service => confidential::marked(folder),
+        Engine::SpeechAnalyzer => false,
+    };
+    whisper && settings.model == Settings::default().model && !settings.model.is_file()
+}
+
+/// The window's offer of the default model, where it says it is missing (D36): the tray's own
+/// fetch. One the user named is theirs: nothing is fetched for it.
+#[tauri::command]
+fn model_fetch(app: AppHandle) {
+    let model = app.state::<Shell>().settings().model;
+    if model == Settings::default().model && !model.is_file() {
+        fetch(&app, 0);
+    }
+}
+
+/// The minutes' recommended model, fetched by Ollama on the user's click, unless a fetch is on (D37).
+#[tauri::command]
+fn ollama_pull_offered(app: AppHandle) {
+    pull(&app);
+}
+
+/// Ollama's own pull of the minutes' recommended model, one fetch at a time with the Whisper ones:
+/// how far said as theirs is, the tray's entry waiting meanwhile (D37).
+fn pull(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    if std::mem::replace(&mut *shell.fetching.lock().unwrap(), true) {
+        return;
+    }
+    *shell.fetched.lock().unwrap() = Some((providers::RECOMMENDED.to_owned(), 0, 0));
+    let waiting = |app: &AppHandle, enabled: bool| {
+        let app = app.clone();
+        let _ = app.clone().run_on_main_thread(move || {
+            let _ = app.state::<Shell>().download.set_enabled(enabled);
+        });
+    };
+    waiting(app, false);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let outcome = providers::ollama_pull(&ollama(), providers::RECOMMENDED, &mut |held, bytes| {
+            if let Some((_, far, all)) = app.state::<Shell>().fetched.lock().unwrap().as_mut() {
+                (*far, *all) = (held, bytes);
+            }
+        });
+        let shell = app.state::<Shell>();
+        *shell.fetched.lock().unwrap() = None;
+        *shell.fetching.lock().unwrap() = false;
+        if let Err(why) = &outcome {
+            tracing::error!(detail = %why, "shell.model_pull_failed");
+        }
+        tell(&app, &words::pulled(&outcome, providers::RECOMMENDED, shell.language()));
+        waiting(&app, true);
+        // The confidential minutes that waited for a model of Ollama's: made now (D60).
+        if outcome.is_ok() {
+            let waited: Vec<PathBuf> = shell.ollama_waiting.lock().unwrap().keys().cloned().collect();
+            for folder in waited {
+                write_minutes_from(&app, folder, None, None, true, Cancel::default());
+            }
+        }
+    });
+}
+
+/// One of the models Settings offer, fetched on the user's click, unless it is there (D37).
+#[tauri::command]
+fn model_offered_fetch(app: AppHandle, file: String) {
+    let Some(index) = offered().iter().position(|listed| model::file(&listed.published) == file) else {
+        return;
+    };
+    if !models_folder().join(&file).is_file() {
+        fetch(&app, index);
+    }
+}
+
+/// Fetches the default model, on the user's click — their agreement. Ready, the entry leaves
+/// the menu and the waiting transcript is made; cut or refused, it is said, and the entry
+/// takes it up again.
+fn fetch(app: &AppHandle, index: usize) {
+    let shell = app.state::<Shell>();
+    if std::mem::replace(&mut *shell.fetching.lock().unwrap(), true) {
+        return;
+    }
+    // The list read once: its address and the file it is kept as are one model's, whatever is
+    // read again meanwhile.
+    let listed = offered().get(index).map_or(model::DEFAULT, |listed| listed.published);
+    let wanted = published_named(index).unwrap_or(listed);
+    let file = model::file(&listed);
+    let to = models_folder().join(file);
+    // The tray's entry is the default model's: it says how far that one is, and waits while
+    // another comes — one fetch at a time.
+    let label = move |app: &AppHandle, text: Option<String>, enabled: bool| {
+        let app = app.clone();
+        let _ = app.clone().run_on_main_thread(move || {
+            let shell = app.state::<Shell>();
+            if let Some(text) = text {
+                let _ = shell.download.set_text(text);
+            }
+            let _ = shell.download.set_enabled(enabled);
+        });
+    };
+    // In the language spoken at each step: chosen meanwhile, it is said in it (D64).
+    let said = move |app: &AppHandle, held: u64| (index == 0).then(|| words::fetching(app.state::<Shell>().language(), held, wanted.bytes));
+    *shell.fetched.lock().unwrap() = Some((file.to_owned(), 0, wanted.bytes));
+    label(app, said(app, 0), false);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let mut shown = String::new();
+        let outcome = model::fetch(&wanted, wanted.address, &to, &mut |held| {
+            if let Some((_, far, _)) = app.state::<Shell>().fetched.lock().unwrap().as_mut() {
+                *far = held;
+            }
+            let text = words::fetching(app.state::<Shell>().language(), held, wanted.bytes);
+            if text != shown {
+                shown.clone_from(&text);
+                label(&app, said(&app, held), false);
+            }
+        });
+        let shell = app.state::<Shell>();
+        *shell.fetched.lock().unwrap() = None;
+        *shell.fetching.lock().unwrap() = false;
+        if let Err(why) = &outcome {
+            tracing::error!(detail = %why, "shell.model_fetch_failed");
+        }
+        // The one the transcripts are made with: those in line follow it. Another is chosen
+        // in Settings, the choice the user's (D37).
+        let chosen = shell.settings().model == to;
+        tell(&app, &words::fetched(&outcome, chosen, shell.language()));
+        if outcome.is_err() {
+            let text = words::download(shell.language(), &model::size(published().bytes), published().host);
+            return label(&app, Some(text), true);
+        }
+        if index != 0 {
+            return label(&app, None, true);
+        }
+        let handle = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let shell = handle.state::<Shell>();
+            let _ = shell.menu.remove(&shell.download);
+        });
+        // The meetings in line, none other: fetched from Settings, none may wait (D36).
+        if chosen {
+            transcribe_next(&app);
+        }
+    });
+}
+
+/// The tray's menu in the language spoken now (D64): each entry's words, as it stands.
+fn relabel(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    let shown = match (shell.recording.lock().unwrap().is_some(), *shell.stopping.lock().unwrap()) {
+        (false, _) => Shown::Idle,
+        (true, false) => Shown::Recording,
+        (true, true) => Shown::Stopping,
+    };
+    let hearing = shell.transcription.lock().unwrap().is_some();
+    let writing = shell.writing_minutes.lock().unwrap().is_some();
+    show(app, shown);
+    transcribing(app, hearing);
+    minuting(app, writing);
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let shell = app.state::<Shell>();
+        let labels = words::menu(shell.language());
+        let _ = shell.open.set_text(labels.open);
+        let _ = shell.show_bar.set_text(labels.show_bar);
+        let _ = shell.quit.set_text(labels.quit);
+        // The model's entry, while it is offered: how far it is, or what it fetches.
+        let wanted = published();
+        let default = model::file(&model::DEFAULT);
+        let text = match shell.fetched.lock().unwrap().as_ref() {
+            Some((file, held, _)) if file == default => words::fetching(shell.language(), *held, wanted.bytes),
+            _ => words::download(shell.language(), &model::size(wanted.bytes), wanted.host),
+        };
+        let _ = shell.download.set_text(text);
+    });
+}
+
+/// The menu's transcript entry: its words, and whether it answers.
+fn transcribing(app: &AppHandle, now: bool) {
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        let shell = app.state::<Shell>();
+        let labels = words::menu(shell.language());
+        let _ = shell.transcribe.set_text(if now { labels.transcribing } else { labels.transcribe });
+        let _ = shell.transcribe.set_enabled(!now && shell.recording.lock().unwrap().is_none());
+    });
+}
+
+/// Shows a notification whose click opens its meeting in the full window, on its page (D44).
+/// Under a Linux desktop the notification server says when it was clicked; elsewhere it is a
+/// notification alone, and its words promise no click.
+#[cfg(target_os = "linux")]
+fn tell_opening(app: &AppHandle, notice: &Notice, folder: PathBuf) {
+    let (title, body) = (notice.title.clone(), notice.body.clone());
+    let app = app.clone();
+    std::thread::spawn(move || {
+        let shown = notify_rust::Notification::new()
+            .appname("Kitokey")
+            .summary(&title)
+            .body(&body)
+            .action("default", &title)
+            .show();
+        if let Ok(shown) = shown {
+            shown.wait_for_action(|action| {
+                if action == "default" {
+                    let page = format!(
+                        "#/meeting/{}",
+                        address_part(&folder.file_name().unwrap_or_default().to_string_lossy())
+                    );
+                    let opened = app.clone();
+                    let _ = app.run_on_main_thread(move || open_window_at(&opened, &page));
+                }
+            });
+        }
+    });
+}
+
+#[cfg(not(target_os = "linux"))]
+fn tell_opening(app: &AppHandle, notice: &Notice, _: PathBuf) {
+    tell(app, notice);
+}
+
+/// A meeting's name as the window's address holds it, as `encodeURIComponent` writes it.
+#[cfg(target_os = "linux")]
+fn address_part(name: &str) -> String {
+    name.bytes()
+        .map(|byte| match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'!' | b'~' | b'*' | b'\'' | b'(' | b')' => {
+                (byte as char).to_string()
+            }
+            _ => format!("%{byte:02X}"),
+        })
+        .collect()
+}
+
+/// Seconds since 1970, by the system's clock.
+fn seconds_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() as i64)
+}
+
+/// Whether a window of Kitokey is seen: shown and not minimized, as the toolkit says (D44).
+fn window_seen(app: &AppHandle) -> bool {
+    ["main", "small"]
+        .iter()
+        .filter_map(|label| app.get_webview_window(label))
+        .any(|window| window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false))
+}
+
+/// Whether a window of Kitokey has the focus, as the toolkit says: the user is in Kitokey (D92).
+fn window_focused(app: &AppHandle) -> bool {
+    ["main", "small"]
+        .iter()
+        .filter_map(|label| app.get_webview_window(label))
+        .any(|window| window.is_focused().unwrap_or(false))
+}
+
+/// A notice about a meeting, its meeting named first: its title, else when it was recorded (D92).
+fn of_meeting(app: &AppHandle, notice: &Notice, folder: &Path) -> Notice {
+    let language = app.state::<Shell>().language();
+    words::for_meeting(notice.clone(), &meeting_said(folder, language), language)
+}
+
+/// A meeting as a sentence names it: its title, else when it was recorded (D92).
+fn meeting_said(folder: &Path, language: Language) -> String {
+    let name = folder.file_name().unwrap_or_default().to_string_lossy();
+    let title = named::read(folder).or_else(|| minutes::title(folder));
+    let started = chrono::NaiveDateTime::parse_from_str(&name, "%Y-%m-%d_%H-%M").ok();
+    words::meeting(title.as_deref(), started, chrono::Local::now().date_naive(), language)
+}
+
+/// The notification that ends a meeting's making — its last step written or failed, or the next
+/// one unable to start (D25) —: told naming the meeting, and only when no window of Kitokey has the
+/// focus, the window saying it there (D92). `opening`: its click opens the meeting (D44).
+/// The focus is asked on the main thread, where the toolkit answers at once; asked from here, its
+/// getter would wait for the main thread, which may be waiting for a lock this caller holds — the
+/// window frozen, nothing told (#824). Nothing here waits for the main thread: the notification
+/// is sent from a thread of its own once the focus is known.
+fn tell_made(app: &AppHandle, notice: &Notice, folder: &Path, opening: bool) {
+    // The bar at rest says it ended there too, whoever has the focus (D92).
+    if let Some((last, ended)) = app.state::<Shell>().last.lock().unwrap().as_mut()
+        && last.as_path() == folder
+    {
+        *ended = true;
+    }
+    let notice = of_meeting(app, notice, folder);
+    let (app, folder) = (app.clone(), folder.to_path_buf());
+    let _ = app.clone().run_on_main_thread(move || {
+        if window_focused(&app) {
+            tracing::info!("shell.made_not_told");
+            return;
+        }
+        std::thread::spawn(move || {
+            if opening {
+                tell_opening(&app, &notice, folder);
+            } else {
+                tell(&app, &notice);
+            }
+        });
+    });
+}
+
+/// Quits Kitokey. A recording in progress is stopped first, as the user would stop it: its
+/// files are whole before Kitokey is gone. Asked a second time, Kitokey leaves at once: a
+/// recorder that does not end is not a reason to keep the user.
+fn leave(app: &AppHandle) {
+    let shell = app.state::<Shell>();
+    let mut recording = shell.recording.lock().unwrap();
+    let asked_before = std::mem::replace(&mut *shell.leaving.lock().unwrap(), true);
+    // A transcript being made is ended: run again, it goes on from where it was.
+    if let Some(transcription) = shell.transcription.lock().unwrap().as_ref() {
+        transcription.end();
+    }
+    // A transcript being made again is ended: the earlier one is put back now, before Kitokey goes.
+    if let Some((current, previous)) = shell.redoing.lock().unwrap().take() {
+        let _ = std::fs::rename(&previous, &current);
+    }
+    // Minutes being written are ended: nothing half-written is left, and they can be asked again.
+    if let Some(making) = shell.minuting.lock().unwrap().as_ref() {
+        making.end();
+    }
+    match recording.as_mut() {
+        Some(running) if !asked_before => {
+            if !std::mem::replace(&mut *shell.stopping.lock().unwrap(), true) {
+                let _ = running.stop();
+            }
+            show(app, Shown::Stopping);
+        }
+        _ => app.exit(0),
+    }
+}
+
+/// Binds the global shortcut that starts and stops a recording. Under a Linux desktop it is
+/// the desktop's to grant, through its portal, to an installed application; elsewhere the
+/// system takes it directly. Refused, it is said once: the tray's menu still does the same.
+fn shortcut(app: &AppHandle) {
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(why) = bound(&handle).await {
+            tracing::warn!(detail = %why, "shell.shortcut_refused");
+            // Said from the main thread: a notification waits on the desktop, which a task of
+            // this runtime may not do.
+            let app = handle.clone();
+            let _ = handle.run_on_main_thread(move || {
+                let language = app.state::<Shell>().language();
+                tell(&app, &words::trouble(&Trouble::Shortcut(why), language));
+            });
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+async fn bound(app: &AppHandle) -> Result<(), String> {
+    use ashpd::desktop::global_shortcuts::{GlobalShortcuts, NewShortcut};
+    use futures_util::StreamExt;
+
+    let said = |error: ashpd::Error| error.to_string();
+    // The desktop answers an application it knows: one whose desktop entry is installed
+    // under this very name (`linux/com.napkinstack.Kitokey.desktop`).
+    let id: ashpd::AppID = "com.napkinstack.Kitokey"
+        .parse()
+        .map_err(|_| "the application's name was refused".to_string())?;
+    ashpd::register_host_app(id).await.map_err(said)?;
+    let shortcuts = GlobalShortcuts::new().await.map_err(said)?;
+    let session = shortcuts.create_session(Default::default()).await.map_err(said)?;
+    let labels = words::menu(app.state::<Shell>().language());
+    let wanted = NewShortcut::new("record", format!("{} / {}", labels.start, labels.stop)).preferred_trigger("LOGO+ALT+m");
+    let bound = shortcuts
+        .bind_shortcuts(&session, &[wanted], None, Default::default())
+        .await
+        .map_err(said)?;
+    let granted = bound.response().map_err(said)?;
+    let Some(first) = granted.shortcuts().first() else {
+        return Err("no key was bound".into());
+    };
+    *app.state::<Shell>().shortcut.lock().unwrap() = desktop::keys(first.trigger_description());
+    // A press records or stops; a change the user makes in the desktop's settings is what the
+    // window shows next.
+    enum Heard {
+        Pressed,
+        Changed(Option<String>),
+    }
+    let pressed = shortcuts.receive_activated().await.map_err(said)?.map(|_| Heard::Pressed);
+    let changed = shortcuts.receive_shortcuts_changed().await.map_err(said)?.map(|changed| {
+        Heard::Changed(
+            changed
+                .shortcuts()
+                .first()
+                .and_then(|shortcut| desktop::keys(shortcut.trigger_description())),
+        )
+    });
+    let mut heard = std::pin::pin!(futures_util::stream::select(pressed, changed));
+    while let Some(event) = heard.next().await {
+        match event {
+            Heard::Pressed => {
+                let handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    toggle_recording(&handle);
+                });
+            }
+            Heard::Changed(keys) => *app.state::<Shell>().shortcut.lock().unwrap() = keys,
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
+async fn bound(app: &AppHandle) -> Result<(), String> {
+    use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+    let keys = if cfg!(target_os = "macos") {
+        Modifiers::ALT | Modifiers::SUPER
+    } else {
+        Modifiers::CONTROL | Modifiers::ALT
+    };
+    let handler = tauri_plugin_global_shortcut::Builder::new()
+        .with_handler(|app, _, event| {
+            if event.state() == ShortcutState::Pressed {
+                toggle_recording(app);
+            }
+        })
+        .build();
+    app.plugin(handler).map_err(|error| error.to_string())?;
+    app.global_shortcut()
+        .register(Shortcut::new(Some(keys), Code::KeyM))
+        .map_err(|error| error.to_string())?;
+    *app.state::<Shell>().shortcut.lock().unwrap() = Some(if cfg!(target_os = "macos") { "⌥⌘M" } else { "Ctrl+Alt+M" }.to_string());
+    Ok(())
+}

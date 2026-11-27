@@ -1,0 +1,64 @@
+# summary — local instructions
+
+> Only what is **specific to this module**.
+> Never duplicate a kernel rule (`/AGENTS.md`): that is wasted context and a source of
+> divergence.
+>
+> Indicative budget: 100 lines.
+
+## Responsibility
+
+Writes the minutes of a transcript.
+
+## What this module does not do
+
+- It makes no transcript and reads no audio: `transcription`.
+- It shows nothing and asks nothing of the user — the consent before a first sending online
+  is the `shell`'s, which reads the `sending` event.
+- It keeps no key: `KITOKEY_PROVIDER_KEY` is read from the environment and written nowhere.
+
+## Internal conventions nobody could guess
+
+- `src/lib.rs` knows no network; `src/provider.rs` holds the one connection; `src/main.rs` the
+  program. `tests/program.rs` plays a provider on this machine: no test calls a real one.
+- The request is written in English and asks for the meeting's language.
+- The answer may open on one title of first level: the meeting's name, written as `title` when `minutes/v3` lets it, never judged as a section.
+- An answer is minutes when it holds exactly three sections of second level (`minutes/v4`), or as many as its structure has (`minutes/v5`, `--structure`), none empty, once the times it may not keep are gone. A structure's ids are the contract's (`tests/structure.rs` reads its page).
+- A cost is read from `openrouter.ai` alone, the one host whose documentation names a currency. Its test puts that name on a stand-in in a namespace of its own (`tests/program.rs`), never the real host.
+
+## Business invariants
+
+- `minutes.md` appears under its name only once it is whole; a failure leaves what was there.
+- One host is contacted, the one configured: a redirection is refused, never followed, and no
+  proxy the environment names is used. The host named is the host the request goes to.
+- The minutes name the host that answered, or `local` — never a key, a path or a full address.
+- A key the provider sends back in its answer is never written; nothing leaves before `sending`.
+- What the meeting did not settle is asked to be said, never guessed.
+- A log line holds steps, counts, durations, hosts and failures — never a text of the meeting,
+  its context, a key, nor a session's path beyond its folder's name (`tests/program.rs`).
+
+## Known traps
+
+- A model that opens with a sentence before the sections is refused, by design. One title of
+  first level above them, the habit of local models, is left out of the file instead (#353).
+- An answer that is not minutes is asked for once more, never a third time and never for
+  another failure: a local model's form varies from one answer to the next (#366). What is judged
+  stays the same.
+- The transcript's speakers, `me` and `others`, are asked never to reach the minutes (#354).
+- Reading a format by hand: an answer was once read line by line, an address split by hand —
+  each cost several rounds of verification. An answer goes through a CommonMark reader, an
+  address through the HTTP client's own.
+- The key is looked for in an answer as it is written: sent back in another case or encoded,
+  it is not caught. A key that is a common word turns honest minutes away.
+
+- Ollama's `/v1` ignores `options.num_ctx` and cuts a long request from its head, silently:
+  the native route is why the rules still reach the model.
+
+## Areas not to change without approval
+
+- The format of `minutes.md`: it is `contracts/minutes/v3`.
+- The rules of the request in `request()`: they are D5's third criterion.
+
+## Non-standard commands
+
+None.

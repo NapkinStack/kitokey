@@ -1,0 +1,63 @@
+name: Modules
+
+# Runs the standard verbs on the changed modules only: nstack reads their commands
+# from the module's MANIFEST.yaml, assuming no stack. A module is a folder holding a
+# MANIFEST.yaml, contracts/ included: nstack lists them, the workflow defines nothing.
+# The level of validation is proportionate to the criticality declared in the MANIFEST
+# (.nstack/handbook/07-governance.md §6).
+#
+# `Module checks` is the required check, and the only job: every changed module runs in it, one
+# after another, through .nstack/check-modules.sh. Each job is billed at least a minute: one job
+# costs what the modules' verbs take, where a job per module, a listing and a summary cost three.
+#
+# A change to a contract version also runs the checks of the module that provides it and of
+# every module that declares it in consumes: the contract tests of both sides, which is what
+# .nstack/handbook/03-contracts.md section 5 promises.
+#
+# Module names come from the paths the pull request changed: they are never inserted
+# into a script, only read from an environment variable.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Module checks
+    runs-on: ${{ vars.NSTACK_RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      # A job starts clean: what an earlier job left in the checkout — a build that failed
+      # half-way on a self-hosted runner — is removed before this one runs.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          clean: true
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+
+      - name: NapkinStack, the project version
+        run: bash .nstack/install-engine.sh
+
+      # bootstrap, check, test, compat even after a failure, e2e, and clean on a self-hosted
+      # runner — module by module (.nstack/handbook/05-workflow.md §7, 09-platform.md §2).
+      - name: Every changed module
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: bash .nstack/check-modules.sh
+
+      # The evidence the test sheet links to (.nstack/handbook/05-workflow.md §7), kept even on
+      # failure: one archive, a folder per module.
+      - name: Evidence of the scenarios
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: evidence
+          path: "**/.evidence/"
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 30

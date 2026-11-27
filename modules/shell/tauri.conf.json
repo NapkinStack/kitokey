@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Kitokey",
+  "version": "1.0.0",
+  "identifier": "com.napkinstack.Kitokey",
+  "build": {
+    "frontendDist": "./ui"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": "default-src 'self'; media-src http://127.0.0.1:*"
+    },
+    "withGlobalTauri": true
+  },
+  "bundle": {
+    "active": false,
+    "icon": [
+      "icons/icon.png"
+    ]
+  }
+}

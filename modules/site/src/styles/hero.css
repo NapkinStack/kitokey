@@ -1,0 +1,157 @@
+/* Site v7 (validated by the decider on 2026-11-26), the header and the hero, ported from the mock-up
+   (kitokey-team/site-proto/index-v7-validated.html) to the site's tokens and its dark theme, html[data-site]. The
+   other sections keep site.css until each is rebuilt. Motion: transform only, never opacity; none under reduced
+   motion. */
+
+/* ---- The halo behind the page, and its grain ---- */
+.halo { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.halo i { position: absolute; display: block; width: 62vmax; height: 50vmax; border-radius: 50%; filter: blur(80px); opacity: .3; }
+.halo .h1 { background: radial-gradient(closest-side, #9DB8FF, transparent); left: -16vmax; top: -18vmax; }
+.halo .h2 { background: radial-gradient(closest-side, #9FDCD3, transparent); right: -18vmax; top: -8vmax; }
+.halo .h3 { background: radial-gradient(closest-side, #B9CCFF, transparent); left: 22vw; bottom: -30vmax; opacity: .22; }
+.halo::after { content: ""; position: absolute; inset: 0; background: url("/grain.png") repeat; opacity: .05; mix-blend-mode: multiply; }
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .halo i { animation: linear both; animation-timeline: scroll(root); }
+    .halo .h1 { animation-name: drift1; } .halo .h2 { animation-name: drift2; } .halo .h3 { animation-name: drift3; }
+    @keyframes drift1 { to { transform: translate(28vw, 70vh); } }
+    @keyframes drift2 { to { transform: translate(-30vw, 55vh); } }
+    @keyframes drift3 { to { transform: translate(18vw, -60vh); } }
+  }
+}
+html[data-site="dark"] .halo i { filter: blur(90px) brightness(.45) saturate(1.3); opacity: .45; }
+html[data-site="dark"] .halo::after { mix-blend-mode: screen; opacity: .04; }
+
+/* ---- The header ---- */
+.top { position: sticky; top: 0; z-index: 30; background: color-mix(in srgb, var(--bg-canvas) 88%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-bottom: 1px solid transparent; }
+.top.scrolled { border-bottom-color: var(--border-subtle); }
+.top .wrap { display: flex; align-items: center; gap: var(--sp-6); height: 64px; }
+.top .brand { display: inline-flex; align-items: center; gap: var(--sp-2); font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--text-primary); text-decoration: none; letter-spacing: -.01em; min-height: 44px; }
+.top .brand img { width: 26px; height: 26px; }
+.top .nav { display: flex; gap: var(--sp-5); margin-left: auto; }
+.top .nav a { color: var(--text-secondary); text-decoration: none; font-weight: 600; font-size: 15px; padding: 12px 2px; }
+.top .nav a:hover { color: var(--text-primary); }
+.top .lang { color: var(--text-secondary); text-decoration: none; font-weight: 700; font-size: 14px; letter-spacing: .02em; height: 44px; min-width: 44px; display: grid; place-items: center; border-radius: var(--r-sm); }
+.top .lang:hover { color: var(--text-primary); background: var(--bg-hover); }
+.top .theme-toggle { width: 44px; height: 44px; border-radius: var(--r-sm); border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-secondary); display: inline-grid; place-items: center; cursor: pointer; }
+.top .theme-toggle:hover { background: var(--bg-hover); }
+.top .theme-toggle[hidden] { display: none; }
+.top .theme-toggle .ico { width: 20px; height: 20px; }
+
+/* ---- The hero ---- */
+.hero { position: relative; padding: 40px 0 112px; }
+.hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.hero .pitch { position: relative; }
+.hero h1 { font-family: var(--display); font-weight: 780; font-size: clamp(38px, 4vw, 54px); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; }
+.hero h1 .l { display: block; }
+.hero h1 .soft { color: var(--accent); }
+.hero .lead { font-size: 19px; line-height: 1.55; color: var(--text-secondary); margin-top: var(--sp-5); max-width: 540px; text-wrap: pretty; }
+.hero .ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.buy { margin-top: var(--sp-8); }
+.buy-line { font-weight: 600; color: var(--text-primary); font-size: 15px; margin: 0 0 var(--sp-3); }
+.cta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3) var(--sp-5); }
+/* Until the Store's listing exists (PDR-0009): these words where its badge will be. */
+.store-soon { display: inline-flex; align-items: center; min-height: 48px; padding: 0 var(--sp-5); border-radius: var(--r-md); background: var(--accent); color: var(--on-accent); font-weight: 600; font-size: 16px; text-decoration: none; }
+.store-soon:hover { background: var(--accent-hover); color: var(--on-accent); }
+.quiet { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-primary); text-decoration: none; padding: 12px 4px; border-radius: var(--r-sm); }
+.quiet:hover { color: var(--accent); }
+.tux { width: 22px; height: auto; flex: none; margin-right: 2px; }
+.cta-note { margin: var(--sp-3) 0 0; font-size: 14px; color: var(--text-tertiary); }
+.assure { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: var(--sp-6) 0 0; padding-top: var(--sp-5); border-top: 1px solid var(--border-subtle); font-size: 15px; color: var(--text-secondary); max-width: 540px; }
+.assure span { display: inline-flex; align-items: center; gap: 6px; }
+.assure .ico { color: var(--accent); }
+/* The two voices' spectrogram, decorative, behind the pitch and into the minutes card (public/hero.js). */
+.voices { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .hero h1 .l { animation: glide .8s var(--ease-out) both; }
+  .hero h1 .l + .l { animation-delay: .1s; }
+}
+
+/* ---- The scene: a call app (another app, so its own fixed dark colours), Kitokey's compact bar, the minutes ---- */
+.scene { position: relative; padding: 60px 0 0; min-height: 540px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: var(--fs-small); background: var(--bg-sunken); color: var(--text-secondary); white-space: nowrap; }
+.chip-private { background: var(--private-bg); color: var(--private); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.callwin { position: relative; width: 92%; border-radius: 14px; overflow: hidden; box-shadow: var(--e3); background: #1C1F26; }
+html[data-site="dark"] .callwin { outline: 1px solid rgb(255 255 255/.1); }
+.callwin .cb { height: 30px; display: flex; align-items: center; justify-content: center; color: #C9CFDA; font-size: 12px; background: #2A2F3B; }
+.callwin .cg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+.callwin .ct { aspect-ratio: 16/10; border-radius: 9px; background: linear-gradient(160deg, #3A4152, #232833); position: relative; overflow: hidden; }
+.callwin .ct img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 30%; }
+.callwin .ct.sp::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2.5px rgb(255 255 255/.85); z-index: 1; }
+.callwin .ct span { z-index: 2; position: absolute; left: 8px; bottom: 7px; font-size: 12px; color: #DDE2EC; background: rgb(0 0 0/.45); padding: 1px 7px; border-radius: 5px; font-weight: 600; }
+/* The compact bar, as the app draws it while recording: the live dot, the time, the two voices' meters, the lock, a calm stop. */
+.cbar { display: inline-flex; align-items: center; gap: var(--sp-2); height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4); background: var(--bg-surface); border-radius: var(--r-md); box-shadow: var(--e2); white-space: nowrap; }
+.cbar .rec { width: 10px; height: 10px; border-radius: 50%; background: var(--record); flex: none; }
+.cbar .tm { font-family: var(--display); font-weight: 700; color: var(--text-primary); min-width: 66px; font-size: 15px; letter-spacing: -.01em; }
+.mtr { display: inline-flex; align-items: center; gap: 5px; color: var(--text-secondary); }
+.mtr .tr { width: 84px; height: 14px; display: inline-flex; align-items: center; gap: 2px; overflow: hidden; }
+.mtr .tr i { width: 2px; border-radius: 2px; flex: none; }
+.cbar .lockt, .cbar .stop { width: 32px; height: 32px; border-radius: var(--r-sm); display: grid; place-items: center; color: var(--text-secondary); flex: none; }
+.cbar .lockt.on { color: var(--private); background: var(--private-bg); }
+.cbar .lockt .ico { width: 20px; height: 20px; }
+.cbar .stop { background: var(--bg-sunken); outline: 1px solid var(--border-subtle); }
+.cbar .stop i { width: 10px; height: 10px; border-radius: 2px; background: var(--text-primary); }
+.cbar .sep { width: 1px; height: 20px; background: var(--border-subtle); margin: 0 2px; }
+.scene .cbar { position: absolute; top: 0; left: 46%; transform: translateX(-50%); z-index: 2; }
+@media (prefers-reduced-motion: no-preference) {
+  .cbar .rec { animation: breathe .8s var(--ease-spring) 4 alternate; }
+  .scene .mcard { animation: rise .7s var(--ease-out) .3s both; }
+}
+@keyframes breathe { from { transform: scale(1); } to { transform: scale(1.18); } }
+@keyframes rise { from { transform: translateY(18px); } }
+/* The minutes card: the meeting page's look, shortened. */
+.mcard { background: var(--bg-surface); border-radius: var(--r-lg); box-shadow: var(--e3); padding: var(--sp-5) var(--sp-5) var(--sp-4); }
+.scene .mcard { position: absolute; right: 0; top: 210px; width: 360px; z-index: 3; outline: 1px solid var(--border-subtle); }
+.mc-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); color: var(--text-tertiary); font-size: var(--fs-small); }
+.mc-title { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.2; letter-spacing: -.01em; margin: var(--sp-2) 0 2px; }
+.mc-meta { font-size: var(--fs-small); color: var(--text-tertiary); }
+.prov { font-size: var(--fs-caption); color: var(--text-secondary); margin: var(--sp-3) 0 0; padding: 6px 10px; background: var(--bg-sunken); border-radius: var(--r-sm); }
+.mcard .mh { font-size: 13px; font-weight: 700; color: var(--text-primary); margin: var(--sp-4) 0 var(--sp-1); }
+.mcard p { font-size: 14px; line-height: 1.5; color: var(--text-secondary); margin: 0; }
+.act-row { display: grid; grid-template-columns: 58px 1fr auto; gap: var(--sp-2); align-items: center; padding: 7px 0; border-top: 1px solid var(--border-subtle); font-size: 14px; line-height: 1.3; }
+.mcard .mh + .act-row { border-top: 0; }
+.act-row .who { font-weight: 600; color: var(--accent); }
+.act-row .chip { height: 22px; font-size: 12px; padding: 0 8px; gap: 4px; }
+.act-row .chip .ico, .chip .ico { width: 13px; height: 13px; }
+
+/* ---- A group rising into place as it enters (public/site.js adds .in); still under reduced motion and on #still ---- */
+html.js-reveal .rise > * { opacity: 0; transform: translateY(12px); transition: opacity .4s var(--ease-out), transform .4s var(--ease-out); }
+html.js-reveal .rise > :nth-child(2) { transition-delay: 60ms; }
+html.js-reveal .rise > :nth-child(n+3) { transition-delay: 120ms; }
+html.js-reveal .rise.in > * { opacity: 1; transform: none; }
+
+/* ---- The footer ---- */
+.foot { border-top: 1px solid var(--border-subtle); padding: 40px 0 56px; }
+.foot .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; }
+.foot .brand { display: inline-flex; align-items: center; gap: var(--sp-2); font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--text-primary); text-decoration: none; min-height: 44px; }
+.foot nav { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-left: auto; }
+.foot nav a { color: var(--text-secondary); text-decoration: none; font-size: 15px; padding: 12px 0; }
+.foot nav a:hover { color: var(--text-primary); text-decoration: underline; }
+.foot .pub { color: var(--text-tertiary); font-size: 14px; }
+.foot .credit { font-size: 12px; color: var(--text-tertiary); flex-basis: 100%; }
+
+/* ---- Narrow screens ---- */
+@media (max-width: 1040px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: 48px; }
+  .scene { max-width: 640px; }
+  .top .nav { display: none; }
+  .top .lang { margin-left: auto; }
+}
+@media (max-width: 640px) {
+  .hero { padding: 24px 0 64px; }
+  .hero h1 { font-size: 34px; line-height: 1.08; }
+  .hero .lead { font-size: 17px; }
+  .store-soon { width: 100%; justify-content: center; text-align: center; height: auto; padding: 12px 16px; }
+  .cta .quiet { margin: 0 auto; }
+  /* The scene, re-composed: the bar on top, the call, the minutes overlapping below. */
+  .scene { min-height: 0; padding-top: 58px; }
+  .scene .cbar { left: 50%; height: 44px; gap: 6px; padding: 0 6px 0 12px; }
+  .scene .cbar .sep { display: none; }
+  .scene .cbar .mtr .tr { width: 44px; }
+  .scene .cbar .tm { min-width: 58px; font-size: 14px; }
+  .callwin { width: 100%; }
+  .callwin .ct span { font-size: 11px; }
+  .scene .mcard { position: relative; top: auto; right: auto; width: auto; margin: -56px 0 0 18px; padding: 16px; }
+}
+@media (max-width: 380px) { .scene .cbar .mtr .tr { width: 30px; } }

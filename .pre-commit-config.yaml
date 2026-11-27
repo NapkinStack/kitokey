@@ -1,0 +1,143 @@
+# Repository hooks: immediate feedback before every commit.
+# Bypassable (--no-verify), therefore never a guarantee: CI runs the same
+# configuration (the "Hooks and secrets" job). Install with: pre-commit install
+#
+# Updates: Dependabot on GitHub (.github/dependabot.yml), by hand elsewhere; off GitHub the
+# hooks on GitHub's files find none: skipped, or passed. Dependabot does not know the version of
+# gitleaks-history: align it with the one of the gitleaks hook.
+# pre-commit autoupdate only sees tags on the default branch: do not use it.
+
+minimum_pre_commit_version: "3.2.0"  # the stage names below
+default_install_hook_types: [pre-commit, commit-msg, pre-push]  # the message is read too
+default_stages: [pre-commit]  # a hook runs at commit only, unless it names its stages
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: detect-private-key
+      - id: check-added-large-files
+        stages: [pre-commit]  # its own default adds the push
+        # Two files, each by its path; every other file keeps the limit.
+        # - axe-core's 637 KB, a test asset vendored for the shell's e2e (D106), pinned by its SHA-256 and
+        #   checked before it is injected, never shipped.
+        # - The shell's THIRD-PARTY-NOTICES.html, about 800 KB (D102): text made by cargo-about from Cargo.lock,
+        #   480 crates each under its licence's text, held true by modules/shell/tests/notices.rs. Apache-2.0's
+        #   51 copies differ by the copyright lines they carry, so none can be dropped.
+        exclude: ^modules/shell/(scripts/vendor/axe-core-4\.14\.0/axe\.min\.js|THIRD-PARTY-NOTICES\.html)$
+      # Also outside a git merge: Copier writes its update conflicts straight into the
+      # files. The configuration its documentation recommends.
+      - id: check-merge-conflict
+        args: [--assume-in-merge]
+      - id: check-executables-have-shebangs
+        stages: [pre-commit]
+      - id: check-shebang-scripts-are-executable
+        stages: [pre-commit]
+      # Actually loads the YAML: refuses duplicate keys, which PyYAML accepts silently.
+      - id: check-yaml
+
+  # YAML style and traps ("yes"/"on" values, indentation). --strict: warnings block
+  # too. Rules: .yamllint.yaml
+  - repo: https://github.com/adrienverge/yamllint
+    rev: cba56bcde1fdd01c1deb3f945e69764c291a6530  # frozen: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [--strict]
+
+  # GitHub files validated against their schemas, bundled in the tool: offline.
+  # The workflows are covered by actionlint.
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: a76b92851fc9eede9f9bc4073eb55202f34eb0df  # frozen: 0.39.0
+    hooks:
+      - id: check-dependabot
+      - id: check-github-issue-forms
+      - id: check-github-issue-config
+
+  # Workflow security. Offline, so local and CI results are identical.
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: 06a39750ec31860bb44f2acf67182c40016cd1e7  # frozen: v1.32.0
+    hooks:
+      - id: zizmor
+        # An empty token variable makes zizmor refuse its option before --offline counts (#327).
+        entry: env -u GH_TOKEN -u GITHUB_TOKEN -u ZIZMOR_GITHUB_TOKEN zizmor
+        args: [--no-progress, --offline]
+
+  # Workflow validity. shellcheck disabled: absent locally, present on GitHub runners,
+  # it would give different results.
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca  # frozen: v1.7.12
+    hooks:
+      - id: actionlint
+        args: [-shellcheck=, -pyflakes=]
+
+  # The e2e scripts, run only by the coordinator's e2e: an undefined name or a loop variable
+  # overwritten is seen at commit, not after a run (72470a8). F and PLW2901 only, on the shell's
+  # and capture's scripts. The version contracts and platform lock.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 44b5042edab9382aba712eed4f9c7bab7a3d6a3e  # frozen: v0.17.0
+    hooks:
+      - id: ruff-check
+        args: [--isolated, --select, "F,PLW2901"]
+        files: ^modules/(shell|capture)/scripts/.*\.py$
+
+  # At commit time: only scans the staged changes.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e  # frozen: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      # In CI: the whole git history. --redact, because CI logs are public.
+      - id: gitleaks-history
+        name: Secrets in the whole git history
+        language: golang
+        additional_dependencies: [github.com/zricethezav/gitleaks/v8@v8.30.1]
+        entry: gitleaks git --redact --verbose
+        pass_filenames: false
+        always_run: true
+        stages: [manual]
+
+      # A link into one person's assistant session names their account on a page anyone
+      # reads: refused in a file and in a commit message. CI reads the messages again.
+      # Only a session, a conversation or a share: a link to the assistant's site is a link.
+      - id: no-session-link
+        name: No link to a private assistant session
+        language: pygrep
+        entry: >-
+          (?ix)\b(
+          claude\.ai/(code/session|chat/|share/)
+          |(chatgpt\.com|chat\.openai\.com)/(c/|share/|g/[^/\s]+/c/)
+          |gemini\.google\.com/(app/[0-9a-f]|share/)
+          |copilot\.microsoft\.com/(chats/|shares/)
+          )
+        stages: [pre-commit, commit-msg, manual]
+
+      # Git reads trailers from the message's last paragraph only: an Agent-Session line above a
+      # blank line — before a Co-Authored-By given in its own -m, say — names no session, and
+      # pr-check would say so only after the push. Git itself judges here: a message that names
+      # a session git does not read as a trailer is refused, with the correction. A rebase or a
+      # cherry-pick never runs this hook: .nstack/fitness-before-push.sh reads the same before a push.
+      - id: agent-session-trailer
+        name: "Agent-Session in the last paragraph: no blank line inside the trailer block"
+        language: system
+        entry: >-
+          sh -c 'grep -qiE "^agent-session[[:blank:]]*:" "$1" || exit 0;
+          git interpret-trailers --parse --no-divider "$1" | grep -qi "^agent-session:" && exit 0;
+          echo "Agent-Session is not in the last paragraph of the message, so git reads no session: put it
+          with Co-Authored-By and any other trailer in one block, no blank line between them." >&2;
+          exit 1' --
+        stages: [commit-msg]
+
+      # Before a push, the fitness functions CI runs on every pull request — a fault seen here,
+      # not after a round trip. The skills are left to CI: what they are generated from is
+      # the engine's version, which a contributor's may not be. Where nstack is not
+      # installed, it says so and lets the push go: CI still judges. An engine behind the
+      # project's version is refused, never trusted: .nstack/fitness-before-push.sh.
+      - id: nstack-fitness
+        name: NapkinStack fitness functions (manifests, boundaries, plan, hygiene)
+        language: system
+        entry: sh .nstack/fitness-before-push.sh
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

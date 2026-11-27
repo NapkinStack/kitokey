@@ -1,0 +1,116 @@
+/* kitokey.com, what every page shares (site v7, validated by the decider on 2026-11-26): the tokens, light and
+   dark, the base, the policy's page and the install's commands. Static, self-hosted, nothing from another domain.
+   Titles: Bricolage Grotesque (SIL OFL, public/fonts/OFL-Bricolage.txt); text: the system's font. Motion:
+   transform and opacity only, and none under prefers-reduced-motion. The sections' own: hero.css, walk.css,
+   middle.css, end.css. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("/fonts/bricolage-latin.woff2") format("woff2");
+  font-weight: 500 800;
+  font-display: swap;
+}
+/* The tokens. Copied, never read, from the app's palette (the shell's tokens.css, D120, at 7f747b7):
+   the site is its own module. From its roles, in both themes: --bg-canvas (ground), --bg-surface (surface),
+   --bg-hover, --bg-pressed, --border-subtle (divider), --border-control (edge), --text-primary (text),
+   --text-secondary (text-soft), --accent, --success, --record (live), --mark. The others (raised, sunken,
+   tint, tertiary text, the accent hovered, a warning, the confidential violet, the others' voice, the
+   shadows, the radii) are the v7 mock-up's, validated by the decider on 2026-11-26, until the app's
+   palette holds them; the light tertiary text darkened from #6B7385 to #5F6777, 4.5:1 on every light
+   ground (axe on #1294). */
+:root {
+  color-scheme: light;
+  --bg-canvas: #F2F4F7; --bg-surface: #FFFFFF; --bg-sunken: #F0F2F7; --bg-raised: #FFFFFF;
+  --bg-hover: #E3E7EE; --bg-pressed: #D9DDE5; --bg-tint: #EEF2FB;
+  --border-subtle: #D9DDE5; --border-control: #808898;
+  --text-primary: #15171C; --text-secondary: #4C5464; --text-tertiary: #5F6777;
+  --accent: #2253CF; --accent-hover: #1A44AD; --on-accent: #FFFFFF;
+  --success: #16794A; --warning: #8A5300; --warning-bg: #FFF4DC;
+  --record: #C2352D; --private: #6E56CF; --private-bg: #F3F0FF;
+  --track-me: var(--accent); --track-others: #0F766E; --focus: #2253CF;
+  --mark: #FDE68A;
+  --e1: 0 1px 2px rgb(17 19 24/.05), 0 4px 12px -8px rgb(30 50 100/.12);
+  --e2: 0 1px 2px rgb(20 30 55/.06), 0 10px 24px -12px rgb(30 50 100/.18);
+  --e3: 0 1px 2px rgb(0 0 0/.08), 0 24px 56px -20px rgb(30 50 100/.30);
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-pill: 999px;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --fs-caption: 12px; --fs-small: 13px;
+  --d-base: 200ms; --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --display: "Bricolage Grotesque", system-ui, sans-serif;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; overflow-x: clip; -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg-canvas); color: var(--text-primary); overflow-x: clip;
+  font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+img, video { display: block; max-width: 100%; height: auto; }
+a { color: var(--accent); text-underline-offset: .18em; }
+a:hover { color: var(--accent-hover); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.025em; line-height: 1.06; margin: 0; text-wrap: balance; }
+p { text-wrap: pretty; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
+.skip:focus { top: 10px; color: var(--on-accent); }
+.wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 700px) { .wrap { padding: 0 32px; } }
+
+/* ---- A page of text: the privacy policy ---- */
+.prose { max-width: 50rem; padding-top: clamp(2.5rem, 1.5rem + 4vw, 5rem); padding-bottom: clamp(3rem, 2rem + 4vw, 6rem); }
+.prose h1 { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4rem); font-weight: 800; letter-spacing: -.04em; }
+.prose h2 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 740; margin: 2.6rem 0 .8rem; }
+.prose .changed { color: var(--text-secondary); margin: 1rem 0 2rem; }
+.prose table { border-collapse: collapse; width: 100%; background: var(--bg-surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--border-subtle); }
+.prose th, .prose td { border-bottom: 1px solid var(--border-subtle); padding: .7rem .8rem; text-align: left; vertical-align: top; }
+.prose th { background: var(--bg-tint); font-weight: 650; }
+.prose code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: .92em; overflow-wrap: anywhere; }
+@media (max-width: 699px) { .prose table { display: block; overflow-x: auto; } }
+
+/* ---- The landing's install section, until a page of its own (site v7) ---- */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+.ico { width: 1.5rem; height: 1.5rem; flex: none; }
+
+/* Install: the commands on a dark block, one tab per system. */
+.get { max-width: 860px; margin: 0 auto; }
+.code { position: relative; background: #0F1218; color: #E6EAF2; border-radius: 20px; padding: 1.4rem; margin-top: 2rem; }
+.code pre { margin: 0; overflow-x: auto; font: .95rem/1.8 ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace; }
+.code pre .p { color: #8AB0FF; user-select: none; }
+.code-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .6rem; font-size: .9rem; }
+.os-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+.os-tab { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; padding: .3rem .85rem .3rem .45rem; border-radius: 999px; border: 1px solid #333B4D; background: transparent; color: #DDE2EC; font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer; }
+.os-tab[aria-pressed="true"] { background: #262C3A; border-color: #4A5468; color: #FFFFFF; }
+.copy { background: #262C3A; color: #F2F4F8; border: 0; border-radius: 999px; min-height: 44px; padding: .3rem .95rem; font: inherit; font-size: .88rem; font-weight: 600; cursor: pointer; }
+.copy:hover { background: #333B4D; }
+.code :focus-visible { outline-color: #8AB0FF; }
+.os-note { color: #B7BFCE; font-size: .9rem; margin: .9rem 0 0; }
+.os-note a { color: #8AB0FF; }
+.os-note code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; color: #E6EAF2; }
+@media (max-width: 420px) { .code pre { font-size: .8rem; } }
+
+@keyframes glide { from { transform: translateY(22px); } }
+
+/* ---- The dark theme (the decider's round 9): html[data-site] sets it;
+   public/theme.js follows the system until the visitor picks the moon or the sun. ---- */
+.theme-toggle[hidden] { display: none; }
+.theme-toggle .i-sun, html[data-site="dark"] .theme-toggle .i-moon { display: none; }
+html[data-site="dark"] .theme-toggle .i-sun { display: block; }
+html[data-site="dark"] {
+  color-scheme: dark;
+  --bg-canvas: #15171C; --bg-surface: #1E2129; --bg-sunken: #12141A; --bg-raised: #1E222B;
+  --bg-hover: #313644; --bg-pressed: #3A4050; --bg-tint: #1B2540;
+  --border-subtle: #343946; --border-control: #737B8C;
+  --text-primary: #EEF0F4; --text-secondary: #AAB1BF; --text-tertiary: #8A92A3;
+  --accent: #8AB0FF; --accent-hover: #A9C4FF; --on-accent: #0B1530;
+  --success: #63D49C; --warning: #F5B54A; --warning-bg: #2A2214;
+  --record: #FF7A72; --private: #B9A6FF; --private-bg: #221D38;
+  --track-others: #F2C14E; --focus: #8AB0FF; --mark: #FBBF24;
+  --e1: 0 1px 2px rgb(0 0 0/.12), 0 4px 12px -8px rgb(0 0 0/.3), inset 0 0 0 1px rgb(255 255 255/.06);
+  --e2: 0 1px 2px rgb(0 0 0/.15), 0 10px 24px -12px rgb(0 0 0/.45), inset 0 0 0 1px rgb(255 255 255/.06);
+  --e3: 0 1px 2px rgb(0 0 0/.2), 0 24px 56px -20px rgb(0 0 0/.75), inset 0 0 0 1px rgb(255 255 255/.06);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

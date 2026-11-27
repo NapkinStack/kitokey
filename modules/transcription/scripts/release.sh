@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# What this module ships: kitokey-transcription, into $NSTACK_DIST. Built for the system KITOKEY_TARGET
+# names — in a container of that system (containers/<target>.Containerfile), so that it links the
+# libraries that system has, never this machine's (D27); unset, for this machine.
+set -euo pipefail
+here=$(cd "$(dirname "$0")/.." && pwd)
+dist=${NSTACK_DIST:?run through nstack release, which names this module\'s artefacts folder}
+target=${KITOKEY_TARGET:-}
+# Windows names a program with its .exe (D53).
+exe=; [ "${OS:-}" = Windows_NT ] && exe=.exe
+# What the program owes its crates' authors goes beside it, for the package to ship (D102).
+cp "$here/THIRD-PARTY-NOTICES.html" "$dist/"
+# The processors it is built for: .cargo/config.toml, read by every build of the module.
+# On the graphics card through Vulkan where the machine has it — a tenth of the meeting's
+# length on the decider's laptop —, on the processor where it has not (ADR-0003). A Mac has no
+# Vulkan: there, Whisper on the processor, and Apple's own engine beside it (D42). Windows, on the
+# processor for now: GitHub's runner has no Vulkan SDK to build with (D53).
+features=(--features vulkan)
+{ [ "$(uname -s)" = Darwin ] || [ -n "$exe" ]; } && features=()
+if [ -z "$target" ]; then
+  (cd "$here" && cargo build --locked --release ${features[@]+"${features[@]}"})
+  # whisper-rs-sys does not build again when the flags change: a whisper.cpp built before them,
+  # tuned to this processor, would be shipped as it is — built again, then.
+  out=${CARGO_TARGET_DIR:-$here/target}/release
+  if grep -qs '^GGML_NATIVE:BOOL=ON' "$out"/build/whisper-rs-sys-*/out/build/CMakeCache.txt; then
+    (cd "$here" && cargo clean --release -p whisper-rs-sys && cargo build --locked --release ${features[@]+"${features[@]}"})
+  fi
+  cp "${CARGO_TARGET_DIR:-$here/target}/release/kitokey-transcription$exe" "$dist/"
+  # On a Mac, Apple's SpeechAnalyzer through a Swift program of its own, beside it (D42, ADR-0012).
+  if [ "$(uname -s)" = Darwin ]; then
+    swift build -c release --package-path "$here/speech"
+    cp "$here/speech/.build/release/kitokey-speech" "$dist/"
+  fi
+  exit 0
+fi
+recipe=$here/containers/$target.Containerfile
+[ -f "$recipe" ] || { echo "release: kitokey-transcription is not built for '$target' (containers/*.Containerfile)" >&2; exit 2; }
+image=kitokey-build-transcription:$target
+podman build -q -t "$image" -f "$recipe" "$here/containers" >/dev/null
+# Kept between releases, outside the repository: the build — one per image, so that another
+# recipe (headers, compilers) builds again from nothing — and the crates fetched.
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/kitokey-build/$target
+built=$cache/transcription-$(podman image inspect -f '{{.Id}}' "$image" | cut -c1-12)
+mkdir -p "$built" "$cache/registry"
+# No relabelling of what is mounted (`:Z` would relabel the files in place): labels left alone;
+# the source seen through a throwaway layer (`:O`): what a build writes there never reaches it.
+podman run --rm --security-opt label=disable -v "$here:/src:O" -v "$built:/target" \
+  -v "$cache/registry:/opt/cargo/registry" -e CARGO_TARGET_DIR=/target -w /src "$image" \
+  cargo build --locked --release -q "${features[@]}"
+cp "$built/release/kitokey-transcription" "$dist/"

@@ -1,0 +1,27 @@
+[project]
+name = "wholeheard-platform"
+version = "0.1.0"
+description = "What Wholeheard's modules share and none owns: the bench that measures a transcript against a meeting whose truth is known."
+requires-python = ">=3.12"
+dependencies = [
+    "jiwer>=4",
+    "num2words>=0.5.14",
+    "numpy>=2",
+    "piper-tts>=1.3",
+    "pyarrow>=26.0.0",
+    "scipy>=1.14",
+]
+
+[dependency-groups]
+dev = [
+    "jsonschema>=4.23",
+    "pytest>=8",
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
