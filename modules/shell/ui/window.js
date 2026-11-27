@@ -6391,6 +6391,10 @@ document.addEventListener("focusout", (event) => {
 window.addEventListener("blur", () => {
   inMenu = document.activeElement instanceof HTMLSelectElement || Date.now() - listLeft < 1000;
 });
+// WebKitGTK matches no `:focus-visible` on a radio reached by an arrow (#1313): the document is marked while its
+// last input is a key, so that components.css rings a card whose radio has the focus; a pointer clears the mark.
+addEventListener("keydown", () => document.documentElement.setAttribute("data-keys", ""), true);
+addEventListener("pointerdown", () => document.documentElement.removeAttribute("data-keys"), true);
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [], before: [] };
