@@ -196,7 +196,7 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
 // in the window's language and theme, as `components.css` draws it — for the eye and for the e2e (CT).
 function showGallery(words) {
   const page = document.getElementById("gallery");
-  const [buttons, banners, dialogs] = words.gallery_parts;
+  const [buttons, banners, dialogs, engines] = words.gallery_parts;
   const specimen = (made, component, state) => {
     made.dataset.component = component;
     made.dataset.state = state;
@@ -259,7 +259,25 @@ function showGallery(words) {
     section(dialogs,
       shown("confirm", fill(words.send_to, destination), fill(words.send_confidential_ask, destination), words.send_cancel, words.send_confirm, false),
       shown("destructive", words.trash_ask, words.trash_restore, words.trash_cancel, words.trash_confirm, true),
-      row(opener)));
+      row(opener)),
+    section(engines, ...galleryEngines(words)));
+}
+
+// The engine cards as D122 draws them (`engines.js`), from invented offers: their four states, and three groups
+// side by side — a radio chosen in one leaves the others' as they were.
+function galleryEngines(words) {
+  const local = "http://127.0.0.1:11434";
+  const offered = (writing) => ({
+    auto_hearing: { model: "ggml-small.bin", state: "ready", bytes: 487601967 },
+    auto_writing: { model: "qwen3:8b", provider: local, state: writing, bytes: 5225376000 },
+    whisper: [], ollama: [], apple: false, service: null, engine: "whisper", model: "ggml-small.bin",
+    minutes_provider: null, minutes_model: null, ollama_address: local, confidential: false, chosen: {},
+  });
+  return [
+    engineCards({ job: "transcribe", offered: offered("download"), words, scope: "first" }).box,
+    engineCards({ job: "write", offered: offered("download"), words, scope: "first" }).box,
+    engineCards({ job: "write", offered: offered("install"), words, scope: "settings" }).box,
+  ];
 }
 
 // « Plus d’actions » (D89): the rarer actions behind one button, as WAI-ARIA's menu button has it —

@@ -6527,8 +6527,24 @@ def gallery_shown(now: dt.datetime) -> None:
                 "document.fonts.check('700 20px \"Bricolage Grotesque\"'),"
                 "getComputedStyle(document.querySelector('#gallery h1')).fontFamily,"
                 "getComputedStyle(document.querySelector('#gallery p')).fontFamily]))")
+            # WebKit says a family without its quotes: the first one named, unquoted, is the face asked for.
+            first = lambda family: family.split(",")[0].strip().strip('"')
             check(f"{short}, {theme}: the titles in Bricolage Grotesque, loaded; the words in the system's face",
-                  faces[0] and faces[1].startswith('"Bricolage Grotesque"') and "Bricolage" not in faces[2], faces)
+                  faces[0] and first(faces[1]) == "Bricolage Grotesque" and "Bricolage" not in faces[2], faces)
+            # D122's engine card (`engineCards()`): its four states, and its groups side by side, each its own.
+            states = browser.execute_script("return [...document.querySelectorAll('#gallery .engine-card')]"
+                                            ".filter((e) => e.getClientRects().length).map((e) => e.dataset.state)")
+            check(f"{short}, {theme}: the engine card ready, to download, to install, its key missing (D122)",
+                  {"ready", "download", "install", "key"} <= set(states), states)
+            chosen = ("return [...document.querySelectorAll('#gallery .engine-cards')]"
+                      ".map((g) => g.querySelector('input:checked')?.closest('.engine-card').dataset.engine ?? null)")
+            before = browser.execute_script(chosen)
+            for group in (0, 1):
+                browser.execute_script("const r = document.querySelectorAll('#gallery .engine-cards')[arguments[0]]"
+                                       ".querySelectorAll('input[type=radio]'); r[r.length - 1].click()", group)
+            after = browser.execute_script(chosen)
+            check(f"{short}, {theme}: a card chosen in one group leaves the other groups' choice", len(before) >= 3
+                  and after[0] != before[0] and after[1] != before[1] and after[0] is not None and after[2:] == before[2:], (before, after))
             # The dialog the platform draws (`<dialog>`, modal): « Annuler » focused, Escape closes it, the focus back.
             opener = browser.find_element(By.ID, "gallery-dialog-open")
             opener.click()

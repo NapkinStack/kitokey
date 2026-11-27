@@ -622,9 +622,9 @@ pub struct Window {
     /// Shows: the design system's gallery (D120, `#/gallery`, linked from nowhere): its title. When: the
     /// gallery shown. At most: one line. Placeholders: none.
     pub gallery_title: &'static str,
-    /// Shows: the gallery's sections: its buttons, its banners, its dialogs (D120). When: the gallery shown.
+    /// Shows: the gallery's sections: its buttons, its banners, its dialogs, its engine cards (D120). When: the gallery shown.
     /// At most: one line each. Placeholders: none.
-    pub gallery_parts: [&'static str; 3],
+    pub gallery_parts: [&'static str; 4],
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
@@ -2122,7 +2122,7 @@ pub fn window(language: Language) -> Window {
             trash_confirm: "Move to trash",
             trash_refused: "Not moved to the trash: {}",
             gallery_title: "Components",
-            gallery_parts: ["Buttons", "Banners", "Dialogs"],
+            gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
             more_actions: "More actions",
             labelled: "{}:",
             minutes_title: "Summary",
@@ -2659,7 +2659,7 @@ pub fn window(language: Language) -> Window {
             trash_confirm: "Mettre à la corbeille",
             trash_refused: "Pas mise à la corbeille\u{a0}: {}",
             gallery_title: "Composants",
-            gallery_parts: ["Boutons", "Bandeaux", "Dialogues"],
+            gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
             more_actions: "Plus d’actions",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
