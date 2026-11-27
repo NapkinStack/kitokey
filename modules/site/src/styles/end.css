@@ -1,0 +1,110 @@
+/* Site v7 (validated by the decider on 2026-11-26): the price, what a computer needs, the questions and the last
+   call. Ported from the mock-up to the site's tokens and html[data-site]; every rule under .end. */
+.end { padding: 104px 0; }
+.end-band { background: color-mix(in srgb, var(--bg-surface) 62%, transparent); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.end .sh { max-width: 720px; margin-bottom: 48px; }
+.end .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
+.end h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.1vw, 42px); line-height: 1.1; letter-spacing: -.02em; margin: 0; }
+.end h3 { font-family: var(--display); font-weight: 700; margin: 0; }
+.end p { margin: 0; }
+.end .ico { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.end .tile { width: 44px; height: 44px; border-radius: var(--r-md); display: grid; place-items: center; background: var(--bg-tint); color: var(--accent); flex: none; }
+.end .tile .ico { width: 20px; height: 20px; }
+
+/* The price. */
+.end .price { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+.end .pcard { background: var(--bg-surface); border-radius: var(--r-xl); padding: 32px; box-shadow: var(--e2); outline: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 20px; }
+.end .pcard.main { outline: 0; border: 2px solid transparent; box-shadow: var(--e3);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 7%, var(--bg-surface)), var(--bg-surface) 38%) padding-box,
+              linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--track-others) 75%, var(--accent)) 55%, color-mix(in srgb, var(--accent) 30%, var(--border-subtle))) border-box; }
+.end .pc-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.end .oslogos { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 26px; }
+.end .lg { line-height: 0; display: inline-block; }
+.end .lg.win img { height: 30px; width: auto; }
+.end .lg.apl { display: inline-flex; align-items: center; gap: 10px; line-height: 1; }
+.end .lg.apl img { height: 32px; width: auto; }
+.end .lg.tux-l img { height: 40px; width: auto; }
+.end .on-dark, html[data-site="dark"] .end .on-light { display: none; }
+html[data-site="dark"] .end .on-dark { display: block; }
+.end .chip { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); font-size: var(--fs-small); background: var(--bg-sunken); color: var(--text-secondary); }
+.end .chip-warning { background: var(--warning-bg); color: var(--warning); font-weight: 600; }
+.end .pblock { display: grid; gap: 6px; padding-bottom: 18px; border-bottom: 1px solid var(--border-subtle); }
+.end .amount { display: flex; align-items: baseline; gap: 10px; }
+.end .amount b { font-family: var(--display); font-weight: 700; font-size: 64px; line-height: 1; letter-spacing: -.03em; }
+.end .amount span { color: var(--text-secondary); font-size: 18px; font-weight: 600; }
+.end .pnote { color: var(--text-secondary); font-size: 15px; }
+.end .strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: var(--r-md); background: var(--bg-tint); overflow: hidden; }
+.end .linux .strip { background: var(--bg-sunken); }
+.end .strip span { display: grid; gap: 2px; padding: 12px 14px; font-size: 13px; color: var(--text-secondary); line-height: 1.3; }
+.end .strip span + span { border-left: 1px solid color-mix(in srgb, var(--accent) 14%, transparent); }
+.end .linux .strip span + span { border-left-color: var(--border-subtle); }
+.end .strip b { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -.01em; }
+.end .incl-h { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+.end .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.end .checks li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; color: var(--text-secondary); font-size: 15.5px; }
+.end .checks .ico { color: var(--accent); margin-top: 4px; width: 16px; height: 16px; }
+.end .mac { color: var(--text-secondary); font-size: 14px; padding: 12px 14px; background: var(--bg-sunken); border-radius: var(--r-md); }
+.end .row-b { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: auto; min-height: 52px; }
+/* Until the Store's listing exists, the words where its badge will be, not a button. */
+.end .store-soon.is-soon { background: var(--bg-sunken); color: var(--text-secondary); outline: 1px solid var(--border-subtle); }
+.end .install-l { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 var(--sp-5); border-radius: var(--r-md); background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle); border-bottom-color: var(--border-control); font-weight: 600; text-decoration: none; }
+.end .install-l:hover { background: var(--bg-hover); }
+.end .nosub { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 20px; font-size: 15px; color: var(--text-secondary); }
+.end .nosub b { color: var(--text-primary); }
+.end .nosub .ico { color: var(--accent); }
+
+/* What a computer needs, folded. */
+.end-need { padding-bottom: 0; }
+.end details.need { background: var(--bg-surface); border-radius: var(--r-lg); outline: 1px solid var(--border-subtle); box-shadow: var(--e1); }
+.end details.need summary, .end .faq summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 14px; }
+.end details.need summary::-webkit-details-marker, .end .faq summary::-webkit-details-marker { display: none; }
+.end details.need summary { padding: 22px 26px; }
+.end details.need summary b { font-family: var(--display); font-size: 20px; letter-spacing: -.01em; }
+.end details.need summary span.s { display: block; color: var(--text-secondary); font-size: 15px; }
+.end .chev { margin-left: auto; color: var(--text-tertiary); transition: transform var(--d-base) var(--ease-out); }
+.end details[open] > summary .chev { transform: rotate(180deg); }
+.end .need-body { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 26px 26px; }
+.end .need-body > div { background: var(--bg-canvas); border-radius: var(--r-md); padding: 20px; }
+.end .need-body h3 { font-size: 17px; margin-bottom: 4px; }
+.end .need-body p { color: var(--text-secondary); font-size: 15px; margin-bottom: 10px; }
+.end .need-body ul { margin: 0; padding-left: 18px; color: var(--text-secondary); font-size: 15px; display: grid; gap: 4px; }
+
+/* The questions. */
+.end .faq-grid { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.6fr); gap: 56px; align-items: start; }
+.end .faq-grid .sh { margin: 0; }
+.end .faq { border-top: 1px solid var(--border-subtle); }
+.end .faq details { border-bottom: 1px solid var(--border-subtle); }
+.end .faq summary { padding: 20px 0; font-weight: 600; font-size: 17px; }
+.end .faq .a { padding: 0 40px 22px 0; color: var(--text-secondary); font-size: 16px; display: grid; gap: 10px; }
+
+/* The last call. */
+.end.final { text-align: center; }
+.end .illus { width: min(360px, 100%); height: auto; display: block; margin: 0 auto 28px; overflow: visible; }
+.end .illus .doc { fill: var(--bg-surface); stroke: var(--border-subtle); stroke-width: 1.5; filter: drop-shadow(0 6px 14px rgb(30 50 100/.14)); }
+html[data-site="dark"] .end .illus .doc { stroke: var(--border-control); filter: none; }
+.end .illus .ln { stroke: var(--text-tertiary); stroke-width: 4; stroke-linecap: round; opacity: .55; }
+.end .illus .i-rec { fill: var(--record); }
+.end .illus .i-me, .end .illus .i-ot { fill: none; stroke-width: 3; stroke-linecap: round; }
+.end .illus .i-me { stroke: var(--track-me); } .end .illus .i-ot { stroke: var(--track-others); }
+.end .illus .i-stop { fill: var(--bg-sunken); stroke: var(--border-subtle); }
+.end .illus .i-sq { fill: var(--text-primary); }
+.end .illus .i-dots { stroke: var(--border-control); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0 8; }
+.end .illus .i-me-l, .end .illus .i-ot-l { stroke-width: 4; stroke-linecap: round; }
+.end .illus .i-me-l { stroke: var(--track-me); } .end .illus .i-ot-l { stroke: var(--track-others); }
+.end .illus .i-ok { fill: var(--accent); }
+.end .illus .i-check { fill: none; stroke: var(--on-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.end.final h2 { max-width: 680px; margin: 0 auto; }
+.end.final p { color: var(--text-secondary); font-size: 18px; margin: 16px auto 0; max-width: 560px; }
+.end.final .cta { justify-content: center; margin-top: var(--sp-8); }
+
+@media (max-width: 1040px) { .end .price, .end .faq-grid { grid-template-columns: 1fr; } .end .faq-grid { gap: 24px; } }
+@media (max-width: 640px) {
+  .end { padding: 72px 0; }
+  .end .sh { margin-bottom: 32px; }
+  .end .pcard { padding: 24px 20px; }
+  .end .amount b { font-size: 52px; }
+  .end .strip span { padding: 10px; } .end .strip b { font-size: 15px; }
+  .end .need-body { grid-template-columns: 1fr; padding: 0 16px 16px; }
+  .end details.need summary { padding: 18px 16px; }
+  .end .faq .a { padding-right: 0; }
+}

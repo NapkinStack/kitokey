@@ -1,7 +1,6 @@
 // The landing's words (D114, proposal D validated by the decider on 2026-11-25), in English and in French,
 // each with what keeps its promise, as words.mjs asks. A list's entries are tuples in the order the page
 // reads them. French takes its narrow no-break spaces here, once (typo below).
-const REPO = "https://github.com/NapkinStack/kitokey";
 
 const raw = {
   title: {
@@ -15,8 +14,8 @@ const raw = {
     keeps: "docs/store/listing.md (D103); PDR-0001, free on Linux",
   },
   nav: {
-    en: [["how", "How it works"], ["privacy", "Privacy"], ["who", "Who it’s for"], ["systems", "Systems & price"], ["faq", "FAQ"], ["install", "Install"]],
-    fr: [["parcours", "Comment ça marche"], ["confidentialite", "Confidentialité"], ["pour-qui", "Pour qui"], ["systemes", "Systèmes et prix"], ["faq", "FAQ"], ["installer", "Installer"]],
+    fr: [["parcours", "Comment ça marche"], ["confidentialite", "Confidentialité"], ["pour-qui", "Pour qui"], ["prix", "Prix"], ["faq", "Questions"]],
+    en: [["how", "How it works"], ["privacy", "Privacy"], ["who", "Who it’s for"], ["price", "Price"], ["faq", "Questions"]],
     keeps: "the page's own sections",
   },
   // Site v7, the hero (validated by the decider on 2026-11-26): PDR-0009's promise, the price, the Store's
@@ -159,24 +158,59 @@ const raw = {
     },
     keeps: "on main: D116 the send, D113 the dates and .ics (RFC 5545), D26 a line played, D109 every summary written to a folder in Markdown, never a confidential meeting's (D60, e2e CF), D113 the previous version kept; « Bientôt », cycle 12 and not on main yet: D121 the PDF from the window (the program is D108's, merged), D127 the search, D129 and D130 the formats. Importing a file is not planned: not said",
   },
-  cta: {
-    en: ["Install on Linux, free", "Follow the releases"],
-    fr: ["Installer sur Linux, gratuit", "Suivre les sorties"],
-    keeps: "PDR-0001, free on Linux; the repository's tags, each a release (v0.2.6, 2026-11-18)",
+  price: {
+    fr: {
+      kicker: "Prix et systèmes", h: "Essayez avant de payer.", soon: "Bientôt",
+      main: ["Windows et macOS", "69 €", "une fois", "Un seul paiement, sans renouvellement.", "L’essai gratuit", [["14 jours", "d’essai au moins"], ["10 réunions", "au moins"], ["Sans compte", "rien à créer"]],
+        "Ce qui est inclus", ["La transcription et le compte rendu, sur votre ordinateur", "Confidentielle, d’un geste sur le cadenas", "Le partage d’un geste vers Slack, Discord ou un webhook", "Les mises à jour de la version 1"],
+        "Après l’essai, vos réunions restent lisibles, même sans acheter. Sur macOS bientôt, au même prix.", "Bientôt dans le Microsoft Store"],
+      linux: ["Linux", "Gratuit", "Le même Kitokey, sans essai ni paiement.", "Les distributions", [["Fedora", "depuis un dépôt"], ["Ubuntu", "depuis le code source"], ["Debian", "depuis le code source"]],
+        "Ce qui est inclus", ["La transcription et le compte rendu, sur votre ordinateur", "Confidentielle, d’un geste sur le cadenas", "Le partage d’un geste vers Slack, Discord ou un webhook", "Le code source public, sous GPL v3"], "Installer sur Linux"],
+      nosub: ["Pas d’abonnement", ", ni sur Windows et macOS, ni sur Linux."],
+    },
+    en: {
+      kicker: "Price and systems", h: "Try before you pay.", soon: "Soon",
+      main: ["Windows and macOS", "€69", "once", "One payment, no renewal.", "The free trial", [["14 days", "of trial at least"], ["10 meetings", "at least"], ["No account", "nothing to create"]],
+        "What is included", ["The transcript and the minutes, on your computer", "Confidential, in one gesture on the lock", "Sharing in one gesture to Slack, Discord or a webhook", "The updates of version 1"],
+        "After the trial, your meetings stay readable, even without buying. On macOS soon, at the same price.", "Coming soon to the Microsoft Store"],
+      linux: ["Linux", "Free", "The same Kitokey, with no trial and no payment.", "The distributions", [["Fedora", "from a repository"], ["Ubuntu", "from the source code"], ["Debian", "from the source code"]],
+        "What is included", ["The transcript and the minutes, on your computer", "Confidential, in one gesture on the lock", "Sharing in one gesture to Slack, Discord or a webhook", "The public source code, under GPL v3"], "Install on Linux"],
+      nosub: ["No subscription", ", neither on Windows and macOS nor on Linux."],
+    },
+    keeps: "PDR-0009, 69 € once on Windows and macOS after a free trial, the same price on the Mac, the Store's button once its listing exists; PDR-0001 and PDR-0005, a trial of at least 14 days and 10 meetings, no account, minor versions included, the meetings readable after it; PDR-0001, free on Linux; README.md, Fedora from Copr, Ubuntu 24.04 and Debian 13 built from the source; LICENSE, GPL v3",
   },
-  systems: {
-    en: ["Systems & price", "Free on Linux. One payment elsewhere.", "No account, no subscription. Linux today, Windows and macOS next.", "No subscription. The price will be announced at launch."],
-    fr: ["Systèmes et prix", "Gratuit sur Linux. Un seul paiement ailleurs.", "Pas de compte, pas d’abonnement. Linux aujourd’hui, Windows et macOS ensuite.", "Sans abonnement. Le prix sera annoncé à la sortie."],
-    keeps: "PDR-0001: free on Linux, paid once on macOS and Windows",
+  need: {
+    fr: ["Ce qu’il faut à l’ordinateur", "Un ordinateur récent avec 16 Go de mémoire."],
+    en: ["What your computer needs", "A recent computer with 16 GB of memory."],
+    keeps: "README.md, « What a computer needs »: 16 GB at least",
   },
-  oses: {
-    en: [[["linux"], "Linux", "Available", "Free", "Fedora, Ubuntu and Debian 13.", true],
-      [["windows"], "Windows", "Coming soon", "One-time purchase", "A free trial, then a single payment. Coming to the Microsoft Store.", false],
-      [["apple"], "macOS", "Coming soon", "One-time purchase", "A free trial, then a single payment.", false]],
-    fr: [[["linux"], "Linux", "Disponible", "Gratuit", "Fedora, Ubuntu et Debian 13.", true],
-      [["windows"], "Windows", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement. À venir dans le Microsoft Store.", false],
-      [["apple"], "macOS", "Bientôt", "Achat unique", "Un essai gratuit, puis un seul paiement.", false]],
-    keeps: "README.md, « Install it »: Fedora from Copr, Ubuntu 24.04 and Debian 13; PDR-0001 and PDR-0005, the Store's unlimited trial; ADR-0017, macOS sold once",
+  faq: {
+    fr: ["Questions", "Ce qu’on nous demande avant d’essayer.", [
+      ["Mon client voit-il quelque chose\u202f?", ["Non. Aucun robot ne rejoint l’appel et rien ne s’affiche chez lui. Kitokey enregistre le son de votre ordinateur, votre micro d’un côté, l’appel de l’autre.", "C’est à vous d’annoncer l’enregistrement et d’obtenir son accord. Kitokey vous le rappelle à chaque début d’appel."]],
+      ["Est-ce compatible avec mon secret professionnel\u202f?", ["Voici ce que fait Kitokey, pour que vous en jugiez. L’audio, la transcription et le compte rendu sont écrits sur votre ordinateur, dans un dossier que vous choisissez. Kitokey n’a pas de serveur et ne demande pas de compte. Un moteur en ligne n’est utilisé que si vous le choisissez, et jamais pour une réunion confidentielle.", "Ce que votre profession exige, votre ordre ou votre barreau est seul à le dire. Kitokey ne remplace pas leur avis."]],
+      ["Où sont mes réunions, et comment les supprimer\u202f?", ["Dans un dossier que vous choisissez, sur votre ordinateur\u00a0: l’audio, la transcription et le compte rendu de chaque réunion. Supprimer une réunion la place dans la corbeille de votre ordinateur, d’où vous pouvez la restaurer."]],
+      ["Faut-il installer quelque chose dans Zoom, Meet ou Teams\u202f?", ["Non. Kitokey écoute le son de l’ordinateur, il marche donc avec tout logiciel d’appel, et avec un appel téléphonique passé depuis l’ordinateur."]],
+      ["Kitokey reconnaît-il chaque participant\u202f?", ["Il sépare deux côtés\u00a0: votre micro (Vous) et le son de l’appel (Les autres). Vous nommez chacun, par exemple «\u00a0Sarah\u00a0» et «\u00a0Camille, Hugo et Léa\u00a0», et ces noms passent dans le compte rendu. Il ne distingue pas encore les voix des autres participants entre elles."]],
+      ["Le compte rendu peut-il se tromper\u202f?", ["Oui. Il est écrit par une IA, et Kitokey le rappelle en tête de chaque compte rendu. Relisez-le avant de le remettre. La transcription se corrige ligne par ligne, et chaque phrase se réécoute."]],
+      ["Combien de temps faut-il pour le compte rendu\u202f?", ["Cela dépend de votre ordinateur et de la durée de l’appel, puisque le travail se fait chez vous et pas sur un serveur. Comptez quelques minutes plutôt que quelques secondes. Il démarre tout seul à la fin de l’appel."]],
+      ["Que se passe-t-il à la fin de l’essai\u202f?", ["L’essai dure au moins 14 jours et 10 réunions. Ensuite, Kitokey vous propose d’acheter avant tout nouvel enregistrement. Les réunions déjà faites restent à vous\u00a0: vous les lisez et les réécoutez, que vous achetiez ou non."]],
+      ["Quelles langues sont transcrites\u202f?", ["Kitokey détecte la langue parlée, ou vous la choisissez pour une réunion parmi huit\u00a0: le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais et l’arabe."]]]],
+    en: ["Questions", "What people ask us before they try.", [
+      ["Does my client see anything?", ["No. No bot joins the call and nothing shows on their side. Kitokey records your computer’s sound, your microphone on one side, the call on the other.", "It is up to you to tell them you are recording and to get their agreement. Kitokey reminds you as each call starts."]],
+      ["Does it fit my professional secrecy?", ["Here is what Kitokey does, so that you can judge. The audio, the transcript and the minutes are written on your computer, in a folder you choose. Kitokey has no server and asks for no account. An online engine is used only if you choose one, and never for a confidential meeting.", "What your profession requires, only your order or your bar can say. Kitokey does not replace their advice."]],
+      ["Where are my meetings, and how do I delete them?", ["In a folder you choose, on your computer: the audio, the transcript and the minutes of each meeting. Deleting a meeting moves it to your computer’s trash, from where you can restore it."]],
+      ["Do I need to install anything in Zoom, Meet or Teams?", ["No. Kitokey listens to the computer’s sound, so it works with any calling app, and with a phone call made from the computer."]],
+      ["Does Kitokey recognise each participant?", ["It separates two sides: your microphone (You) and the call’s sound (Others). You name each, for instance “Sarah” and “Camille, Hugo and Léa”, and these names go into the minutes. It does not yet tell the other participants’ voices apart."]],
+      ["Can the minutes be wrong?", ["Yes. They are written by an AI, and Kitokey says so at the top of each one. Read them over before you hand them over. The transcript can be corrected line by line, and each line played again."]],
+      ["How long do the minutes take?", ["It depends on your computer and the length of the call, since the work is done on your computer and not on a server. Count a few minutes rather than a few seconds. They start on their own when the call ends."]],
+      ["What happens when the trial ends?", ["The trial lasts at least 14 days and 10 meetings. Then Kitokey offers to buy before any new recording. The meetings already made stay yours: you read them and play them again, whether you buy or not."]],
+      ["Which languages are transcribed?", ["Kitokey detects the language spoken, or you choose it for a meeting among eight: French, English, German, Spanish, Italian, Portuguese, Dutch and Arabic."]]]],
+    keeps: "capture: the computer's sound, two sides, no bot (D103); the reminder (settings.rs reminder = true); PDR-0001 and PDR-0003, no server, no account; D60 and D118, a confidential meeting never online; the trash (D113); the sides named (#1205); minutes/v5's AI line; the transcript corrected (ADR-0014) and a line played (D26); the minutes started after a recording (#1276); PDR-0005, the trial and the meetings kept readable; spoken.rs, the eight languages offered",
+  },
+  final: {
+    fr: ["Essayez-le sur votre prochain rendez-vous client.", "Installez-le avant l’appel, cliquez sur Enregistrer, et lisez le compte rendu quand vous raccrochez. Essai gratuit, puis 69\u00a0€ une fois."],
+    en: ["Try it on your next client call.", "Install it before the call, click Record, and read the minutes when you hang up. Free trial, then €69 once."],
+    keeps: "the app's record button; PDR-0009, the price after a free trial",
   },
   install: {
     en: ["Install", "Install Kitokey.", "Pick your system, open a terminal and paste the commands.", "Copy", "System", "Copied", "Select and copy"],
@@ -188,53 +222,12 @@ const raw = {
     fr: { debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
     keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; README.md, « Install it »: the Ubuntu package installs and starts on Debian 13, not on 12 (#1214)",
   },
-  needs: {
-    en: ["Prerequisites", [["transcript", "Transcription.", "At first start, its model (874 MB) downloads in one click."],
-      ["summary", "Ollama, for the minutes.", "<a href=\"https://ollama.com/download\">Install Ollama</a>, which is free. Kitokey then offers its model, Qwen3 8B (about 5 GB), downloaded in one click."]]],
-    fr: ["Prérequis", [["transcript", "La transcription.", "Au premier démarrage, son modèle (874 Mo) se télécharge en un clic."],
-      ["summary", "Ollama, pour le compte rendu.", "<a href=\"https://ollama.com/download\">Installez Ollama</a>, qui est gratuit. Kitokey propose ensuite son modèle, Qwen3 8B (environ 5 Go), téléchargé en un clic."]]],
-    keeps: "ADR-0003, the 874 MB model; cycle 03, qwen3:8b about 5 GB fetched through Ollama; docs/support.md",
-  },
   hardware: {
-    en: [["lock", "Everything on your computer", "Confidentiality assured, your data stays with you.",
-      ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two models", "About 2 GB free for each hour that records, then 0.2 GB kept an hour"]],
-      ["unlock", "With the service you choose", "No special hardware. The transcript and the minutes are made online.",
-      ["An OpenAI-compatible service, such as Groq", "Often paid, billed by that service, not by Kitokey", "About 2 GB free while an hour records, then 0.2 GB kept"]]],
-    fr: [["lock", "Tout sur votre ordinateur", "Confidentialité assurée, vos données restent chez vous.",
-      ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux modèles", "Environ 2 Go libres par heure qui s’enregistre, puis 0,2 Go gardés par heure"]],
-      ["unlock", "Avec le service de votre choix", "Aucun matériel particulier. La transcription et le compte rendu se font en ligne.",
-      ["Un service compatible OpenAI, comme Groq", "Souvent payant, facturé par ce service, pas par Kitokey", "Environ 2 Go libres pendant l’enregistrement d’une heure, puis 0,2 Go gardés"]]],
-    keeps: "README.md, « What a computer needs », measured on 2026-11-25: its two ways; ADR-0013, a transcription service the user names (Groq among them), ADR-0013 and the minutes' services, their cost the user's; the decider's « no special hardware » (2026-11-25)",
-  },
-  faq: {
-    en: ["Frequently asked questions", [
-      ["Do I need to install anything in Zoom, Meet or Teams?", "No. Kitokey records your computer’s sound. It works with any call app and no bot joins the meeting."],
-      ["Does Kitokey recognise each participant?", "No. It separates two sides, your microphone (You) and the call’s audio (Others), and you can rename either. It does not tell the other participants’ voices apart."],
-      ["Does Kitokey install Ollama?", "No, never. Ollama is a free program of its own, at <a href=\"https://ollama.com/download\">ollama.com</a>. Once it runs, Kitokey’s settings offer its model for the minutes."],
-      ["What does Kitokey do without Ollama?", "It records and transcribes your meetings on your computer. Their minutes wait until Ollama runs, and the window tells you so. You can also choose an online service, with your own key."],
-      ["Where are my meetings, and how do I delete them?", "In your Documents/Kitokey folder, unless you choose another. A meeting is deleted from its own page. To erase everything, uninstall Kitokey and delete that folder."],
-      ["Can the minutes be wrong?", "Yes. They are written by AI, and Kitokey says so at the top of every summary. Read them before you share them. The transcript can be corrected line by line."],
-      ["How long do the minutes take?", "It depends on your computer and the length of the call, because the work happens on your machine and not on a server. Think minutes rather than seconds."],
-      ["Does it work on Wayland, with PipeWire?", "Yes, on GNOME (Wayland), with sound through PipeWire. That is the environment its end-to-end tests run in. Other desktops are not tested yet."],
-      ["Am I allowed to record a call?", "It is up to you to tell the participants you are recording and to get their consent. It is common courtesy, and often the law. Kitokey reminds you, and the reminder can be turned off."],
-      ["Which languages are transcribed?", "Kitokey detects the spoken language, among the many Whisper hears, or you choose it for a meeting among eight: English, French, German, Spanish, Italian, Portuguese, Dutch and Arabic."]]],
-    fr: ["Questions fréquentes", [
-      ["Faut-il installer quelque chose dans Zoom, Meet ou Teams ?", "Non. Kitokey enregistre le son de votre ordinateur. Il fonctionne avec n’importe quelle application d’appel et aucun robot ne rejoint la réunion."],
-      ["Kitokey reconnaît-il chaque participant ?", "Non. Il sépare deux côtés, votre micro (Vous) et le son de l’appel (Les autres), et vous pouvez renommer chacun. Il ne distingue pas les voix des autres participants entre elles."],
-      ["Kitokey installe-t-il Ollama ?", "Non, jamais. Ollama est un programme gratuit à part, sur <a href=\"https://ollama.com/download\">ollama.com</a>. Une fois qu’il tourne, les réglages de Kitokey proposent son modèle pour les comptes rendus."],
-      ["Que fait Kitokey sans Ollama ?", "Il enregistre et transcrit vos réunions sur votre ordinateur. Leurs comptes rendus attendent qu’Ollama tourne, et la fenêtre vous le dit. Vous pouvez aussi choisir un service en ligne, avec votre propre clé."],
-      ["Où sont mes réunions, et comment les supprimer ?", "Dans votre dossier Documents/Kitokey, sauf si vous en choisissez un autre. Une réunion se supprime depuis sa page. Pour tout effacer, désinstallez Kitokey puis supprimez ce dossier."],
-      ["Le compte rendu peut-il se tromper ?", "Oui. Il est rédigé par une IA, et Kitokey le rappelle en tête de chaque compte rendu. Relisez-le avant de le partager. La transcription se corrige ligne par ligne."],
-      ["Combien de temps faut-il pour le compte rendu ?", "Cela dépend de votre ordinateur et de la durée de l’appel, car le travail se fait sur votre machine et pas sur un serveur. Comptez des minutes plutôt que des secondes."],
-      ["Fonctionne-t-il sous Wayland, avec PipeWire ?", "Oui, sous GNOME (Wayland), le son passe par PipeWire. C’est l’environnement où tournent ses tests de bout en bout. Les autres bureaux ne sont pas encore testés."],
-      ["Ai-je le droit d’enregistrer un appel ?", "C’est à vous d’annoncer l’enregistrement aux participants et d’obtenir leur accord. C’est la règle de bon sens, et souvent celle de la loi. Kitokey vous le rappelle, et ce rappel peut se désactiver."],
-      ["Quelles langues sont transcrites ?", "Kitokey détecte la langue parlée, parmi les nombreuses que Whisper entend, ou vous la choisissez pour une réunion parmi huit : le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais et l’arabe."]]],
-    keeps: "docs/support.md (Ollama, the folder); #1211 and #1205, the two sides named; words.rs minutes_ai; docs/privacy.md, the reminder; cycle 01, GNOME on Wayland; spoken.rs, the eight languages offered and any other of ISO 639-1, none said: the engine detects it (D64, D65)",
-  },
-  final: {
-    en: "Try it on your next call.",
-    fr: "Essayez-le sur votre prochain appel.",
-    keeps: "the install above",
+    fr: [["chip", "Tout sur votre ordinateur", "Le choix par défaut.", ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux moteurs", "Environ 2 Go libres par heure enregistrée, puis 0,2 Go gardés par heure", "Ollama, gratuit, installé à part pour rédiger le compte rendu"]],
+      ["cloud", "Avec un moteur en ligne", "Aucun matériel particulier.", ["Un service que vous choisissez, avec votre clé", "Souvent payant, facturé par ce service et pas par Kitokey", "Environ 2 Go libres pendant l’enregistrement d’une heure, puis 0,2 Go gardés"]]],
+    en: [["chip", "Everything on your computer", "The default choice.", ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two engines", "About 2 GB free for each hour recorded, then 0.2 GB kept an hour", "Ollama, free, installed on its own to write the minutes"]],
+      ["cloud", "With an online engine", "No special hardware.", ["A service you choose, with your key", "Often paid, billed by that service, not by Kitokey", "About 2 GB free while an hour records, then 0.2 GB kept"]]],
+    keeps: "README.md, « What a computer needs », measured on 2026-11-25: its two ways and their figures; docs/support.md, Ollama installed on its own for the private minutes until ADR-0020 is built; ADR-0013, a service the user names, its cost the user's",
   },
 };
 
@@ -250,7 +243,6 @@ function typo(v) {
 }
 
 export const landing = Object.fromEntries(Object.entries(raw).map(([k, w]) => [k, { ...w, fr: typo(w.fr) }]));
-export const repo = REPO;
 // The install's commands, as README.md gives them: Fedora from Copr (D78, published 2026-11-18); Ubuntu built as
 // README.md says, until a repository is published; Debian 13 takes Ubuntu's package (README.md, « Install it »).
 export const channels = [

@@ -48,17 +48,16 @@ const source = "https://github.com/NapkinStack/kitokey";
       </div>
     </header>
     <main id="main" class={kind}><slot /></main>
-    <footer class="site-footer">
-      <div class="wrap foot">
-        <div>
-          <a class="brand" href={`/${lang}/`}><img src="/kitokey.svg" width="24" height="24" alt="" />Kitokey</a>
-          <p>{say("publisher", lang)}</p>
-        </div>
-        <ul>
-          <li><a href={source}>{say("source", lang)}</a></li>
-          <li><a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a></li>
-          <li><a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a></li>
-        </ul>
+    <footer class="foot">
+      <div class="wrap">
+        <a class="brand" href={`/${lang}/`}><img src="/kitokey.svg" width="24" height="24" alt="" />Kitokey</a>
+        <span class="pub">{say("publisher", lang)}</span>
+        <nav aria-label={say("footer", lang)}>
+          <a href={source}>{say("source", lang)}</a>
+          <a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a>
+          <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
+        </nav>
+        <span class="credit">{say("credit", lang)}</span>
       </div>
     </footer>
   </body>

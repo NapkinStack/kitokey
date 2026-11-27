@@ -59,7 +59,6 @@ p { text-wrap: pretty; }
 .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
 @media (min-width: 700px) { .wrap { padding: 0 32px; } }
 
-
 /* ---- A page of text: the privacy policy ---- */
 .prose { max-width: 50rem; padding-top: clamp(2.5rem, 1.5rem + 4vw, 5rem); padding-bottom: clamp(3rem, 2rem + 4vw, 6rem); }
 .prose h1 { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4rem); font-weight: 800; letter-spacing: -.04em; }
@@ -71,60 +70,15 @@ p { text-wrap: pretty; }
 .prose code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: .92em; overflow-wrap: anywhere; }
 @media (max-width: 699px) { .prose table { display: block; overflow-x: auto; } }
 
-/* ---- Footer ---- */
-.site-footer { border-top: 1px solid var(--line); padding: 2.5rem 0 3rem; font-size: .92rem; color: var(--soft); }
-.foot { display: grid; gap: 1.2rem; }
-.foot p { margin: .4rem 0 0; }
-.foot .brand { font-size: 1.1rem; margin: 0; }
-.foot ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; }
-.foot ul a { display: inline-block; padding: .6rem 0; }
-@media (min-width: 800px) { .foot { grid-template-columns: 1fr auto; align-items: center; } }
-
-/* ---- The landing (proposal D): its sections, from the hero to the final call ---- */
+/* ---- The landing's install section, until a page of its own (site v7) ---- */
 .eyebrow { font-weight: 650; font-size: .95rem; color: var(--accent); letter-spacing: .01em; margin: 0 0 .9rem; }
 .lead { font-size: clamp(1.1rem, 1rem + .5vw, 1.35rem); color: var(--soft); max-width: 40rem; margin: 0; }
 .section { padding: clamp(5rem, 4rem + 6vw, 9rem) 0 0; }
 .section-head { max-width: 50rem; margin: 0 auto clamp(2.5rem, 2rem + 2vw, 4rem); text-align: center; }
 .section-head h2 { font-size: clamp(2.2rem, 1.4rem + 3.6vw, 4.4rem); font-weight: 760; }
 .section-head .lead { margin: 1.1rem auto 0; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: .7rem 1.4rem; border-radius: 999px; border: 0;
-  background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; transition: transform .2s var(--ease), background-color .2s; }
-.btn:hover { background: var(--accent-hover); color: var(--on-accent); }
-.btn:active { transform: scale(.98); }
-.btn-lg { font-size: 1.1rem; padding: .95rem 1.8rem; }
-.btn-ghost { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 1.5px currentColor; }
-.btn-ghost:hover { background: var(--tint); color: var(--accent); }
 .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 .ico { width: 1.5rem; height: 1.5rem; flex: none; }
-.ico-xl { width: 3.2rem; height: 3.2rem; }
-.tile { display: inline-grid; place-items: center; width: 3.2rem; height: 3.2rem; border-radius: 16px; background: var(--tint); color: var(--accent); }
-.tile .ico { width: 1.7rem; height: 1.7rem; }
-.kicker { font-weight: 650; font-size: .92rem; color: var(--accent); margin: .3rem 0 0; }
-.soon { display: inline-block; font-size: .75rem; font-weight: 700; letter-spacing: .02em; color: #6A3F00; background: #FFF1D6; border-radius: 999px; padding: .15rem .55rem; }
-
-
-.card { background: var(--surface); border-radius: var(--radius); padding: clamp(1.5rem, 1.1rem + 1.2vw, 2.2rem); outline: 1px solid var(--line); display: flex; flex-direction: column; gap: .8rem; min-width: 0; }
-.card > * { min-width: 0; margin: 0; }
-.card h3 { font-size: clamp(1.35rem, 1.1rem + 1vw, 1.9rem); font-weight: 740; }
-.card p { color: var(--soft); }
-.card .kicker { color: var(--accent); margin-top: .4rem; }
-
-
-.needs { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem; }
-.needs li { display: flex; gap: .9rem; align-items: flex-start; }
-.note { margin: 1.4rem auto 0; max-width: 50rem; text-align: center; color: var(--soft); }
-
-
-.systems { display: grid; gap: 16px; }
-@media (min-width: 860px) { .systems { grid-template-columns: repeat(3, 1fr); } }
-.os-logos { display: inline-flex; gap: .5rem; }
-.os-logo { width: 2.6rem; height: 2.6rem; color: var(--ink); }
-.os-logos img.os-logo { width: auto; height: 2.6rem; } /* a brand's own file keeps its proportions */
-.os-apple-dark, html[data-site="dark"] .os-apple { display: none; }
-html[data-site="dark"] .os-apple-dark { display: block; }
-.os-state .ok { display: inline-block; font-size: .78rem; font-weight: 700; color: #0F5C37; background: #DDF5E8; border-radius: 999px; padding: .15rem .6rem; }
-.card .os-price { font-family: var(--titles); font-size: clamp(1.9rem, 1.5rem + 1.4vw, 2.6rem); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; color: var(--ink); }
-.os .btn { align-self: flex-start; margin-top: auto; }
 
 /* Install: the commands on a dark block, one tab per system. */
 .get { max-width: 860px; margin: 0 auto; }
@@ -142,29 +96,8 @@ html[data-site="dark"] .os-apple-dark { display: block; }
 .os-note a { color: #8AB0FF; }
 .os-note code { font-family: ui-monospace, "DejaVu Sans Mono", monospace; color: #E6EAF2; }
 @media (max-width: 420px) { .code pre { font-size: .8rem; } }
-.needs-h { font-size: 1.4rem; font-weight: 740; margin: 2.8rem 0 1.2rem; }
-.needs .ico { color: var(--accent); margin-top: .1rem; }
-.needs strong { display: block; }
-.needs span { color: var(--soft); }
-.hw { display: grid; gap: 16px; margin-top: 1.6rem; }
-.hw-card h4 { font-family: var(--titles); font-size: 1.15rem; letter-spacing: -.015em; }
-.hw-card ul { margin: .2rem 0 0; padding-left: 1.1rem; color: var(--soft); display: grid; gap: .35rem; }
-@media (min-width: 760px) { .hw { grid-template-columns: 1fr 1fr; } }
 
-.faq { max-width: 860px; margin: 0 auto; border-top: 1px solid var(--line); }
-.faq details { border-bottom: 1px solid var(--line); }
-.faq summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 1rem; align-items: center; padding: 1.3rem 0; min-height: 44px;
-  font-family: var(--titles); font-weight: 680; font-size: clamp(1.1rem, 1rem + .4vw, 1.3rem); letter-spacing: -.015em; }
-.faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: "+"; font-size: 1.6rem; color: var(--accent); flex: none; transition: transform .25s var(--ease); line-height: 1; }
-.faq details[open] summary::after { transform: rotate(45deg); }
-.faq details p { color: var(--soft); margin: 0; padding: 0 0 1.4rem; max-width: 44rem; }
-
-.final { text-align: center; padding: clamp(5rem, 4rem + 6vw, 9rem) 0; }
-.final h2 { font-size: clamp(2.2rem, 1.4rem + 3.6vw, 4.4rem); font-weight: 780; }
-.final .hero-cta { display: flex; flex-wrap: wrap; gap: .9rem 1.4rem; justify-content: center; align-items: center; margin-top: 1.8rem; }
-
-/* Motion: the hero's words glide in; blocks rise into place as they enter (public/site.js adds .in). */
+/* Motion: blocks rise into place as they enter (public/site.js adds .in). */
 @media (prefers-reduced-motion: no-preference) {
   html.js-reveal .reveal { opacity: 0; transform: translateY(20px); transition: opacity .5s ease-out, transform .5s cubic-bezier(.22, .61, .36, 1); }
   html.js-reveal .reveal.in { opacity: 1; transform: none; }
@@ -172,7 +105,6 @@ html[data-site="dark"] .os-apple-dark { display: block; }
   html.js-reveal .reveal:nth-child(3) { transition-delay: 160ms; }
   html.js-reveal .reveal:nth-child(4) { transition-delay: 240ms; }
 }
-@keyframes enter { from { opacity: 0; transform: translateY(18px); } }
 @keyframes glide { from { transform: translateY(22px); } }
 
 /* ---- The dark theme (the decider's round 9): html[data-site] sets it;
@@ -197,8 +129,6 @@ html[data-site="dark"] {
   --e2: 0 1px 2px rgb(0 0 0/.15), 0 10px 24px -12px rgb(0 0 0/.45), inset 0 0 0 1px rgb(255 255 255/.06);
   --e3: 0 1px 2px rgb(0 0 0/.2), 0 24px 56px -20px rgb(0 0 0/.75), inset 0 0 0 1px rgb(255 255 255/.06);
 }
-html[data-site="dark"] .os-state .ok { color: #9BE8C0; background: #10301F; }
-html[data-site="dark"] .soon { color: #FFD58A; background: #2A2110; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
