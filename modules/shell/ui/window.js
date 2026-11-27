@@ -3397,7 +3397,8 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // as the menu's description, never a menu item.
   if (session.confidential) {
     const menu = share.querySelector(".menu");
-    const note = element("p", "menu-note", words.share_confidential);
+    const note = element("p", "menu-note");
+    note.append(icon("lock"), element("span", "", words.share_confidential));
     note.id = "share-confidential";
     note.setAttribute("role", "none");
     menu.prepend(note);
@@ -3434,7 +3435,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   }
   rarer.push(["trash-meeting", words.trash_meeting, () => trashAsked(session, transcript, minutes, words, refused), true]);
   actions.append(share, redo, moreActions(rarer, words));
-  top.append(refused, shared);
+  top.append(refused);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
@@ -3453,7 +3454,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // bar shows it; at rest, the page's own switch says it.
   if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
   title.append(named, lasts, held);
-  head.append(title, top);
+  // What an export became, on its own line under the bar (the audit of #1320 against v5): never beside it, where a long
+  // file name would push the bar out of sight.
+  head.append(title, top, shared);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
