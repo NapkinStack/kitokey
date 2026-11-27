@@ -91,12 +91,25 @@ impl Summarising {
     /// Starts `kitokey-summary` on a session's folder. The key goes to its environment only — a
     /// key in Kitokey's own environment never does.
     pub fn start(program: &Path, folder: &Path, provider: &str, model: &str, key: Option<&str>) -> io::Result<(Self, Receiver<Event>)> {
+        Self::start_as(program, folder, provider, model, key, &[])
+    }
+
+    /// The same, in the format chosen (D130): what `formats::argument` gives, after the model.
+    pub fn start_as(
+        program: &Path,
+        folder: &Path,
+        provider: &str,
+        model: &str,
+        key: Option<&str>,
+        shape: &[String],
+    ) -> io::Result<(Self, Receiver<Event>)> {
         let (trace, making) = crate::log::making();
         let _making = making.enter();
         let mut command = Command::new(program);
         command
             .arg(folder)
             .args(["--provider", provider, "--model", model])
+            .args(shape)
             .env("KITOKEY_TRACE", &trace);
         let host = crate::providers::host(provider).unwrap_or_default();
         info!(session = %crate::transcription::named(folder), host, model, key = key.is_some(), "shell.minutes");

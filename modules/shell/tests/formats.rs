@@ -259,3 +259,32 @@ sections = [{ title = "A", about = "x" }]
     assert_eq!(formats.hidden, ["interview", "one_to_one"]);
     assert_eq!(formats.default, "general");
 }
+
+#[test]
+fn kitokey_summary_is_given_the_format_chosen_as_summarising_v1_says() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut formats = Formats::default();
+    let made = formats.made("Point client hebdo", weekly(), Some(2)).unwrap();
+    // `general`: no structure, as before — minutes/v4, its sections the same.
+    assert!(formats::argument(&formats, "general", folder.path()).unwrap().is_empty());
+    // Another built-in: its name.
+    assert_eq!(
+        formats::argument(&formats, "stand_up", folder.path()).unwrap(),
+        ["--structure", "stand_up"]
+    );
+    // A person's own: the file --format reads, written in the formats' folder.
+    let given = formats::argument(&formats, &made, folder.path()).unwrap();
+    let file = folder.path().join("point_client_hebdo.json");
+    assert_eq!(given, ["--format".to_string(), file.to_string_lossy().into_owned()]);
+    let written: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(written, formats::file(formats.own(&made).unwrap()));
+    // One deleted, or hidden, since it was chosen: the default.
+    formats.default_to("client_call").unwrap();
+    formats.hide("interview", true).unwrap();
+    for gone in ["interview", "deleted_since"] {
+        assert_eq!(
+            formats::argument(&formats, gone, folder.path()).unwrap(),
+            ["--structure", "client_call"]
+        );
+    }
+}

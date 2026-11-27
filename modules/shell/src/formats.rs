@@ -244,6 +244,25 @@ impl Formats {
     }
 }
 
+/// What `kitokey-summary` is given after its model for the format of that structure: nothing for
+/// `general` — `minutes/v4`, its sections the same —, `--structure` and its name for another built-in
+/// one, `--format` and its file for a person's own, written in `folder` as [`file`] says. One
+/// deleted or hidden since it was chosen: the default.
+pub fn argument(formats: &Formats, structure: &str, folder: &std::path::Path) -> std::io::Result<Vec<String>> {
+    let offered = formats.shown().contains(&structure);
+    let structure = if offered { structure } else { formats.default.as_str() };
+    if structure == BUILT_IN[0] {
+        return Ok(Vec::new());
+    }
+    let Some(format) = formats.own(structure) else {
+        return Ok(vec!["--structure".into(), structure.into()]);
+    };
+    std::fs::create_dir_all(folder)?;
+    let path = folder.join(format!("{structure}.json"));
+    std::fs::write(&path, file(format).to_string())?;
+    Ok(vec!["--format".into(), path.to_string_lossy().into_owned()])
+}
+
 /// The file `kitokey-summary --format` reads (`summarising/v1`'s `format.schema.json`).
 pub fn file(format: &Format) -> Value {
     let ids = ids(&format.sections);
