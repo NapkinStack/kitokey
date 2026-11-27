@@ -1353,6 +1353,10 @@ pub struct Window {
     /// Goes on with the engine chosen (D126). Shows: the first run, as its primary button. When:
     /// Kitokey's first start. At most: 12 characters. Placeholders: none.
     pub first_next: &'static str,
+    /// Where the user is among the first run's screens, read by a screen reader on its three marks
+    /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
+    /// start. At most: about 20 characters. Placeholders: {} the screen's number.
+    pub first_step: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2396,6 +2400,7 @@ pub fn window(language: Language) -> Window {
             first_lead: "Who writes your summaries? You can change it later, meeting by meeting.",
             first_later: "I’ll choose later",
             first_next: "Continue",
+            first_step: "Step {} of 3",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2947,6 +2952,7 @@ pub fn window(language: Language) -> Window {
             first_lead: "Qui écrit vos comptes rendus\u{202f}? Vous pourrez changer plus tard, réunion par réunion.",
             first_later: "Je choisirai plus tard",
             first_next: "Continuer",
+            first_step: "Étape {} sur 3",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",

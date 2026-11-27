@@ -3,16 +3,22 @@
 // needs to hear downloads at once, while the user reads — what needs an install (Ollama) is only said. « Je
 // choisirai plus tard » keeps « Auto » and writes nothing; either way the window ends on its ready screen (CU).
 // « Refaire la configuration » keeps the assistant before it (`showWelcome`, D58) until D122b.
-// It uses the window's own `element` and `firstRunEnded`, and Settings' `focusMinutes` (window.js).
+// It uses the window's own `element`, `fill`, `icon` and `firstRunEnded`, and Settings' `focusMinutes` (window.js).
 
 async function showFirstRun(words) {
   const page = document.getElementById("welcome");
   const { invoke } = window.__TAURI__.core;
   const offered = await invoke("models_offered", { name: null }).catch(() => null);
-  const made = element("section", "card welcome");
+  const made = element("section", "card welcome first-run");
   made.id = "first-choice";
   const top = element("div", "welcome-top");
-  top.append(document.querySelector("#sidebar .brand").cloneNode(true));
+  // Where the user is among the screens, as v5 draws it: three marks, a screen reader told « Étape 1 sur 3 ».
+  const steps = element("span", "first-steps");
+  steps.id = "first-steps";
+  steps.setAttribute("role", "img");
+  steps.setAttribute("aria-label", fill(words.first_step, 1));
+  steps.append(...[1, 2, 3].map((step) => element("i", step === 1 ? "on" : "")));
+  top.append(document.querySelector("#sidebar .brand").cloneNode(true), steps);
   const heading = element("h1", "", words.first_title);
   heading.id = "welcome-heading";
   heading.tabIndex = -1;
@@ -35,7 +41,7 @@ async function showFirstRun(words) {
   const actions = element("div", "welcome-actions");
   actions.append(
     button("first-later", "link", words.first_later, ready),
-    button("first-next", "primary", words.first_next, async () => {
+    button("first-next", "primary with-icon", words.first_next, async () => {
       const chosen = cards?.value() ?? "";
       // An online service: its key is asked where Settings ask it, nothing saved here.
       if (chosen === "online") {
@@ -55,6 +61,8 @@ async function showFirstRun(words) {
       ready();
     }),
   );
+  // « Continuer » goes on: its chevron after its words, as v5 draws it, hidden from a screen reader.
+  actions.lastChild.append(icon("chevron-right"));
   made.append(actions, said);
   page.replaceChildren(made);
   heading.focus();
