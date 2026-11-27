@@ -869,7 +869,7 @@ fn show_welcome(app: &AppHandle) {
 /// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
 /// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
 /// 440 × 44 asked left a web view of 388 × 1.
-const BAR: (f64, f64) = (440.0, 44.0);
+const BAR: (f64, f64) = (440.0, 48.0);
 /// As tall as the bar may grow: what it holds beyond that scrolls.
 const BAR_TALLEST: f64 = 720.0;
 
@@ -1016,7 +1016,8 @@ fn left(app: &AppHandle, window: settings::Window) {
 #[derive(serde::Serialize)]
 struct Listing {
     words: words::Window,
-    folder: PathBuf,
+    /// The folder as people write it, from their home (`~/…`): the window says it, never the machine's root (#1232).
+    folder: String,
     sessions: Vec<Listed>,
     /// For each session, in the same order, who spoke over it — here, then remote — when its
     /// transcript reads. No row draws it since D89's compact rows: taken out on its own.
@@ -1088,7 +1089,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
         drop(kept);
         Listing {
             words: words::window(shell.language()),
-            folder: shell.settings().sessions.clone(),
+            folder: from_home_said(&shell.settings().sessions),
             sessions,
             shapes,
             recording: shell.recording_on(),

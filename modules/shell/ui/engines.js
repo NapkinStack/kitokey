@@ -20,7 +20,9 @@ function engineCard(job, group, { engine, value, name, at, state, said, facts, m
   label.append(radio, element("span", "name", name));
   // « Par défaut » and the state are D120's chips: the default in the accent, ready a success, a key missing a warning.
   if (mark) label.append(element("span", "default chip accent", mark));
-  label.append(element("span", "where", said.where ?? (at === "online" ? said.online : said.here)));
+  // Where it runs, unless the card's name already says it (« Sur cet ordinateur », the coordinator's audit of #1307).
+  const where = said.where ?? (at === "online" ? said.online : said.here);
+  if (where !== name) label.append(element("span", "where", where));
   label.append(element("span", `state chip ${{ ready: "success", key: "warning" }[state] ?? "neutral"}`, said.state));
   if (facts) label.append(element("span", "facts", facts));
   const more = element("details");

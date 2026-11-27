@@ -83,6 +83,8 @@
   --e2: 0 1px 2px rgb(20 30 55 / .06), 0 10px 24px -12px rgb(30 50 100 / .18);
   --e3: 0 1px 2px rgb(0 0 0 / .08), 0 24px 56px -20px rgb(30 50 100 / .30);
   --color-scrim: rgb(15 17 21 / .36);
+  /* The first run's two halos behind its card (D126, mock-up v5): dimmer in the dark. */
+  --halo-opacity: .25;
 }
 
 /* The window's older names, each the primitive it was on main (tests/look.rs pins them). */
@@ -109,6 +111,7 @@
     --e2: 0 1px 2px rgb(0 0 0 / .15), 0 10px 24px -12px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .06);
     --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
     --color-scrim: rgb(0 0 0 / .55);
+    --halo-opacity: .12;
     --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
     --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
     --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);
@@ -131,6 +134,7 @@
   --e2: 0 1px 2px rgb(0 0 0 / .15), 0 10px 24px -12px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .06);
   --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
   --color-scrim: rgb(0 0 0 / .55);
+  --halo-opacity: .12;
   --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
   --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
   --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);

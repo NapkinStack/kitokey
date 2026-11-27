@@ -52,6 +52,13 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
 .menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
 .menu-item:hover, .menu-item:focus { background: var(--raised); }
+/* D121: a deletion last in its menu, after a line, in the destructive role's colour (PDR-0008). */
+.menu-item.destructive { color: var(--color-destructive); }
+.menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--color-divider); }
+/* A meeting refused the trash (D100): said under its bar, nothing when nothing is said. */
+#trash-said:empty { display: none; }
+/* D121: the meeting's bar of actions, each its words beside its icon; « Agenda »'s count after its words. */
+.bar-action .count { font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }
@@ -74,10 +81,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .meeting-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 /* The meeting's header (D89): its title at 18 px, its actions at its right. */
 #meeting { padding-top: 0; }
-.meeting-head { display: flex; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.meeting-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; min-height: 56px; margin: 0 -24px; padding: 8px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .lasts { color: var(--soft); font-size: 13px; white-space: nowrap; }
 .lasts .length + .weighs::before { content: " · "; }
-.meeting-head .meeting-title { flex: 1 1 auto; min-width: 0; }
+/* D121: the name keeps 280 px at least; where the bar does not fit beside it, the bar goes under it, never squeezing it. */
+.meeting-head .meeting-title { flex: 1 1 280px; min-width: 0; }
 .meeting-head .meeting-top { flex: none; }
 .meeting-title h1 { margin: 0; font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
 .meeting-title h1 .rename { display: block; max-width: 100%; margin: 0; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-align: left; overflow-wrap: anywhere; cursor: text; }
@@ -342,8 +350,7 @@ select:hover, select:focus { border-color: var(--edge); }
 .freeable.busy { cursor: default; opacity: 0.6; }
 .free-total { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding: 20px 24px; background: var(--raised); }
 /* Arrêter in the small window: red, as the recording it stops. */
-.danger { min-height: 32px; padding: 0 12px; border: 0; border-radius: 8px; background: var(--red); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
-.danger:disabled, .primary:disabled, .open:disabled, [aria-disabled="true"] { opacity: 0.45; cursor: default; }
+.primary:disabled, .open:disabled, [aria-disabled="true"] { opacity: 0.45; cursor: default; }
 .page-top { display: flex; align-items: baseline; gap: 18px; }
 .page-top h1 { margin: 0; font-size: 20px; }
 .free-total .total { display: flex; align-items: baseline; gap: 8px; }
@@ -354,32 +361,42 @@ select:hover, select:focus { border-color: var(--edge); }
 body.small-window { background: var(--surface); }
 body.small-window .frame { display: none; }
 #small { max-width: none; padding: 0; gap: 0; }
-#small .bar-row { display: flex; align-items: center; gap: 4px; height: 44px; padding: 0 8px 0 12px; }
+/* 48 high, its controls 32 (D125, the decider's Round 4 of 2026-11-26). */
+#small .bar-row { display: flex; align-items: center; gap: var(--sp-2); height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4); }
 #small .bar-space { flex: 1 1 auto; }
-/* Said confidential while it records (#1204): the lock in the meeting's green, as « Confidentielle »'s chip (3:1 on the
-   surface at least, tests/look.rs). */
-#small .bar-locked { display: inline-flex; flex: none; margin-left: 8px; color: var(--ok); }
-#small .bar-locked .lock { color: inherit; }
-#small .bar-row .icon-button { width: 28px; min-height: 28px; }
+/* Said confidential while it records (#1204, D125): one lock, a toggle; pressed, in the meeting's green, as
+   « Confidentielle »'s chip (3:1 on the surface at least, tests/look.rs). */
+#small .bar-row .icon-button { width: 32px; min-height: 32px; }
+/* The row's buttons keep their 32 px: the meters give way where the row is full. */
+#small .bar-row button { flex: none; }
+/* No focus ring in the row until the keyboard is used (D125): `keyed`, set by a key, taken away by the pointer. */
+#small:not(.keyed) .bar-row button:focus-visible { outline: none; }
+#small .bar-lock[aria-pressed="true"] { color: var(--ok); }
+#small .bar-lock .lock { color: inherit; }
+/* The row's items spaced by its gap alone (Round 4): the separator, the handle and the meters keep no margin of their own. */
+#small .bar-separator { flex: none; width: 1px; height: 20px; background: var(--color-divider); }
 /* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
-#small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }
+#small .handle { display: grid; place-items: center; color: var(--accent); cursor: grab; }
 .mark { display: block; width: 20px; height: 20px; fill: currentColor; }
 .mark .arms { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
 .mark .live, .handle.live .mark .rest { display: none; }
 .handle.live .mark .live { display: inline; }
 #small .handle.live .dot { fill: var(--red); }
-#small .time { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; }
+#small .time { font-weight: 600; font-size: 15px; font-variant-numeric: tabular-nums; color: var(--color-text); }
 /* ● to record, a red ring holding a red dot that grows under the pointer; ■ to stop, red. */
-#small .record { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; border: 2px solid var(--red); border-radius: 50%; background: transparent; cursor: pointer; }
+#small .record { display: inline-grid; place-items: center; width: 32px; min-height: 32px; padding: 0; border: 2px solid var(--red); border-radius: 50%; background: transparent; cursor: pointer; }
 #small .record .record-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--red); transition: transform 90ms ease-out; }
 #small .record:hover .record-dot { transform: scale(1.15); }
 #small .record:disabled { opacity: 0.45; cursor: default; }
-#small .danger { display: inline-grid; place-items: center; width: 28px; min-height: 28px; padding: 0; }
-#small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--surface); }
+/* ■ neutral (Round 4): red is the live dot's alone. */
+#small .stop { display: inline-grid; place-items: center; width: 32px; min-height: 32px; padding: 0; border: 1px solid var(--color-divider); border-radius: var(--r-sm); background: var(--color-sunken); cursor: pointer; transition: background-color 90ms ease-out; }
+#small .stop:hover { background: var(--color-hover); }
+#small .stop:disabled { opacity: 0.45; cursor: default; }
+#small .stop-square { width: 10px; height: 10px; border-radius: 2px; background: var(--color-text); }
 #small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
 /* A thin meter for each side in the row (D90, board 5): its icon, its trace 14 px high; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
-#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; }
 /* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
    Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
 .live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
@@ -507,6 +524,21 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .welcome-actions .link { align-self: center; color: var(--soft); }
 .welcome-actions .primary { margin-left: auto; }
 .welcome-top .link { color: var(--soft); }
+/* D126, the first run's screen (1) as mock-up v5 draws it: its card 760 px wide, its shadow, its steps, the page's
+   two halos behind it; the engine cards three on a line, one a line in a narrow window. The assistant above unchanged. */
+#welcome:has(> .first-run) { position: relative; overflow: hidden; }
+#welcome:has(> .first-run)::before, #welcome:has(> .first-run)::after { content: ""; position: absolute; width: 50vmax; height: 40vmax; border-radius: 50%; filter: blur(80px); opacity: var(--halo-opacity); pointer-events: none; }
+#welcome:has(> .first-run)::before { background: var(--blue-200); left: -10vmax; top: -12vmax; }
+#welcome:has(> .first-run)::after { background: var(--violet-300); right: -12vmax; bottom: -14vmax; }
+#first-choice { position: relative; z-index: 1; width: min(760px, 100%); padding: var(--sp-8); border-radius: var(--r-xl); box-shadow: var(--e3); }
+#first-choice .engine-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Three on a line, the shorter ones as tall as the tallest: their lines stay packed at their top, as v5 stacks them. */
+#first-choice .engine-card { align-content: start; }
+@media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice { padding: var(--sp-5); } }
+.first-steps { display: flex; gap: var(--sp-1); }
+/* Its marks to come in the edge role, not v5's sunken: 3.7:1 on the card in both themes (WCAG 2.2 SC 1.4.11; lina, #1307). */
+.first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-edge); }
+.first-steps i.on { background: var(--color-accent); }
 .welcome-mode { padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); display: flex; flex-direction: column; gap: 2px; }
 .welcome-mode.connected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
 .welcome-mode h1 { font-size: 19px; }
@@ -560,17 +592,13 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .small-context { display: flex; flex-direction: column; gap: 5px; margin-top: -4px; }
 #small .context-text { resize: none; }
 
-/* A meeting said confidential (D60's board): the settings' switch, a lock before its words. */
+/* A meeting said confidential (D60's board): the settings' card, a lock before its words. */
 .lock { color: var(--soft); }
 .confidential { flex-wrap: nowrap; gap: 10px; cursor: pointer; }
-.confidential .said { flex: 1 1 auto; }
-.confidential .says { font-size: 13px; }
 .confidential.on .lock { color: var(--ok); }
 .confidential input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .chip.locked { display: inline-flex; align-items: center; gap: 5px; color: var(--ok); font-weight: 600; }
 .chip.locked .lock { color: inherit; }
-#small .confidential .name { font-size: 14px; }
-#small .confidential .says { font-size: 12.5px; }
 
 /* The window in two panes (D61's board): the meetings in a sidebar of 280 px, the one chosen in the
    pane beside it, as wide as the window leaves it; under 840 px, one at a time. */
@@ -716,11 +744,6 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .check-actions .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .check-actions .open:disabled { border-style: dashed; border-color: var(--edge); color: var(--soft); cursor: default; }
 .check-note { margin-top: 12px; margin-bottom: 16px; font-size: 12.5px; color: var(--soft); }
-/* A meeting to the trash, asked in place under its page's actions (D100). */
-.trash-ask { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; padding: 14px 18px; }
-.trash-ask .trash-choices { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-.trash-ask .trash-choices button { white-space: nowrap; }
-.trash-ask .note:empty { display: none; }
 /* « Dates mentionnées » with its count (#1239): the calendar and the number in one pill, the row's height. */
 .icon-button.counted { width: auto; grid-auto-flow: column; gap: 4px; padding: 0 8px; }
 .icon-button .count { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }

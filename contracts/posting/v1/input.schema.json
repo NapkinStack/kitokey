@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "The posting program's input",
-  "description": "posting/v1 — one JSON object on the program's input, then its end: where to send, a secret, and the meeting's name; for notion, the integration's key too; for a confidential meeting, its confirmation. What a schema cannot say is on the contract's page: which addresses are refused.",
+  "description": "posting/v1 — one JSON object on the program's input, then its end: where to send, a secret, and the meeting's name; for notion, the integration's key too; for a confidential meeting, its confirmation; the parts of the summary a person chose, and the dates with their heading. What a schema cannot say is on the contract's page: which addresses are refused.",
   "type": "object",
   "properties": {
     "address": {
@@ -29,6 +29,83 @@
     "confirmed_confidential": {
       "description": "true once the person confirmed sending a confidential meeting, for this send alone; false when absent.",
       "type": "boolean"
+    },
+    "parts": {
+      "description": "The parts of the summary sent, the title always sent and never one of them; absent, the summary is sent whole, as before. Each part once.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "summary",
+          "actions",
+          "key_points",
+          "dates"
+        ]
+      }
+    },
+    "dates": {
+      "description": "exporting/v1's dates, as the shell gives them: sent only when `parts` names `dates`, each as « date — what — who », never its `passage`. What a schema cannot say is on the contract's page.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "pattern": "[\\n\\r]"
+            }
+          },
+          "who": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "pattern": "[\\n\\r]"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passage": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "what"
+        ]
+      }
+    },
+    "dates_title": {
+      "description": "The dates' heading, in the person's language: required by the program when `parts` names `dates` and `dates` is given.",
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[\\n\\r]"
+      }
     }
   },
   "required": [

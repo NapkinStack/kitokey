@@ -126,6 +126,8 @@ const ICONS = {
   hash: ["M4 9h16", "M4 15h16", "M10 3 8 21", "M16 3l-2 18"],
   globe: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20"],
   "folder-open": ["m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"],
+  // Lucide's share-2: the summary's sends, its copy and its files (D121).
+  "share-2": [["circle", { cx: 18, cy: 5, r: 3 }], ["circle", { cx: 6, cy: 12, r: 3 }], ["circle", { cx: 18, cy: 19, r: 3 }], "M8.59 13.51l6.83 3.98", "M15.41 6.51l-6.82 3.98"],
   ellipsis: [["circle", { cx: 12, cy: 12, r: 1 }], ["circle", { cx: 19, cy: 12, r: 1 }], ["circle", { cx: 5, cy: 12, r: 1 }]],
   "message-square-text": ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"],
   languages: ["m5 8 6 6", "m4 14 6-6 2-3", "M2 5h12", "M7 2h1", "m22 22-5-10-5 10", "M14 18h6"],
@@ -372,28 +374,41 @@ function galleryEngines(words) {
   ];
 }
 
-// « Plus d’actions » (D89): the rarer actions behind one button, as WAI-ARIA's menu button has it —
-// Enter, Space or ↓ open it on its first item, ↑ on its last; ↑ ↓ Home End move in it; Escape
-// closes it, the focus back on its button; Tab or a click elsewhere closes it; an item chosen
-// closes it, the focus back on the button before the item acts.
-function moreActions(items, words) {
+// A button of a meeting's bar (D121): its words beside its icon, never an icon alone; a name for a screen reader
+// only where it says more, and then beginning with the words shown (WCAG 2.5.3).
+function actionButton(glyph, label, id, name) {
+  const button = element("button", "button secondary bar-action");
+  button.type = "button";
+  button.id = id;
+  button.append(icon(glyph), element("span", "label", label));
+  if (name) button.setAttribute("aria-label", name);
+  return button;
+}
+
+// A menu of actions behind one button (D89, D121), as WAI-ARIA's menu button has it — Enter, Space or ↓ open it
+// on its first item, ↑ on its last; ↑ ↓ Home End move in it; Escape closes it, the focus back on its button; Tab or
+// a click elsewhere closes it; an item chosen closes it, the focus back on the button before the item acts. An item
+// marked destructive comes last, after a separator, as the platforms' menus put a deletion.
+function moreActions(items, words, { id = "more-open", menuId = "more-menu", glyph = "ellipsis", label = words.meeting_more, name = words.more_actions, chevron = false } = {}) {
   const more = element("div", "more");
-  const button = iconButton("ellipsis", words.more_actions, "more-actions");
+  const button = actionButton(glyph, label, id, name);
+  // A button that opens a menu says it with a chevron after its words (v5, « Partager ▾ »), as the platforms' menu buttons do.
+  if (chevron) button.append(icon("chevron-down"));
   button.setAttribute("aria-haspopup", "menu");
-  button.setAttribute("aria-controls", "more-menu");
+  button.setAttribute("aria-controls", menuId);
   button.setAttribute("aria-expanded", "false");
   const menu = element("div", "menu");
-  menu.id = "more-menu";
+  menu.id = menuId;
   menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", words.more_actions);
+  menu.setAttribute("aria-label", name);
   menu.hidden = true;
   const close = (back) => {
     menu.hidden = true;
     button.setAttribute("aria-expanded", "false");
     if (back) button.focus();
   };
-  const entries = items.map(([id, said, act]) => {
-    const item = element("button", "menu-item", said);
+  const entries = items.map(([id, said, act, destructive]) => {
+    const item = element("button", destructive ? "menu-item destructive" : "menu-item", said);
     item.type = "button";
     item.id = id;
     item.tabIndex = -1;
@@ -434,7 +449,14 @@ function moreActions(items, words) {
     if (!menu.hidden && !more.contains(event.target)) close(false);
   };
   document.addEventListener("pointerdown", elsewhere, true);
-  menu.append(...entries);
+  for (const entry of entries) {
+    if (entry.classList.contains("destructive")) {
+      const line = element("div", "menu-separator");
+      line.setAttribute("role", "separator");
+      menu.append(line);
+    }
+    menu.append(entry);
+  }
   more.append(button, menu);
   return more;
 }
@@ -490,19 +512,6 @@ function lockedChip(words) {
   const said = chip(words.confidential_chip, "locked");
   said.prepend(lock());
   return said;
-}
-
-// « Réunion confidentielle » (D60): the settings' own switch, a lock before its words.
-function confidentialSwitch(words, id) {
-  const row = element("label", "row confidential");
-  const box = element("input");
-  box.type = "checkbox";
-  box.id = id;
-  box.setAttribute("role", "switch");
-  const said = element("span", "said");
-  said.append(element("span", "name", words.confidential_name), element("span", "says", words.confidential_says));
-  row.append(lock(), said, box);
-  return { row, box };
 }
 
 // What had left before the meeting was said confidential, and to which host.
@@ -1269,9 +1278,9 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   // Once a meeting is there, the first run is over for good: removed again, the window says its ordinary words.
   if (sessions.length > 0) firstRunEnded = false;
   const ready = firstRunEnded && !unreadable && sessions.length === 0;
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : ready ? words.ready_title : words.none;
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folderSaid(folder, words)) : ready ? words.ready_title : words.none;
   // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
-  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
+  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folderSaid(folder, words));
   document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : ready ? words.ready_says : words.none_do;
   // Its style stays the pane's: the sidebar's « Démarrer un enregistrement » is the window's one primary action.
@@ -2168,6 +2177,12 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
 
 // A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
 // own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
+// A folder as people say it (#1232): from their home, « Dossier personnel / Kitokey », or from the root, « / mnt / … ».
+function folderSaid(path, words) {
+  const said = path.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
+  return path.startsWith("/") ? `/ ${said}` : said;
+}
+
 function pathShown(said, whole, id) {
   const shown = element("button", "path");
   shown.id = id;
@@ -2571,14 +2586,12 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
 // beside it, the user choosing.
 function datesOffer(card, mentioned, session, transcript, words) {
   if (mentioned.length === 0) return;
-  // Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, D89): a calendar, its tooltip and name the
-  // words, before « Copier »; never a bar of its own under the summary.
-  const button = iconButton("calendar", words.dates_open, "dates-open");
+  // In the meeting's bar of actions (D121), « Agenda » and its count, before « Refaire »: its words and a calendar.
+  const button = actionButton("calendar", words.meeting_dates, "dates-open");
   button.hidden = true;
-  const actions = card.querySelector(".minutes-actions");
-  const copy = actions?.querySelector("#copy-minutes");
-  if (copy) copy.before(button);
-  else (actions ?? card).append(button);
+  const redo = meetingBar?.querySelector("#redo-open");
+  if (redo) redo.before(button);
+  else card.append(button);
   window.__TAURI__.core
     .invoke("dates_resolved", { name: nameOf(session), whens: mentioned.map((m) => m.when), day: null })
     .then((resolved) => {
@@ -2589,9 +2602,10 @@ function datesOffer(card, mentioned, session, transcript, words) {
       if (count === 0) return;
       const said = fill(words.dates_counted[count === 1 ? 0 : 1], count);
       button.title = said;
-      button.setAttribute("aria-label", said);
+      // Its name begins with what it shows, « Agenda 2 », word for word (WCAG 2.5.3), then what the count is.
+      button.setAttribute("aria-label", `${words.meeting_dates} ${count}, ${words.dates_open.toLocaleLowerCase(words.locale)}`);
       button.classList.add("counted");
-      button.append(element("span", "count", String(count)));
+      button.append(" ", element("span", "count", String(count)));
     })
     .catch(() => {});
   button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
@@ -3367,75 +3381,36 @@ document.addEventListener("keydown", (event) => {
   player.playing() ? player.pause() : player.play();
 });
 
-// A meeting to the trash from its page (D100): the question shows while `trashAsking` names it — a
-// drawing meanwhile draws it again as it was —; once it went, the list focuses `trashedFocus`.
-let trashAsking = null;
+// A meeting to the trash from its page (D100, D121): once it went, the list focuses `trashedFocus`.
 let trashedFocus = null;
+// The bar of actions of the meeting drawn (D121): `datesOffer` puts « Agenda (n) » in it, before « Refaire ».
+let meetingBar = null;
 
-// The question, in place: what the meeting holds, that the system's trash restores it, « Annuler »
-// first; confirmed, sent as « Faire de la place » sends it — the whole folder to the system's trash.
-function trashQuestion(session, transcript, minutes, words, trash) {
+// Asked first in the platform's own dialog (D120's `ask`, PDR-0008): what the meeting holds, that the system's trash
+// restores it, « Annuler » focused, the confirm destructive; Escape answers no, the focus back on « Plus ». Yes: sent
+// as « Faire de la place » sends it, the whole folder to the system's trash; refused (being recorded or made), said.
+async function trashAsked(session, transcript, minutes, words, refused) {
   const name = nameOf(session);
-  const ask = element("section", "card trash-ask");
-  ask.id = "trash-ask";
-  ask.hidden = trashAsking !== name;
-  ask.setAttribute("role", "group");
-  ask.setAttribute("aria-labelledby", "trash-ask-title");
-  const title = element("p", "name", words.trash_ask);
-  title.id = "trash-ask-title";
   const held = [session.audio > 0, transcript.state === "present", minutes.state === "present"]
     .map((there, at) => (there ? words.trash_parts[at] : null))
     .filter(Boolean);
-  const holds = element("p", "says", held.length ? fill(words.trash_holds, new Intl.ListFormat(words.locale, { type: "conjunction" }).format(held)) : "");
-  const restore = element("p", "says", words.trash_restore);
-  const cancel = element("button", "open", words.trash_cancel);
-  cancel.type = "button";
-  cancel.id = "trash-cancel";
-  // Never red: red says a recording, and nothing else (look.rs).
-  const confirm = element("button", "open", words.trash_confirm);
-  confirm.type = "button";
-  confirm.id = "trash-confirm";
-  const said = element("p", "note warn");
-  said.id = "trash-said";
-  said.setAttribute("role", "status");
-  const close = () => {
-    trashAsking = null;
-    ask.hidden = true;
-    said.textContent = "";
-    trash.setAttribute("aria-expanded", "false");
-    trash.focus();
-  };
-  cancel.addEventListener("click", close);
-  ask.addEventListener("keydown", (event) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    close();
-  });
-  confirm.addEventListener("click", async () => {
-    // Never disabled while it holds the focus: WebKit would let it go (#886).
-    if (confirm.getAttribute("aria-disabled") === "true") return;
-    waiting(confirm, true);
-    try {
-      await window.__TAURI__.core.invoke("freed", { names: [name], whole: true });
-    } catch (why) {
-      // Being recorded or made, or the trash refused: said, nothing moved.
-      said.textContent = fill(words.trash_refused, why);
-      waiting(confirm, false);
-      return;
-    }
-    trashAsking = null;
-    // The list next, the focus on the meeting after it — or before it, the last one —, or on the list.
-    const links = [...document.querySelectorAll("#groups .session")];
-    const at = links.findIndex((link) => link.getAttribute("href") === `#/meeting/${encodeURIComponent(name)}`);
-    const next = at < 0 ? null : (links[at + 1] ?? links[at - 1] ?? null);
-    trashedFocus = next ? next.getAttribute("href") : "";
-    location.hash = "#/";
-  });
-  const choices = element("div", "trash-choices");
-  choices.append(cancel, confirm);
-  ask.append(title, holds, restore, choices, said);
-  return ask;
+  const holds = held.length ? fill(words.trash_holds, new Intl.ListFormat(words.locale, { type: "conjunction" }).format(held)) : "";
+  const yes = await ask({ title: words.trash_ask, says: [holds, words.trash_restore].filter(Boolean).join(" "),
+    cancel: words.trash_cancel, confirm: words.trash_confirm, destructive: true });
+  if (!yes) return;
+  refused.textContent = "";
+  try {
+    await window.__TAURI__.core.invoke("freed", { names: [name], whole: true });
+  } catch (why) {
+    refused.textContent = fill(words.trash_refused, why);
+    return;
+  }
+  // The list next, the focus on the meeting after it — or before it, the last one —, or on the list.
+  const links = [...document.querySelectorAll("#groups .session")];
+  const at = links.findIndex((link) => link.getAttribute("href") === `#/meeting/${encodeURIComponent(name)}`);
+  const next = at < 0 ? null : (links[at + 1] ?? links[at - 1] ?? null);
+  trashedFocus = next ? next.getAttribute("href") : "";
+  location.hash = "#/";
 }
 
 // After a drawing of the list: the focus a meeting gone to the trash asked for (D100).
@@ -3467,24 +3442,28 @@ function trashedFocused() {
 function showMeeting({ session, transcript, minutes, developer, listen: listened, context, confidential, language, languages, meeting_language, apple, system_language, models_gone, previous_minutes, previous_transcript, minutes_other_version, speakers }, words) {
   const page = document.getElementById("meeting");
   const top = element("div", "meeting-top");
-  const open = iconButton("folder-open", words.open_folder, "open-folder");
-  open.addEventListener("click", () => window.__TAURI__.core.invoke("open_folder", { name: nameOf(session) }).catch((why) => {
-    open.replaceWith(element("p", "note warn", why));
-  }));
-  // To the system's trash from its page (D100): asked in place first, « Annuler » focused.
-  const trash = iconButton("trash-2", words.trash_meeting, "trash-meeting");
-  const ask = trashQuestion(session, transcript, minutes, words, trash);
-  trash.setAttribute("aria-controls", ask.id);
-  trash.setAttribute("aria-expanded", String(!ask.hidden));
-  trash.addEventListener("click", () => {
-    trashAsking = nameOf(session);
-    ask.hidden = false;
-    trash.setAttribute("aria-expanded", "true");
-    document.getElementById("trash-cancel")?.focus();
-  });
+  const name = nameOf(session);
+  // One bar of actions (D121), each its words and its icon: « Partager », « Agenda (n) » once a date is found
+  // (`datesOffer` puts it here), « Refaire », and the rarer ones behind « Plus ». Until « Partager » and « Refaire »
+  // have menus of their own (D121's next parts), they open the summary's send and copy, and its redo.
   const actions = element("div", "actions");
-  // The rarer actions, behind « Plus d’actions » (D89, board 4): the name, as its heading clicked.
-  const rarer = [["rename-item", words.rename_meeting, () => document.getElementById("rename")?.click()]];
+  actions.id = "meeting-actions";
+  meetingBar = actions;
+  const press = (id) => () => document.getElementById(id)?.click();
+  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")]], words,
+    { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
+  const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
+  redo.addEventListener("click", press("redo-minutes"));
+  // A meeting refused the trash (being recorded or made): said in place, nothing moved.
+  const refused = element("p", "note warn");
+  refused.id = "trash-said";
+  refused.setAttribute("role", "status");
+  // The rarer actions, behind « Plus » (D89, board 4; D121): the name, as its heading clicked; the folder; the trash
+  // last, asked in a dialog first, « Annuler » focused, its confirm destructive (PDR-0008).
+  const rarer = [
+    ["rename-item", words.rename_meeting, () => document.getElementById("rename")?.click()],
+    ["open-folder", words.open_folder, () => window.__TAURI__.core.invoke("open_folder", { name }).catch((why) => { refused.textContent = why; })],
+  ];
   // In developer mode: this meeting's logs, to send to whoever looks into it — nothing of the
   // meeting is in them (D29).
   if (developer) {
@@ -3493,16 +3472,18 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     copied.setAttribute("role", "status");
     rarer.push(["copy-diagnostic", words.copy_diagnostic, async () => {
       try {
-        const lines = await window.__TAURI__.core.invoke("diagnostic", { name: nameOf(session) });
+        const lines = await window.__TAURI__.core.invoke("diagnostic", { name });
         await navigator.clipboard.writeText(lines);
         copied.textContent = lines ? words.diagnostic_copied : words.diagnostic_empty;
       } catch {
         copied.textContent = words.diagnostic_not_copied;
       }
     }]);
-    actions.append(copied);
+    top.append(copied);
   }
-  actions.append(open, trash, moreActions(rarer, words));
+  rarer.push(["trash-meeting", words.trash_meeting, () => trashAsked(session, transcript, minutes, words, refused), true]);
+  actions.append(share, redo, moreActions(rarer, words));
+  top.append(refused);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);
   // The meeting's header (D89, board 4): a bar of 56 px, its name, how long and how heavy beside
@@ -3608,7 +3589,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   step.setAttribute("aria-live", "polite");
   const cancel = element("span", "cancel");
   making.append(step, element("span", "by"), element("span", "left"), cancel, element("div", "segments"));
-  page.replaceChildren(head, making, ask, settings, drawn, columns);
+  page.replaceChildren(head, making, settings, drawn, columns);
   paintBar();
   // The line being said, marked while it plays; the page stays where the user left it (D26, the
   // decider, 2026-10-24: following the line was intrusive).
@@ -4832,8 +4813,7 @@ function showSettings(shown, minutes, words) {
   path.spellcheck = false;
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
-  const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said, "sessions-shown");
+  const folderShown = pathShown(folderSaid(shown.sessions_said, words), shown.sessions_said, "sessions-shown");
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4875,10 +4855,9 @@ function showSettings(shown, minutes, words) {
   exportPath.disabled = locked;
   exportPath.spellcheck = false;
   exportPath.hidden = true;
-  const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
   const exportShown =
     shown.export_said === null ? element("button", "path none", words.export_none)
-    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said, "export-shown");
+    : pathShown(folderSaid(shown.export_said, words), shown.export_said, "export-shown");
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");
@@ -5347,6 +5326,10 @@ function showSmall(words) {
   };
   const fits = new ResizeObserver(fit);
   fits.observe(page);
+  // The row's focus ringed once the keyboard is used, never before it nor after the pointer (D125): WebKit rings a
+  // focus the bar gives by script — ● at its opening, ■ after ● — as if a key had been pressed.
+  document.addEventListener("keydown", () => page.classList.add("keyed"), true);
+  document.addEventListener("pointerdown", () => page.classList.remove("keyed"), true);
   const toFull = iconButton("maximize-2", words.small_full, "small-full");
   toFull.addEventListener("click", () => full());
   const handle = element("span", "handle");
@@ -5378,7 +5361,8 @@ function showSmall(words) {
   start.append(element("span", "record-dot"));
   named(start, words.record_start);
   start.addEventListener("click", () => asking(start, words.record_starting, true, words.record_start));
-  const stop = element("button", "danger");
+  // ■ neutral (D125, Round 4): the sunken ground and the text's colour; red is the live dot's alone.
+  const stop = element("button", "stop");
   stop.type = "button";
   stop.id = "small-stop";
   stop.append(element("span", "stop-square"));
@@ -5439,7 +5423,10 @@ function showSmall(words) {
   hide.addEventListener("click", () => invoke("bar_hide"));
   const row = element("div", "bar-row");
   const space = element("span", "bar-space");
-  row.append(handle, nextField, time, space, start, stop, more, toFull, hide);
+  // A line before ■ while it records (Round 4): drawn, never read.
+  const separator = element("span", "bar-separator");
+  separator.setAttribute("aria-hidden", "true");
+  row.append(handle, nextField, time, space, start, separator, stop, more, toFull, hide);
   // No title bar (D90, board 8): the bar is moved by its handle, or its row anywhere but a control.
   row.addEventListener("mousedown", (event) => {
     if (event.button === 0 && !event.target.closest("button, input, textarea, select")) invoke("bar_drag");
@@ -5674,15 +5661,16 @@ function showSmall(words) {
   );
   meters.hidden = true;
   time.after(meters);
-  // Said confidential (#1204, D60): a lock in the row while it records, named for a screen reader and in its tooltip,
-  // as a row's mark in the list — the bar has no room for its word, the switch under « Plus d’options » says it whole.
-  const locked = element("span", "bar-locked");
-  locked.id = "small-locked";
-  locked.setAttribute("role", "img");
-  locked.setAttribute("aria-label", words.confidential_name);
-  locked.title = words.confidential_name;
-  locked.append(lock());
+  // Said confidential (D60, #1204, D125): one lock in the row while it records, a toggle button — pressed, nothing
+  // of the meeting leaves this computer. Its name stays the same; its state is aria-pressed's, and its drawn lock's.
+  const locked = iconButton("lock-open", words.confidential_name, "small-lock");
+  locked.classList.add("bar-lock");
   locked.hidden = true;
+  const pressLock = (on) => {
+    locked.setAttribute("aria-pressed", String(on));
+    locked.firstChild.replaceWith(icon(on ? "lock" : "lock-open"));
+  };
+  pressLock(false);
   meters.after(locked);
   const note = element("p", "says", words.small_note);
   note.id = "small-note";
@@ -5725,10 +5713,8 @@ function showSmall(words) {
   field.area.setAttribute("aria-label", words.context_label);
   const opened = element("div", "small-context");
   opened.append(field.area, field.count);
-  // Said confidential (D60), under the microphone in the options; kept as it is turned, once the
-  // meeting's folder holds its session.
-  const secret = confidentialSwitch(words, "small-confidential");
-  const mark = { wanted: null, refused: 0 };
+  // Kept as the lock is pressed, once the meeting's folder holds its session.
+  const mark = { on: false, wanted: null, refused: 0 };
   const marked = async () => {
     if (meeting.name === null || mark.wanted === null) return;
     const wanted = mark.wanted;
@@ -5736,22 +5722,24 @@ function showSmall(words) {
       await invoke("confidential_set", { name: meeting.name, on: wanted });
       if (mark.wanted === wanted) mark.wanted = null;
       smallSaid("mark", null);
-      secret.row.classList.toggle("on", secret.box.checked);
+      pressLock(mark.on);
     } catch {
-      // Said, its lock off: on with nothing kept would promise what is not so. Asked again every
+      // Said, the lock not pressed: pressed with nothing kept would promise what is not so. Asked again every
       // five seconds, not every tick: each try is a line in the log.
       mark.refused = Date.now();
-      secret.row.classList.remove("on");
+      pressLock(false);
       smallSaid("mark", words.confidential_not_saved);
     }
   };
-  secret.box.addEventListener("change", () => {
-    mark.wanted = secret.box.checked;
+  // Pressed, it turns from what it shows: a refused « on » shows off, and a press then asks for on again.
+  locked.addEventListener("click", () => {
+    mark.on = locked.getAttribute("aria-pressed") !== "true";
+    mark.wanted = mark.on;
     mark.refused = 0;
-    secret.row.classList.toggle("on", secret.box.checked);
+    pressLock(mark.on);
     marked();
   });
-  live.append(opened, micNext, secret.row, note);
+  live.append(opened, micNext, note);
   live.hidden = true;
   // At rest, the meeting last stopped and its stage (D92): one line under the row, cut by an ellipsis
   // where it is longer than the bar, the whole of it its tooltip; « Ouvrir » beside it once it is made,
@@ -5865,7 +5853,8 @@ function showSmall(words) {
       stop.disabled = false;
       named(stop, words.record_stop);
       start.hidden = nextField.hidden = recording;
-      stop.hidden = time.hidden = meters.hidden = space.hidden = !recording;
+      // At rest, no lock: the next recording says its own — hidden with ■, in the same paint.
+      stop.hidden = time.hidden = meters.hidden = space.hidden = locked.hidden = separator.hidden = !recording;
       // At rest, what the shell keeps for the next recording; taken by this one, recording (D91).
       if (!recording) nextText.value = (await invoke("next_context").catch(() => ({ text: "" }))).text;
       paintNext();
@@ -5881,14 +5870,12 @@ function showSmall(words) {
       // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
       mark.wanted = null;
-      secret.box.checked = false;
-      secret.row.classList.remove("on");
+      mark.on = false;
+      pressLock(false);
       field.area.value = "";
       field.painted();
       rest.hidden = recording;
       live.hidden = !recording;
-      // At rest, no lock: the next recording says its own.
-      if (!recording) locked.hidden = true;
       // A recording starts its traces from empty, never from the last one's last two seconds.
       if (recording) for (const id of ["level-me", "level-others"]) drawLevel(document.getElementById(id), levelShown(undefined, 0, 0, false, TRACE), 0);
       // The microphone in each state's options: recording, after the context, as board 6 has it.
@@ -5961,14 +5948,12 @@ function showSmall(words) {
       }
     }
     keep();
-    // What the folder says, unless a turn of the switch is still to be kept.
-    if (mark.wanted === null && now.meeting !== null && secret.box.checked !== now.confidential) {
-      secret.box.checked = now.confidential;
-      secret.row.classList.toggle("on", now.confidential);
+    // What the folder says, unless a press of the lock is still to be kept.
+    if (mark.wanted === null && now.meeting !== null && mark.on !== now.confidential) {
+      mark.on = now.confidential;
+      pressLock(mark.on);
     }
     if (Date.now() - mark.refused >= 5000) marked();
-    // The lock as the switch stands: the folder's word, or a turn not yet kept.
-    locked.hidden = !(recording && secret.box.checked);
   };
   setInterval(tick, 100);
   setInterval(() => recording === false && paintKeys(), 1500);
@@ -6537,7 +6522,8 @@ async function draw(mine, again) {
     // never takes the answers from under the user.
     if (welcome.dataset.shown === location.hash) return;
     welcome.dataset.shown = location.hash;
-    return showWelcome(location.hash === "#/welcome/again", words);
+    // The first start, its own screens (D126, ui/first-run.js); « Refaire la configuration », the assistant.
+    return location.hash === "#/welcome/again" ? showWelcome(true, words) : showFirstRun(words);
   }
   welcome.replaceChildren();
   delete welcome.dataset.shown;

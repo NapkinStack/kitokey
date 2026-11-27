@@ -504,14 +504,13 @@ fn rules(style: &str) -> Vec<(String, String)> {
 
 /// What draws a recording, the one use of the red (D89): the header's button and the name's dot while it
 /// records, a row's live chip, the bar's ● and ■, its handle's dot while it records (D90).
-const RECORDING: [&str; 7] = [
+const RECORDING: [&str; 6] = [
     ".brand.live #name-dot",
     ".chip.live",
     ".act .primary.live",
     "#small .handle.live .dot",
     "#small .record",
     "#small .record .record-dot",
-    ".danger",
 ];
 
 /// CSS Color 4's named colours, its table of 148 (https://www.w3.org/TR/css-color-4/#named-colors):
@@ -718,11 +717,8 @@ fn the_dark_chosen_in_settings_is_the_systems_dark() {
 fn red_says_a_recording_and_nothing_else() {
     assert_eq!(red_outside_a_recording(STYLE), Vec::<String>::new());
     assert_eq!(colours_in_page(PAGE), Vec::<String>::new());
-    assert_eq!(
-        PAGE.matches("\"danger\"").count(),
-        1,
-        "the red button is the small window's Arrêter alone"
-    );
+    // ■ neutral (D125, the decider's Round 4): no red button; a recording's red is its live dot.
+    assert_eq!(PAGE.matches("\"danger\"").count(), 0, "no red button");
     // The red written out on a failure's border, named, or by its function, is refused as the token is.
     for red in [
         "#C2352D",
@@ -776,13 +772,12 @@ fn red_says_a_recording_and_nothing_else() {
 /// The controls of the window and Settings (D89): 32 px high; the small window's are D90's. A
 /// meeting's settings row and its « Plus d’actions » menu, board 4's. Each must be found, so that
 /// none leaves the scan below by a renamed rule.
-const CONTROLS: [&str; 12] = [
+const CONTROLS: [&str; 11] = [
     ".open, .search",
     "select",
     ".picks input",
     ".field input",
     ".primary",
-    ".danger",
     ".act .primary",
     ".sidebar .act .primary",
     ".icon-button",
@@ -793,7 +788,7 @@ const CONTROLS: [&str; 12] = [
 
 /// What makes a rule a control's: an element a user presses or types in, or a class or id the page
 /// gives one. A rule whose selector ends on one of them and sets a height sets 32 px.
-const CONTROL_PARTS: [&str; 21] = [
+const CONTROL_PARTS: [&str; 20] = [
     "input",
     "select",
     "textarea",
@@ -801,7 +796,6 @@ const CONTROL_PARTS: [&str; 21] = [
     ".open",
     ".search",
     ".primary",
-    ".danger",
     ".icon-button",
     ".edit",
     ".correcting",
