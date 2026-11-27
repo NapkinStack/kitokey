@@ -1,10 +1,8 @@
 {"track": "local", "sample": 0, "at": 0.0}
 {"track": "remote", "sample": 0, "at": 0.0}
-{"track": "local", "sample": 160000, "at": 10.0}
-{"track": "remote", "sample": 160000, "at": 10.0}
-{"track": "local", "sample": 320000, "at": 20.0}
-{"track": "remote", "sample": 320000, "at": 20.0}
-{"track": "local", "sample": 480000, "at": 30.0}
-{"track": "remote", "sample": 480000, "at": 30.0}
-{"track": "local", "sample": 640000, "at": 40.0}
-{"track": "remote", "sample": 640000, "at": 40.0}
+{"track": "local", "sample": 240000, "at": 10.0}
+{"track": "remote", "sample": 240000, "at": 10.0}
+{"track": "local", "sample": 480000, "at": 20.0}
+{"track": "remote", "sample": 480000, "at": 20.0}
+{"track": "local", "sample": 720000, "at": 30.0}
+{"track": "remote", "sample": 720000, "at": 30.0}

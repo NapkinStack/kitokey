@@ -1,41 +1,46 @@
 """Makes the example meeting a newcomer tries (D126): one session folder per language the window
-speaks, as `session-audio/v3` says, its two voices made by Piper. Invented for Kitokey: no real
-meeting, no real person.
+speaks, as `session-audio/v3` says, its two voices made by ElevenLabs Multilingual v2 through
+OpenRouter's speech API. Invented for Kitokey: no real meeting, no real person.
 
-Run once, from `modules/shell`, with the voices downloaded (licences in `ui/example/LICENSE`):
+Run from `modules/shell`, with the key in the environment, never written anywhere:
 
-    uv run --no-project --with piper-tts==1.8.0 python -m piper.download_voices \
-        fr_FR-mls-medium en_US-joe-medium en_GB-cori-medium --download-dir <voices>
-    uv run --no-project --with piper-tts==1.8.0 python scripts/example.py <voices>
+    OPENROUTER_API_KEY=… python3 scripts/example.py <speech-folder>
 
+Each turn's speech is kept in `<speech-folder>/<language>/turnNN-<side>.mp3`, as the API answered it,
+and asked again only when missing: a second run lays the tracks out from those files, with no key.
 It writes `ui/example/<language>/`: `session.json`, `clock.jsonl`, `local.flac` (« Vous »),
-`remote.flac` (« Les autres ») and `title.txt`. Needs `ffmpeg` for the FLAC.
+`remote.flac` (« Les autres ») and `title.txt`. Needs `ffmpeg` (with soxr) for the FLAC.
+
+The service's synthesis is not deterministic: the same words, voices and speed give other bytes on
+another run. Licence of the sound: `ui/example/LICENSE`.
 """
 
 import array
 import json
+import os
 import subprocess
 import sys
-import tempfile
-import wave
+import urllib.request
 from pathlib import Path
 
-from piper import PiperVoice, SynthesisConfig
+# The speech model, as OpenRouter names it, its speed, and the address that makes speech.
+MODEL = "elevenlabs/eleven-multilingual-v2"
+SPEED = 0.95
+SPEECH = "https://openrouter.ai/api/v1/audio/speech"
 
-# The rate the tracks are kept at, and the gap between two turns, in seconds.
-RATE = 16_000
+# The rate the tracks are kept at: the 44.1 kHz MP3 the service sends holds nothing above about
+# 16 kHz, and 24 kHz keeps the voices to 12 kHz under the repository's 500 KB a file. The gap
+# between two turns, in seconds.
+RATE = 24_000
 GAP = 0.45
 
-# Each language: its title, its pace, its voices — a Piper model and its speaker, `None` for one of a
-# single speaker — for the local track and the remote one, and its turns.
+# Each language: its title, the service's voice for the local track (« Vous ») and the remote one,
+# and its turns.
 MEETINGS = {
     "fr": {
         "title": "Exemple : point sur la version 2",
-        # Speaker 3698 (a pitch of about 170 Hz) is « Vous »; 1840 (about 105 Hz) is Hugo.
-        "local": ("fr_FR-mls-medium", "3698"),
-        "remote": ("fr_FR-mls-medium", "1840"),
-        # MLS's readers are slow for a meeting: a little faster, to about 45 s.
-        "pace": 0.72,
+        "local": "lily",
+        "remote": "eric",
         "turns": [
             ("local", "Bonjour Hugo. On fait le point sur la sortie de la version deux ?"),
             ("remote", "Oui. Les tests passent depuis hier soir. Il reste la page d'aide à relire."),
@@ -50,9 +55,8 @@ MEETINGS = {
     },
     "en": {
         "title": "Example: version 2 check-in",
-        "pace": 1.0,
-        "local": ("en_US-joe-medium", None),
-        "remote": ("en_GB-cori-medium", None),
+        "local": "will",
+        "remote": "matilda",
         "turns": [
             ("local", "Hi Jess. Shall we go over the release of version two?"),
             ("remote", "Sure. The tests have passed since last night. The help page still needs a review."),
@@ -71,55 +75,61 @@ MEETINGS = {
 STARTED = "2026-11-26T10:00:00+01:00"
 
 
-def spoken(voice: PiperVoice, speaker: str | None, text: str, pace: float, noise: tuple[float, float] | None) -> array.array:
-    """One turn, as 16-bit samples at the voice's own rate; `pace` below 1 speaks faster; `noise`, Piper's
-    noise and noise width, the voice's own when none."""
-    config = SynthesisConfig(
-        speaker_id=None if speaker is None else voice.config.speaker_id_map[speaker],
-        length_scale=pace,
-        **({} if noise is None else {"noise_scale": noise[0], "noise_w_scale": noise[1]}),
+def asked(text: str, voice: str, mp3: Path) -> None:
+    """One turn's speech, asked of the service with the key the environment holds."""
+    key = os.environ.get("OPENROUTER_API_KEY")
+    if not key:
+        sys.exit(f"{mp3} is missing: set OPENROUTER_API_KEY to ask the service for it")
+    request = urllib.request.Request(
+        SPEECH,
+        method="POST",
+        data=json.dumps({"model": MODEL, "input": text, "voice": voice, "response_format": "mp3", "speed": SPEED}).encode(),
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
     )
+    with urllib.request.urlopen(request, timeout=120) as answered:
+        mp3.write_bytes(answered.read())
+
+
+def heard(mp3: Path) -> array.array:
+    """A turn's speech at the tracks' rate, 16-bit samples, by soxr."""
+    raw = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-i", str(mp3), "-af", f"aresample={RATE}:resampler=soxr:precision=28",
+         "-ac", "1", "-f", "s16le", "-"],
+        capture_output=True, check=True,
+    ).stdout
     samples = array.array("h")
-    for chunk in voice.synthesize(text, syn_config=config):
-        samples.frombytes(chunk.audio_int16_bytes)
+    samples.frombytes(raw)
     return samples
 
 
-def track(samples: array.array, rate: int, out: Path) -> None:
-    """A track as `session-audio/v3` keeps one once stopped: FLAC, PCM 24 bits, one channel."""
-    with tempfile.TemporaryDirectory() as scratch:
-        raw = Path(scratch) / "track.wav"
-        with wave.open(str(raw), "wb") as written:
-            written.setnchannels(1)
-            written.setsampwidth(2)
-            written.setframerate(rate)
-            written.writeframes(samples.tobytes())
-        subprocess.run(
-            # Resampled to 16 bits, then held in 24: the voices' own precision, the low bits zero —
-            # which FLAC keeps for nothing, where a resampling's noise there would double the file.
-            ["ffmpeg", "-loglevel", "error", "-y", "-i", str(raw),
-             "-af", f"aresample={RATE},aformat=sample_fmts=s16,aformat=sample_fmts=s32",
-             "-sample_fmt", "s32", "-bits_per_raw_sample", "24", "-compression_level", "12",
-             "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact", str(out)],
-            check=True,
-        )
+def track(samples: array.array, out: Path) -> None:
+    """A track as `session-audio/v3` keeps one once stopped: FLAC, PCM 24 bits, one channel; the
+    speech's own 16 bits held in 24, the low bits zero, which FLAC keeps for nothing."""
+    subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-y", "-f", "s16le", "-ar", str(RATE), "-ac", "1", "-i", "-",
+         "-af", "aformat=sample_fmts=s32", "-sample_fmt", "s32", "-bits_per_raw_sample", "24",
+         "-compression_level", "12", "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact", str(out)],
+        input=samples.tobytes(), check=True,
+    )
 
 
-def made(voices: Path, language: str, meeting: dict, out: Path) -> None:
-    loaded = {side: PiperVoice.load(str(voices / f"{meeting[side][0]}.onnx")) for side in ("local", "remote")}
-    rate = loaded["local"].config.sample_rate
-    assert loaded["remote"].config.sample_rate == rate, "both voices at one rate"
+def made(speech: Path, language: str, meeting: dict, out: Path) -> None:
+    folder = speech / language
+    folder.mkdir(parents=True, exist_ok=True)
     sides = {"local": array.array("h"), "remote": array.array("h")}
-    gap = array.array("h", [0]) * int(GAP * rate)
-    for side, text in meeting["turns"]:
-        turn = spoken(loaded[side], meeting[side][1], text, meeting["pace"], meeting.get("noise"))
+    gap = array.array("h", [0]) * int(GAP * RATE)
+    for n, (side, text) in enumerate(meeting["turns"]):
+        mp3 = folder / f"turn{n:02d}-{side}.mp3"
+        if not mp3.exists():
+            asked(text, meeting[side], mp3)
+        turn = heard(mp3)
         other = "remote" if side == "local" else "local"
         sides[side].extend(turn + gap)
         sides[other].extend(array.array("h", [0]) * len(turn) + gap)
     out.mkdir(parents=True, exist_ok=True)
     for side, samples in sides.items():
-        track(samples, rate, out / f"{side}.flac")
-    seconds = len(sides["local"]) / rate
+        track(samples, out / f"{side}.flac")
+    seconds = len(sides["local"]) / RATE
     # A point at the first frame, then every ten seconds, on each track.
     clock = [
         {"track": side, "sample": at * RATE, "at": float(at)}
@@ -140,10 +150,10 @@ def made(voices: Path, language: str, meeting: dict, out: Path) -> None:
 
 
 def main() -> None:
-    voices = Path(sys.argv[1])
+    speech = Path(sys.argv[1])
     root = Path(__file__).resolve().parent.parent / "ui" / "example"
     for language, meeting in MEETINGS.items():
-        made(voices, language, meeting, root / language)
+        made(speech, language, meeting, root / language)
 
 
 if __name__ == "__main__":
