@@ -9348,15 +9348,17 @@ def renaming(now: dt.datetime) -> None:
 
 
 def confidential_locked(now: dt.datetime) -> None:
-    """CP. #1204: while a confidential meeting records, the bar shows a lock, named, at 3:1 at least; never at rest."""
-    print("CP. a confidential meeting recording: a lock in the bar's row, named for a screen reader, 3:1 at least, in both themes; "
-          "gone when it is no longer confidential, and at rest (#1204)")
-    lock = ("const l = document.getElementById('small-locked'); if (!l) return null; const r = l.getBoundingClientRect();"
+    """CP. #1204, D125: while it records, the bar's row holds one lock, a toggle button — pressed, the meeting is
+    confidential, its file written; named for a screen reader and in its tooltip, at 3:1 at least pressed; never at
+    rest. No switch under « Plus d’options » any more, no second lock beside it."""
+    print("CP. recording: one lock in the bar's row, a toggle button (aria-pressed) saying the meeting confidential, named, 3:1 at least pressed, "
+          "in both themes and languages; no switch in the options; gone at rest (#1204, D125)")
+    lock = ("const l = document.getElementById('small-lock'); if (!l) return null; const r = l.getBoundingClientRect();"
             " const ground = (e) => { while (e) { const c = getComputedStyle(e).backgroundColor; if (c && !c.endsWith(', 0)') && c !== 'transparent') return c; e = e.parentElement; } return 'rgb(255, 255, 255)'; };"
-            " return {shown: l.getClientRects().length > 0, role: l.getAttribute('role'), label: l.getAttribute('aria-label'), title: l.title,"
+            " return {shown: l.getClientRects().length > 0, tag: l.tagName, type: l.type, pressed: l.getAttribute('aria-pressed'), label: l.getAttribute('aria-label'), title: l.title,"
             " drawn: !!l.querySelector('svg'), colour: getComputedStyle(l).color, ground: ground(l),"
             " inside: r.left >= 0 && r.right <= innerWidth + 0.5 && r.top >= 0 && r.bottom <= innerHeight + 0.5, size: [Math.round(r.width), Math.round(r.height)],"
-            " row: l.closest('.bar-row') !== null}")
+            " row: l.closest('.bar-row') !== null, others: ['small-confidential', 'small-locked'].filter((id) => document.getElementById(id) !== null)}")
     rgb = lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
     for language, named in (("fr_FR.UTF-8", "Réunion confidentielle"), ("en_US.UTF-8", "Confidential meeting")):
         short = language[:2]
@@ -9370,23 +9372,84 @@ def confidential_locked(now: dt.datetime) -> None:
                 check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
-                time.sleep(0.5)
-                check(f"{short}, {theme}: recording, not confidential: no lock", not browser.execute_script(lock)["shown"], browser.execute_script(lock))
-                browser.execute_script("document.getElementById('small-confidential').click()")
-                shown = wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                made = wait_for(browser, lambda b: list(taping.glob("*/session.json")), 5)
+                folder = next(taping.glob("*/session.json")).parent if made else taping
+                got = browser.execute_script(lock) or {}
+                check(f"{short}, {theme}: recording, one lock in the row, a button not pressed, named « {named} » for a screen reader and in its tooltip; no switch, no second lock",
+                      got.get("shown") and got["tag"] == "BUTTON" and got["type"] == "button" and got["pressed"] == "false" and got["label"] == named
+                      and got["title"] == named and got["drawn"] and got["inside"] and got["row"] and got["others"] == [], got)
+                browser.execute_script("document.getElementById('small-lock').click()")
+                pressed = wait_for(browser, lambda b: b.execute_script(lock)["pressed"] == "true" and (folder / "confidential").exists(), 3)
                 got = browser.execute_script(lock)
                 ratio = contrast(rgb(got["colour"]), rgb(got["ground"]))
-                check(f"{short}, {theme}: said confidential, a lock in the row, named « {named} » for a screen reader and in its tooltip, inside the bar",
-                      shown and got["role"] == "img" and got["label"] == named and got["title"] == named and got["drawn"] and got["inside"] and got["row"], got)
-                check(f"{short}, {theme}: the lock at 3:1 at least on the bar ({ratio:.2f})", ratio >= 3.0, got)
+                check(f"{short}, {theme}: pressed, the meeting confidential — its file written —, its name unchanged", pressed and got["label"] == named, [got, sorted(p.name for p in folder.iterdir())])
+                check(f"{short}, {theme}: pressed, the lock at 3:1 at least on the bar ({ratio:.2f})", ratio >= 3.0, got)
                 shot_themed(browser, f"cp-locked-{short}-{theme}", theme)
-                browser.execute_script("document.getElementById('small-confidential').click()")
-                check(f"{short}, {theme}: no longer confidential: the lock gone", wait_for(browser, lambda b: not b.execute_script(lock)["shown"], 3), browser.execute_script(lock))
-                browser.execute_script("document.getElementById('small-confidential').click()")
-                wait_for(browser, lambda b: b.execute_script(lock)["shown"], 3)
+                browser.execute_script("document.getElementById('small-lock').click()")
+                check(f"{short}, {theme}: pressed again, no longer confidential: not pressed, its file gone",
+                      wait_for(browser, lambda b: b.execute_script(lock)["pressed"] == "false" and not (folder / "confidential").exists(), 3), browser.execute_script(lock))
                 stop_from_small(browser)
                 rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
-                check(f"{short}, {theme}: stopped, at rest: no lock", rest and not browser.execute_script(lock)["shown"], browser.execute_script(lock))
+                check(f"{short}, {theme}: stopped, at rest: no lock", rest and not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
+
+
+def bar_stop_neutral(now: dt.datetime) -> None:
+    """CW. D125: the bar recording, as the decider's Round 4 drew it — 48 px high; the time in the text's colour, red
+    for the live dot alone; a separator, then ■, neutral: 32 px, the small radius, the sunken ground edged by the
+    divider, its square in the text's colour, the hover's ground under the pointer; the row's buttons ringed by the
+    focus from the keyboard alone (:focus-visible)."""
+    print("CW. the bar recording: 48 px, the time in the text's colour, red for the live dot alone, a separator then a neutral ■ of 32 px, "
+          "the focus ring from the keyboard alone — both themes (D125)")
+    # A token's value as the page resolves it, read through a probe of the same property.
+    looks = ("const probe = (property, value) => { const p = document.createElement('i'); p.style[property] = value; document.body.append(p);"
+             " const got = getComputedStyle(p)[property]; p.remove(); return got; };"
+             " const stop = document.getElementById('small-stop'), square = stop.querySelector('.stop-square'), row = stop.closest('.bar-row');"
+             " const s = getComputedStyle(stop), r = stop.getBoundingClientRect(), before = stop.previousElementSibling;"
+             " const live = document.querySelector('#small .handle .dot'), time = document.querySelector('#small .time');"
+             " const reds = [...row.querySelectorAll('*')].filter((x) => x.getClientRects().length && x !== live"
+             "   && [getComputedStyle(x).color, getComputedStyle(x).backgroundColor, getComputedStyle(x).fill].includes(probe('color', 'var(--color-record)'))).map((x) => x.id || x.className.baseVal || x.className);"
+             " return {row: Math.round(row.getBoundingClientRect().height), height: innerHeight, size: [Math.round(r.width), Math.round(r.height)],"
+             " radius: s.borderTopLeftRadius, wanted_radius: probe('borderTopLeftRadius', 'var(--r-sm)'),"
+             " ground: s.backgroundColor, sunken: probe('backgroundColor', 'var(--color-sunken)'),"
+             " edge: [s.borderTopWidth, s.borderTopColor], divider: probe('borderTopColor', 'var(--color-divider)'),"
+             " square: getComputedStyle(square).backgroundColor, text: probe('backgroundColor', 'var(--color-text)'), time: getComputedStyle(time).color, text_colour: probe('color', 'var(--color-text)'),"
+             " live: getComputedStyle(live).fill, record: probe('color', 'var(--color-record)'), reds,"
+             " separated: !!before && before.classList.contains('bar-separator') && before.getAttribute('aria-hidden') === 'true' && before.getClientRects().length > 0}")
+    ring = "const a = document.activeElement; const s = getComputedStyle(a); return [a.id, s.outlineStyle, s.outlineWidth]"
+    hover = "return [getComputedStyle(document.getElementById('small-stop')).backgroundColor, (() => { const p = document.createElement('i'); p.style.backgroundColor = 'var(--color-hover)'; document.body.append(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; })()]"
+    for theme in ("light", "dark"):
+        taping = WORK / f"bar-stop-{theme}"
+        taping.mkdir()
+        window = Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
+        if theme == "dark":
+            window.env.update(GTK_THEME="Adwaita:dark")
+        with window as browser:
+            wait_for(browser, lambda b: b.execute_script("return document.activeElement.id") == "small-record", 10)
+            check(f"{theme}: at rest, the bar 48 high", wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3), browser.execute_script("return innerHeight"))
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 10)
+            wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3)
+            time.sleep(0.5)
+            got = browser.execute_script(looks)
+            check(f"{theme}: recording, the row and the bar 48 high", got["row"] == 48 and got["height"] == 48, got)
+            check(f"{theme}: a separator, unseen by a screen reader, then ■", got["separated"], got)
+            check(f"{theme}: ■ neutral — 32 × 32, the small radius, the sunken ground edged 1 px by the divider, its square in the text's colour",
+                  got["size"] == [32, 32] and got["radius"] == got["wanted_radius"] and got["ground"] == got["sunken"]
+                  and got["edge"] == ["1px", got["divider"]] and got["square"] == got["text"], got)
+            check(f"{theme}: the time in the text's colour; red for the live dot alone", got["time"] == got["text_colour"] and got["live"] == got["record"] and got["reds"] == [], got)
+            # The focus on ■ from the keyboard: ringed. Given by a click: none.
+            ring_key = browser.execute_script(ring)
+            check(f"{theme}: ■ reached from the keyboard, ringed by the focus", ring_key[0] == "small-stop" and ring_key[1] != "none" and ring_key[2] != "0px", ring_key)
+            ActionChains(browser).move_to_element(browser.find_element(By.ID, "small-lock")).click().perform()
+            time.sleep(0.3)
+            ring_click = browser.execute_script(ring)
+            check(f"{theme}: the lock pressed by the pointer, no focus ring", ring_click[0] == "small-lock" and (ring_click[1] == "none" or ring_click[2] == "0px"), ring_click)
+            ActionChains(browser).move_to_element(browser.find_element(By.ID, "small-stop")).perform()
+            time.sleep(0.4)
+            under = browser.execute_script(hover)
+            check(f"{theme}: ■ under the pointer, the hover's ground", under[0] == under[1], under)
+            shot_themed(browser, f"cw-bar-recording-{theme}", theme)
+            stop_from_small(browser)
 
 
 def dates_mentioned(now: dt.datetime) -> None:
@@ -15818,6 +15881,7 @@ def main() -> int:
     actions_rows(now)
     dates_mentioned(now)
     confidential_locked(now)
+    bar_stop_neutral(now)
     announced(now)
     heard_checked(now)
     microphone_chosen(now)
