@@ -126,16 +126,3 @@ test("the titles' face keeps Bricolage's optical axis, as v7 loads it: opsz and 
   const woff2 = await readFile(join(root, "public/fonts/bricolage-latin.woff2"));
   assert.deepEqual(axes(woff2).sort(), ["opsz", "wght"]);
 });
-
-// A compound word never breaks at its hyphen (the coordinator's eye on the cards, 2026-11-28: « revenez- / y »): in what
-// a reader reads, outside code and the policy (docs/privacy.md, its own source), a hyphen between two letters or digits
-// is the non-breaking one, U+2011; « BY-SA », a licence's name, alone excepted.
-test("no compound word breaks at its hyphen: U+2011 between two letters, in both languages", async () => {
-  for (const file of await pages()) {
-    const html = (await readFile(file, "utf8")).replace(/<article class="policy">[\s\S]*?<\/article>/g, "")
-      .replace(/<(pre|code|script|style|svg)[\s\S]*?<\/\1>/g, "");
-    const said = html.replace(/<[^>]+>/g, " ");
-    const broken = [...said.matchAll(/[\p{L}\p{N}’]+-[\p{L}\p{N}’]+/gu)].map(([w]) => w).filter((w) => w !== "BY-SA");
-    assert.deepEqual(broken, [], route(file));
-  }
-});

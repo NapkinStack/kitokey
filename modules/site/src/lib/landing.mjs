@@ -21,7 +21,7 @@ const raw = {
   // Site v7, the hero (validated by the decider on 2026-11-26): PDR-0009's promise, the price, the Store's
   // button, and a drawn scene of the call, the bar and the minutes. French first.
   hero: {
-    fr: ["Vos rendez‑vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur.", "Kitokey enregistre l’appel, le transcrit et en écrit le compte rendu, sur votre ordinateur. Il marche avec Zoom, Meet, Teams ou tout autre logiciel d’appel."],
+    fr: ["Vos rendez-vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur.", "Kitokey enregistre l’appel, le transcrit et en écrit le compte rendu, sur votre ordinateur. Il marche avec Zoom, Meet, Teams ou tout autre logiciel d’appel."],
     en: ["Every client call gets its minutes.", "Nothing leaves your computer.", "Kitokey records the call, transcribes it and writes its minutes, on your computer. It works with Zoom, Meet, Teams or any other calling app."],
     keeps: "PDR-0009, the promise; docs/store/listing.md: the minutes written on the computer, any calling app, no bot in the call (D103)",
   },
@@ -39,10 +39,10 @@ const raw = {
     fr: ["Un appel vidéo en cours. Au-dessus, la barre de Kitokey enregistre depuis 31 minutes. À côté, le compte rendu fini de l’appel, avec ses points saillants et trois actions datées.",
       "Appel vidéo", "Sarah (vous)", "Aujourd’hui, 14:00", "Confidentielle", "Atelier Lumen, cadrage du projet", "31 min · Sarah · Camille, Hugo et Léa",
       "Écrit sur cet ordinateur. Relisez avant de partager.", "Points saillants",
-      "Le devis est validé à 18 400 €. Le lancement est fixé au lundi 7 décembre, avec un premier point d’étape à mi‑parcours.", "Actions",
+      "Le devis est validé à 18 400 €. Le lancement est fixé au lundi 7 décembre, avec un premier point d’étape à mi-parcours.", "Actions",
       [["Sarah", "Envoyer le planning", "Vendredi"], ["Camille", "Signer le bon de commande", "Lundi"], ["Hugo", "Ouvrir les accès au site", "3 déc."]]],
     en: ["A video call in progress. Above it, Kitokey’s bar has been recording for 31 minutes. Beside it, the call’s finished minutes, with their highlights and three dated actions.",
-      "Video call", "Sarah (you)", "Today, 2:00 pm", "Confidential", "Atelier Lumen, project kick‑off", "31 min · Sarah · Camille, Hugo and Léa",
+      "Video call", "Sarah (you)", "Today, 2:00 pm", "Confidential", "Atelier Lumen, project kick-off", "31 min · Sarah · Camille, Hugo and Léa",
       "Written on this computer. Read it before you share it.", "Highlights",
       "The quote is approved at €18,400. The launch is set for Monday 7 December, with a first checkpoint halfway.", "Actions",
       [["Sarah", "Send the schedule", "Friday"], ["Camille", "Sign the purchase order", "Monday"], ["Hugo", "Open the site’s access", "3 Dec"]]],
@@ -119,13 +119,13 @@ const raw = {
   who: {
     fr: {
       kicker: "Pour qui", h: "Pour les conversations qui ne regardent que vous.",
-      cases: [["briefcase", "Conseil, avocats, experts‑comptables, coachs", "Le rendez‑vous client", "Vous écoutez votre client au lieu de prendre des notes. Le compte rendu est prêt à relire et à lui remettre.", ["Atelier Lumen, cadrage du projet", "Mar. 17 nov. · 31 min", true]],
+      cases: [["briefcase", "Conseil, avocats, experts-comptables, coachs", "Le rendez-vous client", "Vous écoutez votre client au lieu de prendre des notes. Le compte rendu est prêt à relire et à lui remettre.", ["Atelier Lumen, cadrage du projet", "Mar. 17 nov. · 31 min", true]],
         ["usercheck", "Ressources humaines, managers", "L’entretien de recrutement", "Vous restez attentif au candidat. Ses réponses sont notées, et vous comparez les entretiens sur pièces.", ["Entretien, cheffe de projet", "Mer. 11 nov. · 40 min", true]],
         ["building", "Direction, finance", "La réunion interne sensible", "Budget, organisation, situation d’une personne. Les décisions et les actions sont notées sans passer par un service en ligne.", ["Comité budget, T1", "Jeu. 19 nov. · 45 min", false]]],
     },
     en: {
       kicker: "Who it’s for", h: "For the conversations that are nobody else’s business.",
-      cases: [["briefcase", "Consultants, lawyers, accountants, coaches", "The client meeting", "You listen to your client instead of taking notes. The minutes are ready to read over and hand over.", ["Atelier Lumen, project kick‑off", "Tue 17 Nov · 31 min", true]],
+      cases: [["briefcase", "Consultants, lawyers, accountants, coaches", "The client meeting", "You listen to your client instead of taking notes. The minutes are ready to read over and hand over.", ["Atelier Lumen, project kick-off", "Tue 17 Nov · 31 min", true]],
         ["usercheck", "HR, managers", "The job interview", "You stay with the candidate. Their answers are noted, and you compare interviews on the record.", ["Interview, project manager", "Wed 11 Nov · 40 min", true]],
         ["building", "Leadership, finance", "The sensitive internal meeting", "Budget, organisation, a person’s situation. Decisions and actions are noted without going through an online service.", ["Budget committee, Q1", "Thu 19 Nov · 45 min", false]]],
     },
@@ -138,10 +138,10 @@ const raw = {
         ["calendar", "Les dates dans votre agenda", "Les échéances dites pendant l’appel vont dans Google Agenda ou dans un fichier .ics.", false],
         ["headphones", "Réécouter un passage", "Un chiffre à vérifier ? Cliquez la phrase et vous entendez ce moment précis de l’appel.", false],
         ["folder", "Un fichier dans votre dossier", "Un dossier choisi dans les Réglages reçoit chaque compte rendu en Markdown, sauf les confidentiels.", false],
-        ["history", "Les versions gardées", "Refaites un compte rendu sans perdre le précédent, et revenez‑y si vous le préférez.", false],
+        ["history", "Les versions gardées", "Refaites un compte rendu sans perdre le précédent, et revenez-y si vous le préférez.", false],
         ["file", "Exporter en PDF", "Un PDF accessible, prêt à joindre au dossier du client, depuis le bouton Partager.", true],
         ["search", "Chercher dans ce qui a été dit", "Un seul mot suffit pour retrouver la réunion et le passage où il a été prononcé.", true],
-        ["format", "Personnaliser le format de vos comptes rendus", "Choisissez les rubriques de vos comptes rendus, et gardez un format par type de rendez‑vous.", true]],
+        ["format", "Personnaliser le format de vos comptes rendus", "Choisissez les rubriques de vos comptes rendus, et gardez un format par type de rendez-vous.", true]],
     },
     en: {
       kicker: "Features", h: "After the call, everything is ready.", lead: "The minutes don’t sit in a drawer: they go where you work.", soon: "Soon",
@@ -184,14 +184,14 @@ const raw = {
   },
   faq: {
     fr: ["Questions", "Ce qu’on nous demande avant d’essayer.", [
-      ["Mon client voit‑il quelque chose\u202f?", ["Non. Aucun robot ne rejoint l’appel et rien ne s’affiche chez lui. Kitokey enregistre le son de votre ordinateur, votre micro d’un côté, l’appel de l’autre.", "C’est à vous d’annoncer l’enregistrement et d’obtenir son accord. Kitokey vous le rappelle à chaque début d’appel."]],
-      ["Est‑ce compatible avec mon secret professionnel\u202f?", ["Voici ce que fait Kitokey, pour que vous en jugiez. L’audio, la transcription et le compte rendu sont écrits sur votre ordinateur, dans un dossier que vous choisissez. Kitokey n’a pas de serveur et ne demande pas de compte. Un moteur en ligne n’est utilisé que si vous le choisissez, et jamais pour une réunion confidentielle.", "Ce que votre profession exige, votre ordre ou votre barreau est seul à le dire. Kitokey ne remplace pas leur avis."]],
+      ["Mon client voit-il quelque chose\u202f?", ["Non. Aucun robot ne rejoint l’appel et rien ne s’affiche chez lui. Kitokey enregistre le son de votre ordinateur, votre micro d’un côté, l’appel de l’autre.", "C’est à vous d’annoncer l’enregistrement et d’obtenir son accord. Kitokey vous le rappelle à chaque début d’appel."]],
+      ["Est-ce compatible avec mon secret professionnel\u202f?", ["Voici ce que fait Kitokey, pour que vous en jugiez. L’audio, la transcription et le compte rendu sont écrits sur votre ordinateur, dans un dossier que vous choisissez. Kitokey n’a pas de serveur et ne demande pas de compte. Un moteur en ligne n’est utilisé que si vous le choisissez, et jamais pour une réunion confidentielle.", "Ce que votre profession exige, votre ordre ou votre barreau est seul à le dire. Kitokey ne remplace pas leur avis."]],
       ["Où sont mes réunions, et comment les supprimer\u202f?", ["Dans un dossier que vous choisissez, sur votre ordinateur\u00a0: l’audio, la transcription et le compte rendu de chaque réunion. Supprimer une réunion la place dans la corbeille de votre ordinateur, d’où vous pouvez la restaurer."]],
-      ["Faut‑il installer quelque chose dans Zoom, Meet ou Teams\u202f?", ["Non. Kitokey écoute le son de l’ordinateur, il marche donc avec tout logiciel d’appel, et avec un appel téléphonique passé depuis l’ordinateur."]],
-      ["Kitokey reconnaît‑il chaque participant\u202f?", ["Il sépare deux côtés\u00a0: votre micro (Vous) et le son de l’appel (Les autres). Vous nommez chacun, par exemple «\u00a0Sarah\u00a0» et «\u00a0Camille, Hugo et Léa\u00a0», et ces noms passent dans le compte rendu. Il ne distingue pas encore les voix des autres participants entre elles."]],
-      ["Le compte rendu peut‑il se tromper\u202f?", ["Oui. Il est écrit par une IA, et Kitokey le rappelle en tête de chaque compte rendu. Relisez‑le avant de le remettre. La transcription se corrige ligne par ligne, et chaque phrase se réécoute."]],
-      ["Combien de temps faut‑il pour le compte rendu\u202f?", ["Cela dépend de votre ordinateur et de la durée de l’appel, puisque le travail se fait chez vous et pas sur un serveur. Comptez quelques minutes plutôt que quelques secondes. Il démarre tout seul à la fin de l’appel, dès qu’un moteur de rédaction est prêt."]],
-      ["Que se passe‑t‑il à la fin de l’essai\u202f?", ["L’essai dure au moins 14 jours et 10 réunions. Ensuite, Kitokey vous propose d’acheter avant tout nouvel enregistrement. Les réunions déjà faites restent à vous\u00a0: vous les lisez et les réécoutez, que vous achetiez ou non."]],
+      ["Faut-il installer quelque chose dans Zoom, Meet ou Teams\u202f?", ["Non. Kitokey écoute le son de l’ordinateur, il marche donc avec tout logiciel d’appel, et avec un appel téléphonique passé depuis l’ordinateur."]],
+      ["Kitokey reconnaît-il chaque participant\u202f?", ["Il sépare deux côtés\u00a0: votre micro (Vous) et le son de l’appel (Les autres). Vous nommez chacun, par exemple «\u00a0Sarah\u00a0» et «\u00a0Camille, Hugo et Léa\u00a0», et ces noms passent dans le compte rendu. Il ne distingue pas encore les voix des autres participants entre elles."]],
+      ["Le compte rendu peut-il se tromper\u202f?", ["Oui. Il est écrit par une IA, et Kitokey le rappelle en tête de chaque compte rendu. Relisez-le avant de le remettre. La transcription se corrige ligne par ligne, et chaque phrase se réécoute."]],
+      ["Combien de temps faut-il pour le compte rendu\u202f?", ["Cela dépend de votre ordinateur et de la durée de l’appel, puisque le travail se fait chez vous et pas sur un serveur. Comptez quelques minutes plutôt que quelques secondes. Il démarre tout seul à la fin de l’appel, dès qu’un moteur de rédaction est prêt."]],
+      ["Que se passe-t-il à la fin de l’essai\u202f?", ["L’essai dure au moins 14 jours et 10 réunions. Ensuite, Kitokey vous propose d’acheter avant tout nouvel enregistrement. Les réunions déjà faites restent à vous\u00a0: vous les lisez et les réécoutez, que vous achetiez ou non."]],
       ["Quelles langues sont transcrites\u202f?", ["Kitokey détecte la langue parlée, ou vous la choisissez pour une réunion parmi huit\u00a0: le français, l’anglais, l’allemand, l’espagnol, l’italien, le portugais, le néerlandais et l’arabe."]]]],
     en: ["Questions", "What people ask us before they try.", [
       ["Does my client see anything?", ["No. No bot joins the call and nothing shows on their side. Kitokey records your computer’s sound, your microphone on one side, the call on the other.", "It is up to you to tell them you are recording and to get their agreement. Kitokey reminds you as each call starts."]],
@@ -206,7 +206,7 @@ const raw = {
     keeps: "capture: the computer's sound, two sides, no bot (D103); the reminder (settings.rs reminder = true); PDR-0001 and PDR-0003, no server, no account; D60 and D118, a confidential meeting never online; the trash (D113); the sides named (#1205); minutes/v5's AI line; the transcript corrected (ADR-0014) and a line played (D26); the minutes started after a recording (#1276); PDR-0005, the trial and the meetings kept readable; spoken.rs, the eight languages offered",
   },
   final: {
-    fr: ["Essayez‑le sur votre prochain rendez‑vous client.", "Installez‑le avant l’appel, cliquez sur Enregistrer, et lisez le compte rendu quand vous raccrochez. Essai gratuit, puis 69\u00a0€ une fois."],
+    fr: ["Essayez-le sur votre prochain rendez-vous client.", "Installez-le avant l’appel, cliquez sur Enregistrer, et lisez le compte rendu quand vous raccrochez. Essai gratuit, puis 69\u00a0€ une fois."],
     en: ["Try it on your next client call.", "Install it before the call, click Record, and read the minutes when you hang up. Free trial, then $69 once."],
     keeps: "the app's record button; PDR-0009, the price after a free trial",
   },
@@ -223,7 +223,7 @@ const raw = {
   hardware: {
     fr: [["chip", "Tout sur votre ordinateur", "Le choix par défaut.", ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux moteurs", "Environ 2 Go libres par heure enregistrée, puis 0,2 Go gardés par heure", "Ollama, gratuit, installé à part pour rédiger le compte rendu"]],
       ["cloud", "Avec un moteur en ligne", "Aucun matériel particulier.", ["Un service que vous choisissez, avec votre clé", "Souvent payant, facturé par ce service et pas par Kitokey", "Environ 2 Go libres pendant l’enregistrement d’une heure, puis 0,2 Go gardés"]]],
-    en: [["chip", "Everything on your computer", "The default choice.", ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built‑in one being enough", "10 GB free for the two engines", "About 2 GB free for each hour recorded, then 0.2 GB kept an hour", "Ollama, free, installed on its own to write the minutes"]],
+    en: [["chip", "Everything on your computer", "The default choice.", ["16 GB of memory at least, 24 to 32 GB to work in comfort", "A graphics card with Vulkan, a built-in one being enough", "10 GB free for the two engines", "About 2 GB free for each hour recorded, then 0.2 GB kept an hour", "Ollama, free, installed on its own to write the minutes"]],
       ["cloud", "With an online engine", "No special hardware.", ["A service you choose, with your key", "Often paid, billed by that service, not by Kitokey", "About 2 GB free while an hour records, then 0.2 GB kept"]]],
     keeps: "README.md, « What a computer needs », measured on 2026-11-25: its two ways and their figures; docs/support.md, Ollama installed on its own for the private minutes until ADR-0020 is built; ADR-0013, a service the user names, its cost the user's",
   },

@@ -12,7 +12,7 @@ import { landing } from "../src/lib/landing.mjs";
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const hero = async (lang) => (await page(lang)).match(/<section class="hero"[\s\S]*?<\/section>/)?.[0] ?? "";
 const PROMISE = {
-  fr: ["Vos rendez\u2011vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur."],
+  fr: ["Vos rendez-vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur."],
   en: ["Every client call gets its minutes.", "Nothing leaves your computer."],
 };
 

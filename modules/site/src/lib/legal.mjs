@@ -23,4 +23,4 @@ export const publisher = Object.fromEntries(FIELDS.map((name) => [name, read(nam
 export const director = (lang) => (env.PUBLICATION_DIRECTOR ?? "").trim() || (lang === "fr" ? "le président de C12C" : "the President of C12C");
 
 // Cloudflare's own Terms of Use (cloudflare.com/website-terms, effective 2025-08-01, read 2026-11-27).
-export const host = { name: "Cloudflare, Inc.", address: "101 Townsend St, San Francisco, CA 94107, USA", phone: "+1 (650) 319‑8930" };
+export const host = { name: "Cloudflare, Inc.", address: "101 Townsend St, San Francisco, CA 94107, USA", phone: "+1 (650) 319-8930" };
