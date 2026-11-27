@@ -11134,7 +11134,8 @@ def two_panes(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "empty-record").text == "Start recording", browser.find_element(By.ID, "none").text)
         # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
         keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
-        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start recording ({keys[1]})", keys)
+        # The window's own Ctrl+R first (D128), then the desktop's, which works from anywhere.
+        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89, D128)", keys[0] and keys[1] and keys[2] == f"Start recording (Ctrl+R · {keys[1]})", keys)
         # One primary action, the header's (#775): the pane's start is a secondary one, the folder a discreet line under it.
         primaries = browser.execute_script("return [...document.querySelectorAll('button.primary')].filter(b => b.offsetParent !== null).map(b => b.id)")
         under = browser.execute_script("const r = document.getElementById('empty-record').getBoundingClientRect(), f = document.getElementById('empty-folder');"

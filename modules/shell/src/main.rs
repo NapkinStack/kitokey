@@ -1028,6 +1028,8 @@ struct Listing {
     shortcut: Option<String>,
     /// The sidebar folded, as the user left it (D61).
     folded: bool,
+    /// J, K and « ? » taken as shortcuts, as Settings leave them (D128).
+    single_keys: bool,
     /// Every window's look, as the settings hold it (D98): each window takes it when it draws.
     appearance: Appearance,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
@@ -1096,6 +1098,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
             stopping: *shell.stopping.lock().unwrap(),
             shortcut: shell.shortcut.lock().unwrap().clone(),
             folded: shell.settings().folded,
+            single_keys: shell.settings().single_keys,
             appearance: shell.settings().appearance,
             unreadable: {
                 let folder = shell.settings().sessions.clone();
@@ -2772,6 +2775,8 @@ struct SettingsShown {
     export_said: Option<String>,
     after: After,
     reminder: bool,
+    /// J, K and « ? » taken as shortcuts (D128).
+    single_keys: bool,
     /// A call another application starts is offered to be recorded (D30).
     offer: bool,
     /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it; on
@@ -2870,6 +2875,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         sessions: settings.sessions,
         after: settings.after,
         reminder: settings.reminder,
+        single_keys: settings.single_keys,
         offer: settings.offer,
         autostart,
         autostart_offered,
@@ -2934,6 +2940,8 @@ struct Change {
     meeting_language: Option<String>,
     /// The sidebar folded or not (D61).
     folded: Option<bool>,
+    /// J, K and « ? » taken as shortcuts or not (D128).
+    single_keys: Option<bool>,
     /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
     language: Option<String>,
     /// Every window's look (D98).
@@ -3007,6 +3015,9 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     if let Some(folded) = change.folded {
         settings.folded = folded;
+    }
+    if let Some(single_keys) = change.single_keys {
+        settings.single_keys = single_keys;
     }
     if let Some(appearance) = change.appearance {
         settings.appearance = appearance;

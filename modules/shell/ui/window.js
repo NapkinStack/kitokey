@@ -1097,7 +1097,8 @@ function paintRecord(recording, stopping) {
   const ending = recordAsked === false || (recordAsked === null && stopping);
   const said = ending ? words.record_stopping : live ? words.record_stop : words.record_start;
   document.getElementById("record-said").textContent = said;
-  document.getElementById("record").title = recordKeys ? `${said} (${recordKeys})` : said;
+  // Ctrl+R in the window (D128); the desktop's own shortcut beside it, which works from anywhere.
+  document.getElementById("record").title = `${said} (${[keysHeld()[0], recordKeys].filter(Boolean).join(" · ")})`;
   document.getElementById("record").classList.toggle("live", live);
   // The name says it too (D89): its dot red and larger while recording, the cut around it following.
   document.querySelector(".brand").classList.toggle("live", live);
@@ -1132,7 +1133,7 @@ function paintRefused(refused) {
 // A first run just ended (D126): its third screen is the empty window, said ready, until a meeting is there.
 let firstRunEnded = false;
 
-function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
+function show({ words, folder, sessions, recording, stopping, shortcut, folded, single_keys, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
@@ -1143,6 +1144,12 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
     button.title = name;
     button.setAttribute("aria-label", name);
   }
+  // D128: Settings' and the recording's own shortcuts, in the tooltip and to a screen reader.
+  const settingsLink = document.getElementById("settings-link");
+  settingsLink.title = `${words.settings} (${keysHeld()[2]})`;
+  settingsLink.setAttribute("aria-keyshortcuts", "Control+Comma");
+  document.getElementById("record").setAttribute("aria-keyshortcuts", "Control+R");
+  singleKeys = single_keys;
   document.getElementById("free-link").hidden = sessions.length === 0;
   // At rest too: the small window is the user's to choose (D35).
   document.getElementById("small-link").hidden = false;
@@ -2383,6 +2390,8 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
   // rich text and as Markdown together, so that a document or a chat keeps its headings and lists, and
   // a plain field takes the Markdown (D109). Without ClipboardItem, the Markdown alone, as before.
   const copy = iconButton("copy", words.copy_minutes, "copy-minutes");
+  copy.title = `${words.copy_minutes} (${keysHeld()[3]})`;
+  copy.setAttribute("aria-keyshortcuts", "Control+Shift+C");
   const copied = element("span", "says copied");
   copied.id = "minutes-copied";
   copied.setAttribute("role", "status");
@@ -4652,6 +4661,21 @@ function showSettings(shown, minutes, words) {
   const remindSaid = element("span", "said");
   remindSaid.append(element("span", "name", words.reminder[0]), element("span", "says", words.reminder[1]));
   remind.append(remindSaid, box);
+  // J, K and « ? » (D128): a single key each, the user's to turn off (WCAG 2.2 SC 2.1.4).
+  const single = element("label", "row");
+  const singleBox = element("input");
+  singleBox.type = "checkbox";
+  singleBox.id = "single-keys";
+  singleBox.setAttribute("role", "switch");
+  singleBox.checked = shown.single_keys;
+  singleBox.disabled = locked;
+  singleBox.addEventListener("change", () => {
+    singleKeys = singleBox.checked;
+    save({ single_keys: singleBox.checked });
+  });
+  const singleSaid = element("span", "said");
+  singleSaid.append(element("span", "name", words.single_keys[0]), element("span", "says", words.single_keys[1]));
+  single.append(singleSaid, singleBox);
   // When another application takes the microphone (D30), as board 4 has it: offer to record,
   // or do nothing.
   const offer = element("div", "row");
@@ -4890,7 +4914,7 @@ function showSettings(shown, minutes, words) {
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
   // Outside Windows' package, no startup task: nothing offered (D84).
-  more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
+  more.append(speaks, looks, remind, single, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
   after.append(where, exporting, keep, sending);
 
@@ -6604,6 +6628,89 @@ document.addEventListener("keydown", (event) => {
   if (typing || narrow.matches || document.getElementById("frame").hidden || document.body.classList.contains("small-window")) return;
   event.preventDefault();
   fold(!document.body.classList.contains("folded"));
+});
+
+// D128a: Kitokey by the keyboard. Ctrl+R records or stops, Ctrl+F reaches the page's search, Ctrl+, opens
+// Settings, Ctrl+Maj+C copies the summary, Échap goes back; J and K the next and the previous meeting, « ? »
+// the sheet that lists them — a single key each, turned off by Settings' « Raccourcis à une touche » (WCAG 2.2
+// SC 2.1.4). None is taken while a field, a dialog or a menu has the keys: what is typed is typed.
+let singleKeys = true;
+// The keys, in the sheet's order (words.keys_does says what each does): Maj and Échap in the user's language.
+const keysHeld = () => ["Ctrl+R", "Ctrl+F", "Ctrl+,", `Ctrl+${words.keys_named[0]}+C`, "Ctrl+B", words.keys_named[1], "J", "K", "?"];
+function keysSheet() {
+  const back = document.activeElement;
+  const sheet = element("dialog", "dialog keys-sheet");
+  sheet.id = "keys-sheet";
+  const title = element("h2", "", words.keys_title);
+  title.id = "keys-sheet-title";
+  sheet.setAttribute("aria-labelledby", title.id);
+  const table = element("table", "keys-table");
+  for (const [at, keys] of keysHeld().entries()) {
+    const does = words.keys_does[at];
+    const row = element("tr");
+    const held = element("td");
+    held.append(element("kbd", "", keys));
+    row.append(held, element("td", "", does));
+    table.append(row);
+  }
+  const close = element("button", "button secondary", words.keys_close);
+  close.type = "button";
+  const actions = element("div", "actions");
+  actions.append(close);
+  sheet.append(title, table, actions);
+  document.body.append(sheet);
+  const gone = () => {
+    sheet.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus();
+  };
+  close.addEventListener("click", () => sheet.close());
+  sheet.addEventListener("close", gone);
+  sheet.showModal();
+  close.focus();
+}
+document.addEventListener("keydown", (event) => {
+  if (event.altKey || event.isComposing || event.defaultPrevented || document.body.classList.contains("small-window")) return;
+  if (document.getElementById("frame").hidden) return;
+  const typing = event.target.closest?.("textarea, select, [contenteditable], input:not([type=checkbox], [type=radio], [type=button])");
+  // A dialog, a menu open or a panel of the meeting's own keeps its keys (Échap above all).
+  const held = document.querySelector("dialog[open], .menu:not([hidden]), #meeting .redo");
+  if (typing || held) return;
+  const ctrl = event.ctrlKey || event.metaKey;
+  const meeting = !document.getElementById("meeting").hidden;
+  const press = (id) => document.getElementById(id)?.click();
+  const acts = ctrl
+    ? event.shiftKey
+      ? { KeyC: () => meeting && press("copy-minutes") }[event.code]
+      : {
+          KeyR: () => press("record"),
+          Comma: () => (location.hash = "#/settings"),
+          KeyF: () => {
+            const search = meeting ? document.getElementById("search") : null;
+            if (search && !search.hidden) return search.focus();
+            if (document.body.classList.contains("folded")) fold(false);
+            document.getElementById("find").focus();
+          },
+        }[event.code]
+    : event.shiftKey && event.key !== "?"
+      ? undefined
+      : event.key === "Escape"
+        ? location.hash.startsWith("#/settings") || meeting ? () => (history.length > 1 ? history.back() : (location.hash = "#/")) : undefined
+        : !singleKeys
+          ? undefined
+          : event.key === "?"
+            ? keysSheet
+            : { j: 1, k: -1 }[event.key] && (() => {
+                const rows = [...document.querySelectorAll("#groups li:not([hidden]) .session")];
+                const at = rows.findIndex((row) => row.getAttribute("href") === location.hash);
+                const next = rows[at < 0 ? 0 : at + { j: 1, k: -1 }[event.key]];
+                if (!next) return;
+                next.focus();
+                location.hash = next.getAttribute("href");
+              });
+  if (!acts) return;
+  event.preventDefault();
+  if (event.repeat) return;
+  acts();
 });
 // ↑ and ↓ on the list: the meeting above or below shown in the pane, the focus on its row (D61).
 document.getElementById("groups").addEventListener("keydown", (event) => {
