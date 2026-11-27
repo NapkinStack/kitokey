@@ -14313,6 +14313,38 @@ def engine_cards_drawn(now: dt.datetime) -> None:
     tags.shutdown()
 
 
+def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:
+    """CV. D125: the compact bar offers no engine and no language — at rest and while it records, its
+    options hold the context and the microphone under one disclosure, never « Avancé »'s models (D91,
+    gone with D122: a meeting's engine is chosen in Refaire) nor the meeting's language (D99, gone: it is
+    the meeting's page's, D65)."""
+    print("CV. the compact bar: no engine and no language in its options, at rest and recording (D125)")
+    # What the opened options hold that chooses an engine or a language: by id, by class, by a list.
+    chooses = ("const o = document.getElementById('small-options'); if (!o || o.hidden) return null;"
+               " const shown = [...o.querySelectorAll('*')].filter((x) => x.getClientRects().length);"
+               " return shown.filter((x) => /^small-(advanced|language|models)/.test(x.id) || x.closest('.models-advanced, .small-advanced, .small-language')"
+               "   || (x.tagName === 'SELECT' && x.id !== 'small-microphone-choice')).map((x) => x.id || x.className || x.tagName);")
+    opened = lambda b: b.execute_script("const o = document.getElementById('small-options'); return o !== null && !o.hidden")
+    meetings = WORK / "bar-no-engine"
+    meetings.mkdir()
+    with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
+        wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+        browser.execute_script("document.getElementById('small-more').click()")
+        wait_for(browser, opened, 3)
+        time.sleep(1)
+        rest = browser.execute_script(chooses)
+        check("at rest, the bar's options choose no engine and no language", rest == [], rest)
+        press(browser, "small-record")
+        wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 8)
+        if not browser.execute_script("const o = document.getElementById('small-options'); return o !== null && !o.hidden"):
+            browser.execute_script("document.getElementById('small-more').click()")
+        wait_for(browser, opened, 3)
+        time.sleep(1)
+        live = browser.execute_script(chooses)
+        check("recording, the bar's options choose no engine and no language", live == [], live)
+        stop_from_small(browser)
+
+
 def main() -> int:
     now = dt.datetime.now().astimezone()
     began = time.monotonic()
@@ -16118,6 +16150,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     bar_language(now)
+    bar_offers_no_engine_nor_language(now)
     engine_cards_drawn(now)
     bar_after_stop(now)
     summaries_to_a_folder(now)
