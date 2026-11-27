@@ -43,8 +43,10 @@ async function showFirstRun(words) {
     button("first-later", "link", words.first_later, ready),
     button("first-next", "primary with-icon", words.first_next, async () => {
       const chosen = cards?.value() ?? "";
-      // An online service: its key is asked where Settings ask it, nothing saved here.
+      // An online service: its key is asked where Settings ask it, nothing saved here. The first run ends all the
+      // same: back from Settings, the window says ready (screen 3; lina, #1307).
       if (chosen === "online") {
+        firstRunEnded = true;
         focusMinutes = true;
         location.hash = "#/settings";
         return;
