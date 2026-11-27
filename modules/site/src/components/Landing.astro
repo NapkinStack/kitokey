@@ -29,9 +29,9 @@ const pr = t("price");
 const [faqKicker, faqH, faq] = t("faq");
 const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
-// Each system's own mark where its owner allows it, decorative beside its name (BRANDS.md); a link cannot sit in a tab,
-// so its project is linked in its panel. Ubuntu waits for Canonical's word, in words alone.
-const marks = { fedora: ["/img/brands/fedora-logo-white-official.svg", 18, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
+// Each system's own mark, unaltered, decorative beside its name (BRANDS.md); a link cannot sit in a tab, so Fedora's
+// and Debian's projects are linked in their panel.
+const marks = { fedora: ["/img/brands/fedora-logo-white-official.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>

@@ -57,7 +57,7 @@ test("the app's page stands where its placeholder was: the Store's screenshot in
   }
 });
 
-test("Fedora and Debian: their logo in their tab, decorative; their project linked in their panel; Ubuntu in words", async () => {
+test("Fedora, Ubuntu and Debian: their logo in their tab, decorative; Fedora's and Debian's projects linked in their panel", async () => {
   for (const lang of ["fr", "en"]) {
     const html = await page(lang);
     const tab = (os) => html.match(new RegExp(`<button type="button" class="os-tab" data-os="${os}"[\\s\\S]*?</button>`))?.[0] ?? "";
@@ -68,7 +68,7 @@ test("Fedora and Debian: their logo in their tab, decorative; their project link
       const panel = html.match(new RegExp(`<p class="os-note" data-os="${os}"[\\s\\S]*?</p>`))?.[0] ?? "";
       assert.match(panel, new RegExp(`<a href="${site.replace(/[.]/g, "\\.")}"`), `/${lang}/: ${os}'s panel does not link ${site}`);
     }
-    assert.doesNotMatch(tab("ubuntu"), /<img/);
+    assert.match(tab("ubuntu"), /<img[^>]*src="\/img\/brands\/ubuntu-cof-white\.svg"[^>]*alt=""/, `/${lang}/: Ubuntu's tab has no logo`);
   }
 });
 
@@ -82,15 +82,14 @@ test("each page's footer says whose marks Fedora and Debian are, and credits Deb
   }
 });
 
-test("BRANDS.md names each brand's file, its source, its sha256 and the permission its owner gives", async () => {
+test("BRANDS.md names each brand's file, its source, its sha256, the day it was read and whom it is credited to", async () => {
   const brands = await readFile(join(root, "BRANDS.md"), "utf8");
   const header = brands.split("\n").find((l) => l.startsWith("| File"));
-  assert.match(header, /\| File \| Source \| sha256 \| Permission \|/);
+  assert.match(header, /\| File \| Source \| sha256 \| Read, attribution \|/);
   for (const file of await readdir(join(root, "public/img/brands"))) {
     const row = brands.split("\n").find((l) => l.startsWith(`| \`${file}\``));
     assert.ok(row, `${file} not in BRANDS.md`);
-    const permission = row.split("|")[4]?.trim() ?? "";
-    assert.ok(permission.length > 20, `${file}: no permission said`);
+    assert.match(row.split("|")[4] ?? "", /^ 2026-\d\d-\d\d; \S/, `${file}: no day read, no attribution`);
   }
 });
 
