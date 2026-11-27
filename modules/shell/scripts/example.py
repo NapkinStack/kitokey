@@ -12,7 +12,9 @@ It writes `ui/example/<language>/`: `session.json`, `clock.jsonl`, `local.flac` 
 `remote.flac` (« Les autres ») and `title.txt`. Needs `ffmpeg` (with soxr) for the FLAC.
 
 The service's synthesis is not deterministic: the same words, voices and speed give other bytes on
-another run. Licence of the sound: `ui/example/LICENSE`.
+another run. ElevenLabs's default voices named here are to expire on 2026-12-31 (as the verifier
+found, 2026-11-27): the clips already made stay, but after that date this script can no longer make
+them again with these voices. Terms of the sound, and what they do not establish: `ui/example/LICENSE`.
 """
 
 import array
