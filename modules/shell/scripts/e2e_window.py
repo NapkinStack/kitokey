@@ -9496,7 +9496,7 @@ def keys_taught(now: dt.datetime) -> None:
               browser.execute_script(hash_))
         # On the list, Ctrl+F reaches the sidebar's search.
         browser.execute_script("location.hash = '#/'")
-        time.sleep(0.5)
+        wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').hidden"), 5)
         to_body(browser)
         chord(browser, Keys.CONTROL, "f")
         check("Ctrl+F on the list: the focus in the sidebar's « Rechercher »", browser.execute_script(focused)[0] == "find", browser.execute_script(focused))
@@ -11112,7 +11112,7 @@ def two_panes(now: dt.datetime) -> None:
         # The pane's stops in one run: none of the sidebar's between them — past the last, the page starts again.
         last = len(places) - 1 - places[::-1].index("pane") if "pane" in places else 0
         check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start recording", ["Hide sidebar", "Hide sidebar (Ctrl+B)"], ["Show sidebar", "Show sidebar (Ctrl+B)"],
-                                                                                                         ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings"]]
+                                                                                                         ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings (Ctrl+,)"]]
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
