@@ -1,5 +1,5 @@
 // kitokey.com's theme (D114, the decider's round 9, 2026-11-25). Loaded in <head>, not deferred, so the page paints
-// in its theme at once. Moon = dark site and dark app screens; sun = light. Follows the system until the visitor
+// in its theme at once. Moon = the dark theme; sun = the light one. Follows the system until the visitor
 // chooses; the choice is kept in localStorage, a per-viewer convenience: the page works without it.
 (() => {
   "use strict";
@@ -9,8 +9,6 @@
   const system = matchMedia("(prefers-color-scheme: dark)");
   const apply = (theme) => {
     root.dataset.site = theme;
-    root.dataset.screens = theme;
-    document.dispatchEvent(new CustomEvent("kitokey:screens", { detail: theme }));
     const b = document.querySelector(".theme-toggle");
     if (!b) return;
     const dark = theme === "dark";

@@ -19,42 +19,40 @@ const raw = {
     fr: [["confidentialite", "Confidentialité"], ["usages", "Usages"], ["systemes", "Systèmes et prix"], ["faq", "FAQ"], ["installer", "Installer"]],
     keeps: "the page's own sections",
   },
+  // Site v7, the hero (validated by the decider on 2026-11-26): PDR-0009's promise, the price, the Store's
+  // button, and a drawn scene of the call, the bar and the minutes. French first.
   hero: {
-    en: ["Listen.", "Kitokey takes the minutes.", "Meeting minutes written on your own computer, with no bot and no cloud."],
-    fr: ["Écoutez.", "Kitokey prend les notes.", "Des comptes rendus écrits sur votre ordinateur, sans robot ni cloud."],
-    keeps: "docs/store/listing.md: the minutes written on the computer, no bot in the call (D103)",
+    fr: ["Vos rendez-vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur.", "Kitokey enregistre l’appel, le transcrit et en écrit le compte rendu, sur votre ordinateur. Il marche avec Zoom, Meet, Teams ou tout autre logiciel d’appel."],
+    en: ["Every client call gets its minutes.", "Nothing leaves your computer.", "Kitokey records the call, transcribes it and writes its minutes, on your computer. It works with Zoom, Meet, Teams or any other calling app."],
+    keeps: "PDR-0009, the promise; docs/store/listing.md: the minutes written on the computer, any calling app, no bot in the call (D103)",
+  },
+  buy: {
+    fr: ["Essai gratuit, puis 69 € une fois.", "Bientôt dans le Microsoft Store", "Linux, gratuit", "Bientôt sur Mac, au même prix."],
+    en: ["Free trial, then €69 once.", "Coming soon to the Microsoft Store", "Linux, free", "Coming to the Mac, at the same price."],
+    keeps: "PDR-0009, 69 € once on macOS and Windows after a free trial, the Store's button once its listing exists (until then these words, no badge); PDR-0001, free on Linux",
+  },
+  assure: {
+    fr: ["Sans compte.", "Sans abonnement.", "Aucun robot dans l’appel."],
+    en: ["No account.", "No subscription.", "No bot in the call."],
+    keeps: "PDR-0001 and PDR-0003, no account and no subscription; modules/capture records the computer's sound, no participant joins the call",
+  },
+  scene: {
+    fr: ["Un appel vidéo en cours. Au-dessus, la barre de Kitokey enregistre depuis 31 minutes. À côté, le compte rendu fini de l’appel, avec ses points saillants et trois actions datées.",
+      "Appel vidéo", "Sarah (vous)", "Aujourd’hui, 14:00", "Confidentielle", "Atelier Lumen, cadrage du projet", "31 min · Sarah · Camille, Hugo et Léa",
+      "Écrit sur cet ordinateur. Relisez avant de partager.", "Points saillants",
+      "Le devis est validé à 18 400 €. Le lancement est fixé au lundi 7 décembre, avec un premier point d’étape à mi-parcours.", "Actions",
+      [["Sarah", "Envoyer le planning", "Vendredi"], ["Camille", "Signer le bon de commande", "Lundi"], ["Hugo", "Ouvrir les accès au site", "3 déc."]]],
+    en: ["A video call in progress. Above it, Kitokey’s bar has been recording for 31 minutes. Beside it, the call’s finished minutes, with their highlights and three dated actions.",
+      "Video call", "Sarah (you)", "Today, 2:00 pm", "Confidential", "Atelier Lumen, project kick-off", "31 min · Sarah · Camille, Hugo and Léa",
+      "Written on this computer. Read it before you share it.", "Highlights",
+      "The quote is approved at €18,400. The launch is set for Monday 7 December, with a first checkpoint halfway.", "Actions",
+      [["Sarah", "Send the schedule", "Friday"], ["Camille", "Sign the purchase order", "Monday"], ["Hugo", "Open the site’s access", "3 Dec"]]],
+    keeps: "a drawn scene, made-up names and figures: the compact bar as the app draws it (D125's mock-up, PDR-0008's two voices), the meeting page's minutes (D121); the portraits generated, of people who do not exist (2026-11-25)",
   },
   cta: {
     en: ["Install on Linux, free", "Follow the releases"],
     fr: ["Installer sur Linux, gratuit", "Suivre les sorties"],
     keeps: "PDR-0001, free on Linux; the repository's tags, each a release (v0.2.6, 2026-11-18)",
-  },
-  slider: {
-    en: ["Kitokey, feature by feature", "slide", "carousel", "of"],
-    fr: ["Kitokey, fonction par fonction", "diapositive", "carrousel", "sur"],
-    keeps: "the carousel's own words (WAI-ARIA's carousel pattern)",
-  },
-  call: {
-    en: ["Video call", "(you)", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
-    fr: ["Appel vidéo", "(vous)", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
-    keeps: "proposal D's drawn call (the decider's request, 2026-11-25): generated portraits of people who do not exist; the bar as the app draws it while recording (#1179, « B · Trace »)",
-  },
-  // The slides: the clips of c18, filmed from the app at main 17618c9 (shell e2e, run i-sam-film18c), in their
-  // order; the record slide shows the drawn call instead, the decider's request (2026-11-25).
-  slides: {
-    en: [["record", "mic", "Record", "One click, and you listen instead of taking notes.", "", "Sarah records a video call with Camille, Hugo and Léa. At the top, Kitokey’s small bar shows the elapsed time, a level trace for Sarah’s microphone and one for the call’s audio."],
-      ["transcript", "transcript", "Transcribe", "The whole meeting in writing, on your computer.", "", "The transcript of the Weekly product review. The two sides are renamed Sarah and Camille, Hugo and Léa, each line with its time."],
-      ["summary", "summary", "Minutes", "Decisions and actions, ready to share.", "", "The minutes of the Weekly product review, with the highlights, then Hugo’s, Camille’s and Léa’s actions and their due dates."],
-      ["dates", "calendar", "Calendar", "Deadlines in Google Calendar, or as an .ics file for your calendar.", "", "The Dates mentioned panel. A deadline is ticked, then the cursor opens Google Calendar."],
-      ["send", "send", "Share", "Shared in one gesture to Slack, Discord or your webhook.", "", "The cursor presses Send to #product-team, beside Discord’s symbol, then the Sent to line appears."],
-      ["confidential", "lock", "Confidential", "One switch, and no online AI ever sees the meeting.", "", "During a recording, the cursor turns on the Confidential switch, and the padlock shows."]],
-    fr: [["record", "mic", "Enregistrer", "Un clic, et vous écoutez au lieu de noter.", "", "Sarah enregistre un appel vidéo avec Camille, Hugo et Léa. En haut, la petite barre de Kitokey montre le temps écoulé, une trace de niveau pour le micro de Sarah et une pour le son de l’appel."],
-      ["transcript", "transcript", "Transcrire", "Toute la réunion par écrit, sur votre ordinateur.", "", "La transcription de la Revue produit de la semaine. Les deux côtés sont renommés Sarah et Camille, Hugo et Léa, chaque réplique avec son heure."],
-      ["summary", "summary", "Résumer", "Les décisions et les actions, prêtes à partager.", "", "Le compte rendu de la Revue produit de la semaine, avec les points saillants puis les actions de Hugo, Camille et Léa et leurs échéances."],
-      ["dates", "calendar", "Agenda", "Les échéances dans Google Agenda, ou en fichier .ics pour votre agenda.", "", "Le panneau Dates mentionnées. Une échéance est cochée, puis le curseur ouvre Google Agenda."],
-      ["send", "send", "Partager", "Partagé d’un geste sur Slack, Discord ou votre webhook.", "", "Le curseur appuie sur Envoyer à #équipe-produit, à côté du symbole de Discord, puis la ligne Envoyé à apparaît."],
-      ["confidential", "lock", "Confidentielle", "Un interrupteur, et aucune IA en ligne ne voit la réunion.", "", "Pendant un enregistrement, le curseur active l’interrupteur Confidentielle, et le cadenas s’affiche."]],
-    keeps: "the decider's round 9 (2026-11-25): each clip shows it, filmed from the app (c18), light and dark; #1179 the trace; #1205 the names; D113 the dates, .ics as RFC 5545 (Outlook and Apple Calendar named once D115 tests them); D116 the send, « Send… » then the channel: a gesture; #1208 the padlock, D110 the confidential meeting",
   },
   channels: {
     en: ["The whole team up to date, in one gesture.", "In one gesture, to a Slack channel, a Discord channel or your webhook. Nothing leaves without your gesture, and never a confidential meeting without your confirmation.", "Works with"],
