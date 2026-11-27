@@ -163,41 +163,6 @@ fn whole(target: &Path, beside: &Path, models: &Models) -> io::Result<()> {
     written
 }
 
-/// The models chosen in the bar at rest for the next recording (D91), as read again when Kitokey
-/// starts: each part as the contract allows it, or none — as `read` reads a meeting's.
-pub fn read_next(file: &Path) -> Models {
-    read_file(file)
-}
-
-/// Keeps the models chosen at rest for the next recording — Kitokey started again too, as the
-/// context typed before the start is —: written whole, or removed when none is left. Refused for a
-/// part the contract refuses (`InvalidInput`): what was kept stays.
-pub fn keep_next(file: &Path, models: &Models) -> io::Result<()> {
-    if !allowed(models) {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "a part the contract session-audio/v3 refuses",
-        ));
-    }
-    if *models != Models::default()
-        && let Some(folder) = file.parent()
-    {
-        fs::create_dir_all(folder)?;
-    }
-    whole(file, &file.with_extension("part"), models)
-}
-
-/// The models kept for the next recording, taken by the meeting begun: written as its own under
-/// `write`'s rules, none kept after; none chosen writes nothing. Refused — the folder holds no
-/// `session.json` yet —, they stay kept for the next.
-pub fn taken(folder: &Path, next: &mut Models) -> io::Result<()> {
-    let models = std::mem::take(next);
-    if models == Models::default() {
-        return Ok(());
-    }
-    write(folder, &models).inspect_err(|_| *next = models)
-}
-
 /// Settings as the meeting is made with them: what it chose in place of Settings' choice, a
 /// Whisper model found by its name among `listed` — `settings::whisper_models` —, a service to hear
 /// only the one Settings set, a provider to write only the one Settings set or one on this computer,
