@@ -7512,6 +7512,105 @@ def page_estimate(now: dt.datetime) -> None:
             (WORK / "fail-minutes").unlink(missing_ok=True)
 
 
+def meeting_actions_bar(now: dt.datetime) -> None:
+    """MA. D121, criteria 1 and 6: a meeting's page holds one bar of actions — « Partager », « Agenda (n) » once a date
+    is found, « Refaire » and « Plus » —, each its words and its icon, its accessible name beginning with its words
+    (WCAG 2.5.3), before the cards in the focus order; « Plus » a menu button (WAI-ARIA APG), its last entry « Mettre
+    à la corbeille », which asks in a dialog (D120's), « Annuler » focused, its confirm button destructive (PDR-0008),
+    Escape keeping the meeting and the focus back on « Plus »; axe on the page, the menu and the dialog open; in
+    French light and in English dark."""
+    print("MA. a meeting's page: one bar of actions in words, « Plus » a menu, « Mettre à la corbeille » asked in a dialog (D121)")
+    focused = "const a = document.activeElement; return !a || a === document.body ? 'body' : a.id || a.tagName.toLowerCase()"
+    bar = ("const b = document.getElementById('meeting-actions'); if (!b) return null;"
+           " return [...b.querySelectorAll(':scope > button')].filter((e) => !e.hidden).map((e) => ({id: e.id,"
+           " words: e.querySelector('.label')?.textContent.trim() ?? '', count: e.querySelector('.count')?.textContent.trim() ?? '',"
+           " name: e.getAttribute('aria-label') ?? e.textContent.trim(), icon: !!e.querySelector('svg'), popup: e.getAttribute('aria-haspopup'),"
+           " expanded: e.getAttribute('aria-expanded')}))")
+    menu = ("const m = document.getElementById('more-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
+            " return {role: m.getAttribute('role'), items: [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim(), i.classList.contains('destructive')])}")
+    dialog = ("const d = document.querySelector('dialog[open]'); if (!d) return null;"
+              " return {title: d.querySelector('h2')?.textContent ?? '', says: d.querySelector('p')?.textContent ?? '', modal: d.matches(':modal'),"
+              " confirm: [...d.querySelectorAll('button')].map((b) => [b.textContent.trim(), b.classList.contains('destructive')])}")
+    meetings = WORK / "actions-bar"
+    dated, plain = meetings / "2026-11-24_23-30", meetings / "2026-11-23_10-00"
+    for folder, started, actions in ((dated, now - dt.timedelta(days=1), "- Envoyer le devis — Inès — jeudi [00:04]\n- Rappeler Jiří — Marc — 12 décembre [00:10]\n"),
+                                     (plain, now - dt.timedelta(days=2), "- Réserver la salle — Paul — bientôt\n")):
+        session(folder, started, 20, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"Inès, tu envoies le devis jeudi ?"}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":10.0,"end":13.0,"text":"Marc rappelle Jiří le 12 décembre."}\n'
+            '{"type":"complete","duration":20.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v3\nmade: 2026-11-24T23:55:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            f"## 1.\n\nLe devis part.\n\n## 2.\n\n{actions}\n## 3.\n\n- Rien\n")
+    for language, theme, said in (
+        ("fr_FR.UTF-8", "light", {"share": "Partager", "dates": "Agenda", "redo": "Refaire", "more": "Plus", "folder": "Ouvrir le dossier",
+                                  "trash": "Mettre à la corbeille", "ask": "Mettre cette réunion à la corbeille ?", "holds": ["audio", "transcription", "compte rendu"],
+                                  "restore": "restaurer", "cancel": "Annuler"}),
+        ("en_US.UTF-8", "dark", {"share": "Share", "dates": "Calendar", "redo": "Redo", "more": "More", "folder": "Open folder",
+                                 "trash": "Move to trash", "ask": "Move this meeting to the trash?", "holds": ["audio", "transcript", "summary"],
+                                 "restore": "restore", "cancel": "Cancel"}),
+    ):
+        short = language[:2]
+        window = Window(meetings, language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script(f"location.hash = '#/meeting/{dated.name}'")
+            drawn = wait_for(browser, lambda b: b.execute_script(bar), 10)
+            got = browser.execute_script(bar) or []
+            # The four, in their order, each its words and its icon; the dates' count beside « Agenda ».
+            check(f"{short}: one bar, « {said['share']} », « {said['dates']} 2 », « {said['redo']} », « {said['more']} », each its words and its icon (D121)",
+                  drawn and [(b["id"], b["words"], b["count"], b["icon"]) for b in got]
+                  == [("share-open", said["share"], "", True), ("dates-open", said["dates"], "2", True), ("redo-open", said["redo"], "", True), ("more-open", said["more"], "", True)], got)
+            # Each accessible name begins with its visible words, the count in it too (WCAG 2.5.3).
+            check(f"{short}: each name begins with its visible words, the count in it (WCAG 2.5.3)",
+                  bool(got) and all(b["name"].startswith(b["words"]) and b["count"] in b["name"] for b in got), [b["name"] for b in got])
+            # Before the cards in the focus order, and no positive tabindex anywhere.
+            order = browser.execute_script(
+                "const b = document.getElementById('meeting-actions'), c = document.querySelector('#meeting .card');"
+                " return [!!b && !!c && !!(b.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING),"
+                " [...document.querySelectorAll('[tabindex]')].filter((e) => e.tabIndex > 0).length]")
+            check(f"{short}: the bar before the cards in the focus order, no positive tabindex (D121)", order == [True, 0], order)
+            # « Plus »: a menu button; Enter opens its menu, the focus on its first entry; « Mettre à la corbeille » last, destructive.
+            browser.execute_script("document.getElementById('more-open')?.focus()")
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            opened = wait_for(browser, lambda b: b.execute_script(menu), 3)
+            items = browser.execute_script(menu) or {}
+            more = next((b for b in browser.execute_script(bar) or [] if b["id"] == "more-open"), {})
+            check(f"{short}: « {said['more']} » a menu button, opened by Enter, its entries « {said['folder']} »… then « {said['trash']} » last, destructive (WAI-ARIA APG, D121)",
+                  opened and more.get("popup") == "menu" and more.get("expanded") == "true" and items.get("role") == "menu"
+                  and [said["folder"], said["trash"]] == [i[1] for i in items.get("items", []) if i[1] in (said["folder"], said["trash"])]
+                  and items["items"][-1][1:] == [said["trash"], True] and browser.execute_script(focused) == items["items"][0][0], [more, items, browser.execute_script(focused)])
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: the menu open, no violation of axe's WCAG 2.2 A and AA rules (D121)", found == [], found)
+            # Escape closes it, the focus back on « Plus ».
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: b.execute_script(menu) is None and b.execute_script(focused) == "more-open", 3)
+            check(f"{short}: Escape closes the menu, the focus back on « {said['more']} »", closed, browser.execute_script(focused))
+            # « Mettre à la corbeille »: a modal dialog asks, says what goes and that it can be restored, « Annuler » focused, its confirm destructive.
+            ActionChains(browser).send_keys(Keys.ENTER).perform()
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            ActionChains(browser).send_keys(Keys.END, Keys.ENTER).perform()
+            asked = wait_for(browser, lambda b: b.execute_script(dialog), 3)
+            got = browser.execute_script(dialog) or {}
+            check(f"{short}: « {said['trash']} » asks in a modal dialog « {said['ask']} », says what goes and that it comes back, « {said['cancel']} » focused, its confirm destructive (PDR-0008, D121)",
+                  asked and got.get("modal") and got.get("title") == said["ask"] and all(w in got.get("says", "").lower() for w in said["holds"])
+                  and said["restore"] in got.get("says", "").lower() and browser.execute_script("return document.activeElement?.textContent.trim()") == said["cancel"]
+                  and [said["trash"], True] in got.get("confirm", []), [got, browser.execute_script("return document.activeElement?.textContent.trim()")])
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: the dialog open, no violation of axe's WCAG 2.2 A and AA rules (D121)", found == [], found)
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            kept = wait_for(browser, lambda b: b.execute_script(dialog) is None and b.execute_script(focused) == "more-open", 3)
+            check(f"{short}: Escape keeps the meeting, the focus back on « {said['more']} » (D121)", kept and dated.is_dir(), browser.execute_script(focused))
+            # A meeting with no date found: no « Agenda » in the bar.
+            browser.execute_script(f"location.hash = '#/meeting/{plain.name}'")
+            redrawn = wait_for(browser, lambda b: [e["id"] for e in b.execute_script(bar) or []] == ["share-open", "redo-open", "more-open"], 10)
+            check(f"{short}: no date found, no « {said['dates']} » in the bar (D121)", redrawn, browser.execute_script(bar))
+
+
+
 def meeting_trashed(now: dt.datetime) -> None:
     """BT. D100: a meeting moved to the trash from its own page — beside the button that opens its folder,
     a question in place, « Annuler » focused first, what it holds and that the system's trash restores it;
@@ -16112,6 +16211,7 @@ def main() -> int:
     appearance_chosen(now)
     focus_kept(now)
     focus_swept(now)
+    meeting_actions_bar(now)
     meeting_trashed(now)
     sound_checked(now)
     ends_on_sigterm(now)
