@@ -3,7 +3,7 @@
 use std::{fs, path::Path};
 
 use kitokey_shell::{
-    settings::{After, Engine, KeepAudio, Log, Settings, Window, file, read, welcome_due, whisper_models, write},
+    settings::{self, After, Engine, KeepAudio, Log, Settings, Window, file, read, welcome_due, whisper_models, write},
     words::Language,
 };
 
@@ -775,4 +775,31 @@ fn a_new_install_writes_the_minutes_after_a_recording_and_a_file_already_there_k
         write(&path, &settings).unwrap();
         assert_eq!(read(&path).unwrap().after, kept, "{said}");
     }
+}
+
+/// What the bar kept for the next recording before D125 — its models, its language — removed at
+/// start, named once; nothing else of the folder touched, and nothing to say when they are gone.
+#[test]
+fn the_bars_next_choices_left_by_an_earlier_kitokey_are_removed_at_start_and_nothing_else() {
+    let folder = tempfile::tempdir().unwrap();
+    for name in ["next-models.json", "next-language.txt", "settings.toml", "next-context.txt"] {
+        std::fs::write(folder.path().join(name), "kept before").unwrap();
+    }
+    let mut removed = settings::leftovers_removed(folder.path());
+    removed.sort_unstable();
+    assert_eq!(removed, ["next-language.txt", "next-models.json"]);
+    let mut left: Vec<String> = std::fs::read_dir(folder.path())
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["next-context.txt", "settings.toml"]);
+    assert!(
+        settings::leftovers_removed(folder.path()).is_empty(),
+        "removed once, then nothing to say"
+    );
+    assert!(
+        settings::leftovers_removed(&folder.path().join("none")).is_empty(),
+        "no folder, nothing to do"
+    );
 }
