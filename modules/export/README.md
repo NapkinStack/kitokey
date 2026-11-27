@@ -33,8 +33,9 @@ flowchart LR
 **Legend** — grey: a meeting's files and the contract each follows, and the dates its caller gives · green: this module · blue: what it writes.
 
 A library and its program: a meeting's folder read into one model, every format written from it
-(D108). It writes Markdown, HTML, DOCX and subtitles (SRT, WebVTT) today, and its library a tagged PDF (PDF/UA-1)
-through typst with the fonts its caller gives; the program writes it next. The words a file shows
+(D108). It writes Markdown, HTML, DOCX, subtitles (SRT, WebVTT) and a tagged PDF (PDF/UA-1) through typst,
+in the system's static faces — a letter only a variable face has is `pdf.no_font`, never written Thin
+(`chosen()`). The words a file shows
 that no contract carries — « Transcription », who spoke — are given by its caller. Beside them, an iCalendar
 file (RFC 5545, D117): the dates a meeting's actions mention, resolved by the shell, one all-day event each.
 

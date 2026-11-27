@@ -5,12 +5,14 @@
 //! arguments are public to the machine's users. The file is written beside its place, then renamed over
 //! it: whole or not at all, as `pandoc -o` replaces a file.
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::Arc;
 
-use kitokey_export::{Dated, Include, Labels, Meeting, docx, html, ics, markdown, srt, vtt};
+use kitokey_export::{Data, Dated, Face, FontInfo, Include, Labels, Meeting, chosen, docx, html, ics, markdown, pdf, srt, vtt};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -20,10 +22,9 @@ const VERSION: &str = match option_env!("KITOKEY_VERSION") {
     _ => env!("CARGO_PKG_VERSION"),
 };
 
-/// The formats this version writes. `exporting/v1` names `pdf` too: it joins this list as its writer is
-/// delivered (D108), and until then is a wrong argument, which the shell never gives — it offers only
-/// the formats this program writes.
-const WRITTEN: &[&str] = &["md", "html", "docx", "srt", "vtt", "ics"];
+/// The formats this version writes, every one `exporting/v1` names (D108, D117). A format a later version of
+/// the contract names is a wrong argument until it joins this list.
+const WRITTEN: &[&str] = &["md", "html", "docx", "srt", "vtt", "pdf", "ics"];
 
 /// Why the program ends in failure: its sentence, and the code a person acts on, when there is one.
 struct Refused(String, Option<&'static str>);
@@ -221,10 +222,80 @@ fn export() -> Result<Value, Refused> {
         "docx" => docx(&meeting, include, &labels, &name).map_err(unwritable)?,
         "srt" => srt(&meeting, include, &labels).into_bytes(),
         "vtt" => vtt(&meeting, include, &labels, &asked.lang).into_bytes(),
+        "pdf" => {
+            let system = System::read();
+            let taken = chosen(&meeting, include, &labels, &name, &system.infos(), Some(&system.sans())).map_err(|_| {
+                Refused(
+                    "no static font of the system has the meeting's letters: install static fonts of its script".into(),
+                    Some("pdf.no_font"),
+                )
+            })?;
+            let faces = system.faces(&taken);
+            // typst's detail, its kind and its place alone, for the logs (`exporting/v1`): `pdf()` keeps no
+            // word of the meeting in it.
+            pdf(&meeting, include, &labels, &asked.lang, &name, &faces)
+                .map_err(|detail| Refused(format!("the PDF could not be laid out ({detail})"), Some("pdf.failed")))?
+        }
         other => unreachable!("{other} is refused with the arguments"),
     };
     let bytes = whole(&to, &written).map_err(unwritable)?;
     Ok(json!({"event": "written", "file": to, "bytes": bytes}))
+}
+
+/// The system's fonts: fontconfig's folders on Linux, the system's on macOS and Windows (fontdb). None
+/// ships with the program.
+struct System {
+    fonts: fontdb::Database,
+    /// Each face typst reads, and what it is: its family, whether it is variable, its characters — its
+    /// file read for this and not kept.
+    faces: Vec<(fontdb::ID, FontInfo)>,
+}
+
+impl System {
+    fn read() -> System {
+        let mut fonts = fontdb::Database::new();
+        fonts.load_system_fonts();
+        let faces = fonts
+            .faces()
+            .filter_map(|face| {
+                let info = fonts.with_face_data(face.id, FontInfo::new)??;
+                Some((face.id, info))
+            })
+            .collect();
+        System { fonts, faces }
+    }
+
+    /// The system's sans-serif family's name.
+    fn sans(&self) -> String {
+        self.fonts.family_name(&fontdb::Family::SansSerif).to_string()
+    }
+
+    fn infos(&self) -> Vec<FontInfo> {
+        self.faces.iter().map(|(_, info)| info.clone()).collect()
+    }
+
+    /// The faces `taken`, each file read once.
+    fn faces(&self, taken: &[usize]) -> Vec<Face> {
+        let mut read: HashMap<PathBuf, Data> = HashMap::new();
+        taken
+            .iter()
+            .filter_map(|&i| {
+                let face = self.fonts.face(self.faces[i].0)?;
+                let data = match &face.source {
+                    fontdb::Source::Binary(data) => data.clone(),
+                    fontdb::Source::File(path) | fontdb::Source::SharedFile(path, _) => match read.get(path) {
+                        Some(data) => data.clone(),
+                        None => {
+                            let data: Data = Arc::new(fs::read(path).ok()?);
+                            read.insert(path.clone(), data.clone());
+                            data
+                        }
+                    },
+                };
+                Some(Face { data, index: face.index })
+            })
+            .collect()
+    }
 }
 
 /// Writes `bytes` at `to` whole or not at all: a file beside it, flushed, then renamed over it.

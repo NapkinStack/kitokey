@@ -112,6 +112,12 @@ dependencies:
     exit_strategy: >
       pdf() in src/pdf.rs writes one typst source and compiles it; another typesetter that writes PDF/UA
       from a source — a headless browser's print — replaces it, at the cost of its tags or its size.
+  - name: fontdb
+    purpose: >-
+      Finds the system's font files for the PDF — fontconfig's folders on Linux, the system's on macOS
+      and Windows; already built as typst's (MIT)
+    adr: docs/adr/0002-a-rust-core-of-programs-and-a-web-view-shell.md
+    exit_strategy: system() in src/main.rs; a list of the system's font folders read by hand replaces it.
 #  - name:
 #    purpose:
 #    adr:

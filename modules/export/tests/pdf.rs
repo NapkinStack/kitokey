@@ -4,8 +4,9 @@
 //! subsets of Noto, in `tests/fonts/`.
 
 use std::fs;
+use std::sync::Arc;
 
-use kitokey_export::{Include, Labels, Meeting, pdf};
+use kitokey_export::{Face, FontInfo, Include, Labels, Meeting, chosen, pdf};
 use lopdf::{Document, Object};
 
 const SESSION: &str = r#"{"contract": "session-audio/v3", "started": "2026-11-20T09:30:00+01:00", "tracks": {}}"#;
@@ -36,7 +37,15 @@ fn labels() -> Labels {
     }
 }
 
-fn fonts() -> Vec<Vec<u8>> {
+/// A test font, as one face.
+fn face(name: &str) -> Face {
+    Face {
+        data: Arc::new(fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()),
+        index: 0,
+    }
+}
+
+fn fonts() -> Vec<Face> {
     [
         "NotoSans-Regular-subset.ttf",
         "NotoSans-Bold-subset.ttf",
@@ -44,18 +53,30 @@ fn fonts() -> Vec<Vec<u8>> {
         "NotoSansSC-Bold-subset.otf",
         "NotoColorEmoji-subset.ttf",
     ]
-    .iter()
-    .map(|name| fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap())
+    .into_iter()
+    .map(face)
     .collect()
 }
 
-fn written(include: Include) -> Vec<u8> {
+/// The meeting of these tests, or one of a summary alone.
+fn meeting(minutes: &str, transcript: &str) -> Meeting {
     let dir = tempfile::tempdir().unwrap();
     fs::write(dir.path().join("session.json"), SESSION).unwrap();
-    fs::write(dir.path().join("minutes.md"), MINUTES).unwrap();
-    fs::write(dir.path().join("transcript.jsonl"), TRANSCRIPT).unwrap();
-    let meeting = Meeting::read(dir.path()).unwrap();
-    pdf(&meeting, include, &labels(), "fr", "Réunion du 20 nov. 2026", &fonts()).expect("a PDF")
+    fs::write(dir.path().join("minutes.md"), minutes).unwrap();
+    fs::write(dir.path().join("transcript.jsonl"), transcript).unwrap();
+    Meeting::read(dir.path()).unwrap()
+}
+
+fn written(include: Include) -> Vec<u8> {
+    pdf(
+        &meeting(MINUTES, TRANSCRIPT),
+        include,
+        &labels(),
+        "fr",
+        "Réunion du 20 nov. 2026",
+        &fonts(),
+    )
+    .expect("a PDF")
 }
 
 /// The text as an extractor reads it, its runs of white space — U+00A0 and U+202F among them — as one.
@@ -201,4 +222,117 @@ fn a_tab_or_a_control_character_is_written_as_a_space_or_left_out_never_refused(
     for said in ["Réunion du 20", "Le prix fixé.", "un deux", "Bon jour à[31m tous."] {
         assert!(text.contains(said), "« {said} » not in: {text}");
     }
+}
+
+const VARIABLE: &str = "NotoSansSC-VF-subset.otf";
+
+fn choose(meeting: &Meeting, names: &[&str], sans: Option<&str>) -> Result<Vec<String>, char> {
+    let faces: Vec<FontInfo> = names
+        .iter()
+        .map(|name| FontInfo::new(&fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap(), 0).unwrap())
+        .collect();
+    chosen(meeting, Include::all(), &labels(), "Réunion du 20 nov. 2026", &faces, sans)
+        .map(|taken| taken.into_iter().map(|i| names[i].to_string()).collect())
+}
+
+/// Two families with as many of the missing letters: the one given first is taken, and the other, left with
+/// nothing to add, is not (`chosen()`'s tie, lina's B2 on #1279). Given in either order, the first wins; the
+/// meeting's CJK and emoji are their own faces'.
+#[test]
+fn of_two_families_with_as_many_letters_the_first_given_is_taken() {
+    let read = |name: &str| FontInfo::new(&fs::read(format!("{}/tests/fonts/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap(), 0).unwrap();
+    let mut twin = read("NotoSans-Regular-subset.ttf");
+    twin.family = "Noto Sans Twin".into();
+    let regular = read("NotoSans-Regular-subset.ttf");
+    let others = [read("NotoSansSC-Regular-subset.otf"), read("NotoColorEmoji-subset.ttf")];
+    let meeting = meeting(MINUTES, TRANSCRIPT);
+    let taken = |first: &FontInfo, second: &FontInfo| {
+        let faces = [first.clone(), second.clone(), others[0].clone(), others[1].clone()];
+        chosen(&meeting, Include::all(), &labels(), "Réunion du 20 nov. 2026", &faces, None).unwrap()
+    };
+    for (first, second) in [(&twin, &regular), (&regular, &twin)] {
+        let taken = taken(first, second);
+        assert!(
+            taken.contains(&0) && !taken.contains(&1),
+            "{} given first, {} taken: {taken:?}",
+            first.family,
+            second.family
+        );
+    }
+}
+
+#[test]
+fn static_faces_are_chosen_before_a_variable_one_of_the_same_letters() {
+    let names = [
+        VARIABLE,
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+        "NotoSansSC-Bold-subset.otf",
+        "NotoColorEmoji-subset.ttf",
+    ];
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Noto Sans")).unwrap(),
+        &names[1..],
+        "the sans-serif first, then the family that has the most of what is missing; the variable face left out"
+    );
+}
+
+#[test]
+fn a_letter_only_a_variable_face_has_is_refused_never_written_in_its_default_instance() {
+    // The summary's CJK alone, which the variable subset has and no static face here: refused by its first
+    // letter, never written Thin (the decider, 2026-11-25).
+    let names = ["NotoSans-Regular-subset.ttf", "NotoSans-Bold-subset.ttf", VARIABLE];
+    let only_latin_and_these = meeting(MINUTES, "");
+    let refused = choose(&only_latin_and_these, &names, Some("Noto Sans")).unwrap_err();
+    assert!(('\u{4e00}'..='\u{9fff}').contains(&refused), "a CJK letter: {refused:?}");
+}
+
+#[test]
+fn a_letter_no_face_has_is_refused_by_that_letter() {
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        VARIABLE,
+        "NotoColorEmoji-subset.ttf",
+    ];
+    // 下 is the first, by its code, of the transcript's CJK that no face here has.
+    assert_eq!(choose(&meeting(MINUTES, TRANSCRIPT), &names, None), Err('下'));
+}
+
+#[test]
+fn a_symbol_no_face_has_is_no_refusal_and_a_family_nothing_needs_is_not_chosen() {
+    // No emoji face: 👍 and 🎉 are no letters, the PDF is written. A summary in Latin alone: no CJK face.
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+    ];
+    assert_eq!(choose(&meeting(MINUTES, TRANSCRIPT), &names, None).unwrap(), names);
+    let latin = MINUTES.replace("- 会议纪要\n", "- Fini\n");
+    assert_eq!(choose(&meeting(&latin, ""), &names, None).unwrap(), &names[..2],);
+}
+
+#[test]
+fn the_systems_sans_serif_comes_first_when_it_has_any_of_the_letters() {
+    let names = [
+        "NotoSans-Regular-subset.ttf",
+        "NotoSans-Bold-subset.ttf",
+        "NotoSansSC-Regular-subset.otf",
+        "NotoColorEmoji-subset.ttf",
+    ];
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Noto Color Emoji")).unwrap(),
+        [
+            "NotoColorEmoji-subset.ttf",
+            "NotoSans-Regular-subset.ttf",
+            "NotoSans-Bold-subset.ttf",
+            "NotoSansSC-Regular-subset.otf"
+        ]
+    );
+    // A sans-serif the system names but has not, or which has none of the letters: the rule of the most.
+    assert_eq!(
+        choose(&meeting(MINUTES, TRANSCRIPT), &names, Some("Cantarell")).unwrap()[0],
+        names[0]
+    );
 }

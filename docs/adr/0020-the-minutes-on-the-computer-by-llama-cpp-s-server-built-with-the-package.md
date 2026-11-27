@@ -2,8 +2,8 @@
 
 > The framework's words: `.nstack/handbook/glossary.md`.
 
-- **Status**: Proposed by marc (session faac4c8b-75c7-4ae9-810f-7cbe35c1f1b9), 2026-11-26, at the decider's request of that
-  day relayed by the coordinator (#1259)
+- **Status**: Accepted by the decider on 2026-11-26 (option 1, relayed by the coordinator). Proposed by marc (session
+  faac4c8b-75c7-4ae9-810f-7cbe35c1f1b9) the same day, at the decider's request relayed by the coordinator (#1259)
 - **Date**: 2026-11-26
 - **Decision makers**: the decider, `@napkinstack-admin`
 - **Scope**: modules `install`, `shell`; ADR-0010's list; no contract
