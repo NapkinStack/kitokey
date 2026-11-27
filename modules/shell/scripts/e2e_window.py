@@ -7673,7 +7673,7 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             asked = wait_for(browser, lambda b: b.execute_script(dialog), 3)
             got = browser.execute_script(dialog) or {}
             check(f"{short}: « {said['trash']} » asks in a modal dialog « {said['ask']} », says what goes and that it comes back, « {said['cancel']} » focused, its confirm destructive (PDR-0008, D121)",
-                  asked and got.get("modal") and got.get("title") == said["ask"] and all(w in got.get("says", "").lower() for w in said["holds"])
+                  asked and got.get("modal") and got.get("title", "").replace("\u202f", " ") == said["ask"] and all(w in got.get("says", "").lower() for w in said["holds"])
                   and said["restore"] in got.get("says", "").lower() and browser.execute_script("return document.activeElement?.textContent.trim()") == said["cancel"]
                   and [said["trash"], True] in got.get("confirm", []), [got, browser.execute_script("return document.activeElement?.textContent.trim()")])
             found = axe_violations(browser)
@@ -9853,8 +9853,9 @@ def dates_mentioned(now: dt.datetime) -> None:
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
             counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
             label = {"Dates mentionnées": "Agenda", "Dates mentioned": "Calendar"}[opens]
-            check(f"{language}: in the bar of actions, « {label} », a calendar and its count « 2 », before « Refaire », named « {label}, {counted} », its tooltip « {counted} » (D121, #1239)",
-                  shown and form == {"bar": True, "before": True, "words": label, "count": "2", "name": f"{label}, {counted}", "tip": counted, "calendar": True}, form)
+            named = f"{label} 2, {opens.lower()}"
+            check(f"{language}: in the bar of actions, « {label} 2 », a calendar and its count, before « Refaire », named « {named} », its tooltip « {counted} » (D121, #1239, WCAG 2.5.3)",
+                  shown and form == {"bar": True, "before": True, "words": label, "count": "2", "name": named, "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
                 browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
                 shot(browser, "cm-dates-offered-light")

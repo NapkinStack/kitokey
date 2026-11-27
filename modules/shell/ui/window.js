@@ -2508,9 +2508,10 @@ function datesOffer(card, mentioned, session, transcript, words) {
       if (count === 0) return;
       const said = fill(words.dates_counted[count === 1 ? 0 : 1], count);
       button.title = said;
-      button.setAttribute("aria-label", `${words.meeting_dates}, ${said}`);
+      // Its name begins with what it shows, « Agenda 2 », word for word (WCAG 2.5.3), then what the count is.
+      button.setAttribute("aria-label", `${words.meeting_dates} ${count}, ${words.dates_open.toLocaleLowerCase(words.locale)}`);
       button.classList.add("counted");
-      button.append(element("span", "count", String(count)));
+      button.append(" ", element("span", "count", String(count)));
     })
     .catch(() => {});
   button.addEventListener("click", () => datesPanel(mentioned, session, transcript, words, button));
