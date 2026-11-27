@@ -36,6 +36,11 @@ const raw = {
     en: ["No account.", "No subscription.", "No bot in the call."],
     keeps: "PDR-0001 and PDR-0003, no account and no subscription; modules/capture records the computer's sound, no participant joins the call",
   },
+  pause: {
+    fr: "Mettre l’animation du fond en pause",
+    en: "Pause the background animation",
+    keeps: "WCAG 2.2.2 (level A): a pause for the spectrogram, which moves for more than 5 s beside the headline",
+  },
   scene: {
     fr: ["Un appel vidéo en cours. Au-dessus, la barre de Kitokey enregistre depuis 31 minutes. À côté, le compte rendu fini de l’appel, avec ses points saillants et trois actions datées.",
       "Appel vidéo", "Sarah (vous)", "Aujourd’hui, 14:00", "Confidentielle", "Atelier Lumen, cadrage du projet", "31 min · Sarah · Camille, Hugo et Léa",

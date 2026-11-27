@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
+import vm from "node:vm";
 import { dist } from "./helpers.mjs";
 import { landing } from "../src/lib/landing.mjs";
 
@@ -60,6 +61,51 @@ test("the spectrogram runs only on screen and with the tab visible, at most 30 f
   assert.match(js, /IntersectionObserver/);
   assert.match(js, /now - last >= 33/);
 });
+
+// hero.js run against a stand-in page: the loop asks for frames, its pause stops it and keeps the frame, a second
+// press starts it again; under reduced motion nothing runs and the pause stays hidden (WCAG 2.2.2).
+async function run(reduced) {
+  const source = await readFile(join(dist, "hero.js"), "utf8");
+  const frames = [], cancelled = [], listeners = {};
+  const el = (extra = {}) => ({ dataset: {}, style: {}, append() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600 }), ...extra });
+  const pause = el({ hidden: true, attrs: { "aria-pressed": "false" }, setAttribute(k, v) { this.attrs[k] = v; }, addEventListener(type, fn) { listeners[type] = fn; } });
+  const ctx = { setTransform() {}, clearRect() {}, fillRect() {} };
+  const canvas = el({ offsetWidth: 800, getContext: () => ctx });
+  const hero = el({ querySelector: (q) => ({ ".voices": canvas, ".scene .mcard": el(), ".pitch": el(), ".voices-pause": pause })[q] });
+  const page = {
+    document: { documentElement: el(), hidden: false, addEventListener() {}, querySelector: (q) => (q === ".hero" ? hero : null), querySelectorAll: () => [], createElement: () => el() },
+    matchMedia: () => ({ matches: reduced, addEventListener() {} }),
+    getComputedStyle: () => ({ getPropertyValue: () => "#000" }),
+    IntersectionObserver: class { observe() {} }, MutationObserver: class { observe() {} },
+    requestAnimationFrame: (fn) => frames.push(fn), cancelAnimationFrame: (id) => cancelled.push(id),
+    addEventListener() {}, devicePixelRatio: 1, scrollY: 0,
+  };
+  page.window = page;
+  vm.runInNewContext(source, page);
+  return { frames, cancelled, pause, press: () => listeners.click() };
+}
+
+test("the pause stops the spectrogram and keeps its frame, a second press starts it again; under reduced motion it never runs", async () => {
+  const live = await run(false);
+  assert.equal(live.pause.hidden, false, "the pause is hidden while the spectrogram moves");
+  assert.equal(live.frames.length, 1, "the loop never started");
+  live.press();
+  assert.equal(live.pause.attrs["aria-pressed"], "true");
+  assert.equal(live.cancelled.length, 1, "the pause did not stop the loop");
+  live.press();
+  assert.equal(live.pause.attrs["aria-pressed"], "false");
+  assert.equal(live.frames.length, 2, "a second press did not start it again");
+  const still = await run(true);
+  assert.equal(still.frames.length, 0, "it moves under reduced motion");
+  assert.equal(still.pause.hidden, true, "a pause shown with nothing moving");
+});
+
+for (const lang of ["fr", "en"]) {
+  test(`/${lang}/: the spectrogram's pause is a button named in its language, not pressed, hidden until its script runs`, async () => {
+    const html = await hero(lang);
+    assert.ok(html.includes(`<button type="button" class="voices-pause" aria-pressed="false" aria-label="${landing.pause[lang]}" title="${landing.pause[lang]}" hidden>`), "no pause button");
+  });
+}
 
 test("nothing of the old hero is built: no carousel, no clips, no waves", async () => {
   const files = await readdir(dist);
