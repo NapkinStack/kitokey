@@ -1,0 +1,138 @@
+/* Kitokey's tokens (D120): the one file that holds a value. Primitives; the design system's roles and scales,
+   which `components.css` reads alone (PDR-0008; the v5 mock-up the decider accepted on 2026-11-26); the
+   window's older names, each the primitive it was on main, until its screen comes over to the components.
+
+   The theme: the light values on `:root`; the dark ones under the system's dark, unless Settings chose
+   light, and under Settings' dark (D98) — the same list in both, held by tests/look.rs. */
+
+/* The face of the titles (D120): Bricolage Grotesque, SIL OFL 1.1 (`ui/BRICOLAGE-OFL.txt`), its Latin
+   letters at weights 600 to 700. The words stay in the system's face. */
+@font-face {
+  font-family: "Bricolage Grotesque";
+  src: url("bricolage-latin-600-700.woff2") format("woff2");
+  font-weight: 600 700;
+  font-display: swap;
+}
+
+/* Primitives: the palette, named by hue and lightness. */
+:root {
+  color-scheme: light dark;
+  --white: #FFFFFF;
+  --gray-25: #F2F4F7; --gray-50: #EEF1F5; --gray-75: #EEF0F4; --gray-100: #E3E7EE; --gray-150: #D9DDE5;
+  --gray-300: #AAB1BF; --gray-450: #808898; --gray-500: #737B8C; --gray-650: #4C5464; --gray-750: #3A4050;
+  --gray-800: #343946; --gray-825: #313644; --gray-850: #282C37; --gray-900: #1E2129; --gray-950: #15171C;
+  --slate-25: #F6F7FB; --slate-50: #F0F2F7; --slate-100: #E3E6EC; --slate-400: #8A92A3; --slate-450: #7D8699;
+  --slate-500: #717A8C; --slate-550: #5F6777; --slate-650: #50576A; --slate-830: #2E3441; --slate-850: #2A2F3A;
+  --slate-870: #252A35; --slate-900: #1E222B; --slate-930: #171A21; --slate-970: #12141A; --slate-975: #111318;
+  --slate-990: #0F1115;
+  --blue-50: #EEF2FB; --blue-200: #A9C4FF; --blue-300: #8AB0FF; --blue-700: #2253CF; --blue-800: #1A44AD;
+  --blue-950: #1B2540; --blue-975: #0B1530;
+  --green-300: #63D49C; --green-700: #16794A;
+  --teal-700: #0F766E; --gold-300: #F2C14E;
+  --amber-50: #FFF4DC; --amber-300: #F5B54A; --amber-400: #FBBF24; --amber-800: #8A5300; --amber-950: #2A2214;
+  --red-300: #FF7A72; --red-700: #C2352D;
+  --violet-50: #F3F0FF; --violet-300: #B9A6FF; --violet-600: #6E56CF; --violet-950: #221D38;
+  --yellow-200: #FDE68A;
+}
+
+/* Scales: space, radius, size, duration and easing, elevation; the faces. */
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+  --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-pill: 999px;
+  --fs-caption: 12px; --fs-small: 13px; --fs-body: 15px; --fs-title-sm: 17px; --fs-title: 20px; --fs-title-lg: 24px;
+  --d-instant: 90ms; --d-fast: 140ms; --d-slow: 320ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --font-text: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif;
+  --font-display: "Bricolage Grotesque", var(--font-text);
+}
+
+/* Roles: what a colour says, in the light theme. */
+:root {
+  --color-canvas: var(--slate-25);
+  --color-surface: var(--white);
+  --color-sunken: var(--slate-50);
+  --color-raised: var(--white);
+  --color-hover: var(--gray-50);
+  --color-pressed: var(--gray-100);
+  --color-tint: var(--blue-50);
+  /* Divides, and only that; a control's edge, 3:1 on each ground (D89). */
+  --color-divider: var(--slate-100);
+  --color-edge: var(--slate-450);
+  --color-text: var(--slate-975);
+  --color-text-soft: var(--slate-650);
+  --color-text-faint: var(--slate-550);
+  --color-accent: var(--blue-700);
+  --color-accent-hover: var(--blue-800);
+  --color-on-accent: var(--white);
+  /* Success alone: ready, sent, saved (PDR-0008). */
+  --color-success: var(--green-700);
+  --color-warning: var(--amber-800);
+  --color-warning-ground: var(--amber-50);
+  /* Red says two things: a recording, its live dot; a deletion, its button (PDR-0008). */
+  --color-record: var(--red-700);
+  --color-destructive: var(--red-700);
+  --color-on-destructive: var(--white);
+  /* Violet with the lock: « Confidentielle », and nothing else. */
+  --color-private: var(--violet-600);
+  --color-private-ground: var(--violet-50);
+  /* « Vous » blue; « Les autres » teal here, golden amber in the dark. */
+  --color-voice-you: var(--blue-700);
+  --color-voice-others: var(--teal-700);
+  --e1: 0 1px 2px rgb(17 19 24 / .05), 0 4px 12px -8px rgb(30 50 100 / .12);
+  --e3: 0 1px 2px rgb(0 0 0 / .08), 0 24px 56px -20px rgb(30 50 100 / .30);
+  --color-scrim: rgb(15 17 21 / .36);
+  /* The first run's two halos behind its card (D126, mock-up v5): dimmer in the dark. */
+  --halo-opacity: .25;
+}
+
+/* The window's older names, each the primitive it was on main (tests/look.rs pins them). */
+:root {
+  --ground: var(--gray-25); --surface: var(--white); --raised: var(--gray-50); --line: var(--gray-150);
+  --ink: var(--gray-950); --soft: var(--gray-650); --accent: var(--blue-700); --ok: var(--green-700);
+  --red: var(--red-700); --edge: var(--gray-450); --hover: var(--gray-100); --pressed: var(--gray-150);
+  --mark: var(--yellow-200); --mark-ink: var(--gray-950); --mark-edge: var(--gray-950);
+}
+
+/* The dark theme: the same list, written once here, then again under Settings' dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-canvas: var(--slate-990); --color-surface: var(--slate-930); --color-sunken: var(--slate-970);
+    --color-raised: var(--slate-900); --color-hover: var(--slate-870); --color-pressed: var(--slate-830);
+    --color-tint: var(--blue-950); --color-divider: var(--slate-850); --color-edge: var(--slate-500);
+    --color-text: var(--gray-75); --color-text-soft: var(--gray-300); --color-text-faint: var(--slate-400);
+    --color-accent: var(--blue-300); --color-accent-hover: var(--blue-200); --color-on-accent: var(--blue-975);
+    --color-success: var(--green-300); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
+    --color-record: var(--red-300); --color-destructive: var(--red-300); --color-on-destructive: var(--slate-990);
+    --color-private: var(--violet-300); --color-private-ground: var(--violet-950);
+    --color-voice-you: var(--blue-300); --color-voice-others: var(--gold-300);
+    --e1: 0 1px 2px rgb(0 0 0 / .12), 0 4px 12px -8px rgb(0 0 0 / .3), inset 0 0 0 1px rgb(255 255 255 / .06);
+    --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
+    --color-scrim: rgb(0 0 0 / .55);
+    --halo-opacity: .12;
+    --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
+    --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
+    --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);
+    --mark: var(--amber-400); --mark-ink: var(--gray-900); --mark-edge: var(--amber-400);
+  }
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: var(--slate-990); --color-surface: var(--slate-930); --color-sunken: var(--slate-970);
+  --color-raised: var(--slate-900); --color-hover: var(--slate-870); --color-pressed: var(--slate-830);
+  --color-tint: var(--blue-950); --color-divider: var(--slate-850); --color-edge: var(--slate-500);
+  --color-text: var(--gray-75); --color-text-soft: var(--gray-300); --color-text-faint: var(--slate-400);
+  --color-accent: var(--blue-300); --color-accent-hover: var(--blue-200); --color-on-accent: var(--blue-975);
+  --color-success: var(--green-300); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
+  --color-record: var(--red-300); --color-destructive: var(--red-300); --color-on-destructive: var(--slate-990);
+  --color-private: var(--violet-300); --color-private-ground: var(--violet-950);
+  --color-voice-you: var(--blue-300); --color-voice-others: var(--gold-300);
+  --e1: 0 1px 2px rgb(0 0 0 / .12), 0 4px 12px -8px rgb(0 0 0 / .3), inset 0 0 0 1px rgb(255 255 255 / .06);
+  --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
+  --color-scrim: rgb(0 0 0 / .55);
+  --halo-opacity: .12;
+  --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
+  --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
+  --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);
+  --mark: var(--amber-400); --mark-ink: var(--gray-900); --mark-edge: var(--amber-400);
+}

@@ -20,6 +20,53 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "key_points": {
+      "description": "Sent when the key points were chosen: the items of their section, each without its bullet.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "dates": {
+      "description": "Sent when the dates were chosen, in their order.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "what": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "pattern": "[\\n\\r]"
+            }
+          },
+          "who": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "pattern": "[\\n\\r]"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "what",
+          "who"
+        ]
+      }
     }
   },
   "required": [

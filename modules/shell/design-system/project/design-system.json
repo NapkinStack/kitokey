@@ -1,0 +1,26 @@
+{
+  "v": 3,
+  "layout": "files",
+  "editing": "code",
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-11-27T21:39:44+01:00"
+  },
+  "title": "Kitokey",
+  "namespace": "Kitokey",
+  "libraries": [],
+  "sections": {},
+  "groups": [],
+  "assetGroups": {},
+  "blobs": {},
+  "docs": {
+    "readme": "project/README.md",
+    "sections": []
+  },
+  "lastChange": {
+    "by": "kitokey-lina[bot]",
+    "at": "2026-11-27T21:39:44+01:00",
+    "via": "CI · NapkinStack/kitokey@450e7c86e9ce6a7189280eb6db49ae41ebab9bcd",
+    "note": "Exported from ui/tokens.css and ui/components.css by scripts/design-export.py."
+  }
+}

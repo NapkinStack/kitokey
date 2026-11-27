@@ -508,7 +508,8 @@ pub struct Window {
     /// At most: no limit. Placeholders: none.
     pub none: &'static str,
     /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
-    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path as people say it, from their
+    /// home (« Dossier personnel / Kitokey ») or from the root (#1232).
     pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
@@ -516,7 +517,7 @@ pub struct Window {
     /// start. At most: no limit. Placeholders: none.
     pub none_do: &'static str,
     /// Shows: the window with no meeting, as an error. When: the meetings folder cannot be read.
-    /// At most: no limit. Placeholders: {} folder.
+    /// At most: no limit. Placeholders: {} the folder, as `none_folder` says it.
     pub list_unread: &'static str,
     /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
     /// At most: no limit. Placeholders: none.
@@ -629,6 +630,20 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
     pub more_actions: &'static str,
+    /// D121, a meeting's bar of actions: each its words beside its icon. « Partager »: the summary's sends, its copy
+    /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
+    /// characters. Placeholders: none.
+    pub meeting_share: &'static str,
+    /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
+    /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
+    pub meeting_dates: &'static str,
+    /// The engines that make the meeting again, and its versions. Shows: a meeting's page, the bar of actions, a
+    /// button. When: always. At most: about 12 characters. Placeholders: none.
+    pub meeting_redo: &'static str,
+    /// The rarer actions: renaming, opening the folder, the trash; its name for a screen reader `more_actions`, which
+    /// begins with it. Shows: a meeting's page, the bar of actions, a menu button. When: always. At most: about 8
+    /// characters. Placeholders: none.
+    pub meeting_more: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
     /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
@@ -1402,14 +1417,6 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as a status. When: online service ignored: meeting
     /// confidential. At most: no limit. Placeholders: none.
     pub models_unused_confidential: &'static str,
-    /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
-    /// short (D91) — one, or more joined by « · ».
-    /// Shows: the recording bar, as a help line. When: at rest: models kept for next recording.
-    /// At most: no limit. Placeholders: {} the models kept, joined by « · ».
-    pub bar_models_kept: &'static str,
-    /// Shows: the recording bar, as a help line. When: same, one model. At most: no limit.
-    /// Placeholders: {} the model kept.
-    pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     /// Shows: « Vérifier le son » (D88), its title, opened from Settings, « Général » or the bar;
     /// and its row there. When: always. At most: one line. Placeholders: none.
@@ -2179,6 +2186,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Components",
             gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
             more_actions: "More actions",
+            meeting_share: "Share",
+            meeting_dates: "Calendar",
+            meeting_redo: "Redo",
+            meeting_more: "More",
             labelled: "{}:",
             minutes_title: "Summary",
             transcript_title: "Transcript",
@@ -2440,8 +2451,6 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "The transcription model chosen for this meeting is no longer installed — the one in Settings will be used.",
             models_gone_minutes: "The summary service chosen for this meeting is no longer set up — the one in Settings will be used.",
             models_unused_confidential: "Confidential meeting: the online service isn’t used — everything stays on this computer.",
-            bar_models_kept: "Models: {}",
-            bar_model_kept: "Model: {}",
             check_sound: "Check the sound",
             check_sound_says: "Test your microphone and meeting audio before recording.",
             check_unavailable: "Unavailable",
@@ -2733,6 +2742,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Composants",
             gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
             more_actions: "Plus d’actions",
+            meeting_share: "Partager",
+            meeting_dates: "Agenda",
+            meeting_redo: "Refaire",
+            meeting_more: "Plus",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",
@@ -3000,8 +3013,6 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus installé\u{a0}: celui des Réglages sera utilisé.",
             models_gone_minutes: "Le service choisi pour le compte rendu de cette réunion n’est plus configuré\u{a0}: celui des Réglages sera utilisé.",
             models_unused_confidential: "Réunion confidentielle\u{a0}: le service en ligne choisi n’est pas utilisé, tout se fait sur cet ordinateur.",
-            bar_models_kept: "Modèles retenus\u{a0}: {}",
-            bar_model_kept: "Modèle retenu\u{a0}: {}",
             check_sound: "Vérifier le son",
             check_sound_says: "Testez votre micro et le son de la réunion avant d’enregistrer.",
             check_unavailable: "Indisponible",
