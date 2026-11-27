@@ -62,6 +62,19 @@ for (const lang of ["fr", "en"]) {
   });
 }
 
+// sam's review of #1292: D109's folder never holds a confidential meeting (D60, e2e CF), so no card says every
+// summary goes there without that exception.
+test("the Markdown folder is never said to hold every summary: confidential meetings stay in Kitokey", () => {
+  for (const lang of ["fr", "en"]) {
+    const [, , said] = landing.ready[lang].feats.find(([icon]) => icon === "folder");
+    assert.match(said, lang === "fr" ? /Réglages/ : /Settings/, said);
+    assert.match(said, /confidenti/i, `${lang}: the confidential meetings' exception is not said`);
+    for (const [, , card] of landing.ready[lang].feats) {
+      assert.ok(!/chaque compte rendu|each summary|every summary/i.test(card) || /confidenti/i.test(card), `${lang}: « ${card} »`);
+    }
+  }
+});
+
 test("#still in the address keeps every group in place, for a capture", async () => {
   const js = await readFile(join(dist, "site.js"), "utf8");
   assert.match(js, /location\.hash !== "#still"/);
