@@ -520,6 +520,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 #welcome:has(> .first-run)::after { background: var(--violet-300); right: -12vmax; bottom: -14vmax; }
 #first-choice { position: relative; z-index: 1; width: min(760px, 100%); padding: var(--sp-8); border-radius: var(--r-xl); box-shadow: var(--e3); }
 #first-choice .engine-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* Three on a line, the shorter ones as tall as the tallest: their lines stay packed at their top, as v5 stacks them. */
+#first-choice .engine-card { align-content: start; }
 @media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice { padding: var(--sp-5); } }
 .first-steps { display: flex; gap: var(--sp-1); }
 .first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-sunken); }
