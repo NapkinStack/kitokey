@@ -1177,9 +1177,9 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   // Once a meeting is there, the first run is over for good: removed again, the window says its ordinary words.
   if (sessions.length > 0) firstRunEnded = false;
   const ready = firstRunEnded && !unreadable && sessions.length === 0;
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : ready ? words.ready_title : words.none;
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folderSaid(folder, words)) : ready ? words.ready_title : words.none;
   // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
-  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
+  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folderSaid(folder, words));
   document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : ready ? words.ready_says : words.none_do;
   // Its style stays the pane's: the sidebar's « Démarrer un enregistrement » is the window's one primary action.
@@ -2076,6 +2076,12 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
 
 // A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
 // own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
+// A folder as people say it (#1232): from their home, « Dossier personnel / Kitokey », or from the root, « / mnt / … ».
+function folderSaid(path, words) {
+  const said = path.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
+  return path.startsWith("/") ? `/ ${said}` : said;
+}
+
 function pathShown(said, whole, id) {
   const shown = element("button", "path");
   shown.id = id;
@@ -4740,8 +4746,7 @@ function showSettings(shown, minutes, words) {
   path.spellcheck = false;
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
-  const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said, "sessions-shown");
+  const folderShown = pathShown(folderSaid(shown.sessions_said, words), shown.sessions_said, "sessions-shown");
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4783,10 +4788,9 @@ function showSettings(shown, minutes, words) {
   exportPath.disabled = locked;
   exportPath.spellcheck = false;
   exportPath.hidden = true;
-  const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
   const exportShown =
     shown.export_said === null ? element("button", "path none", words.export_none)
-    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said, "export-shown");
+    : pathShown(folderSaid(shown.export_said, words), shown.export_said, "export-shown");
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");
