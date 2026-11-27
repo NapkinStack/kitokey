@@ -1049,6 +1049,8 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   const weight = document.getElementById("weight");
   weight.hidden = sessions.length === 0;
   // A folder that cannot be read is no empty list: said, and tried again (D67).
+  // Once a meeting is there, the first run is over for good: removed again, the window says its ordinary words.
+  if (sessions.length > 0) firstRunEnded = false;
   const ready = firstRunEnded && !unreadable && sessions.length === 0;
   document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : ready ? words.ready_title : words.none;
   // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.

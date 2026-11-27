@@ -2151,19 +2151,47 @@ def first_run_ready(now: dt.datetime) -> None:
                   shown, browser.execute_script(pane))
             check(f"{short}: the third screen keeps the sidebar: nothing is a dead end",
                   browser.find_element(By.ID, "sidebar").is_displayed() and browser.find_element(By.ID, "settings-link").is_displayed())
-            violations = axe_violations(browser)
-            check(f"{short}: the third screen has no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+            # axe in each theme, its colours put on the page where the desktop shows the other one (as shot_themed does).
             for theme in ("light", "dark"):
-                shot_themed(browser, f"d126-ready-{short}-{theme}", theme)
+                forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                    time.sleep(0.3)
+                violations = axe_violations(browser)
+                check(f"{short}, {theme}: the third screen has no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                shot(browser, f"d126-ready-{short}-{theme}")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = ''")
             if example_opens:
                 press(browser, "empty-example")
                 opened = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/example-fr", 10)
                 check("« Essayer sur un exemple »: the example placed, its meeting's page opened",
                       opened and (meetings / "example-fr" / "session.json").is_file(), browser.execute_script("return location.hash"))
+                # A meeting there, then gone again in the same session: the first run is over, the ordinary words come back.
+                wait_for(browser, lambda b: (meetings / "example-fr" / "minutes.md").is_file(), 20)
+                shutil.rmtree(meetings / "example-fr")
+                browser.execute_script("location.hash = '#/'; refresh()")
+                plain = wait_for(browser, lambda b: (b.execute_script(pane) or [None])[0] not in (None, texts[0]), 10)
+                check("a meeting there once, then gone in the same session: the empty window says its ordinary words, no longer ready",
+                      plain, browser.execute_script(pane))
             else:
                 press(browser, "empty-record")
                 live = wait_for(browser, lambda b: b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
                 check("« Record »: a recording starts", live)
+        if example_opens:
+            # Asking for less motion: the third screen the same, nothing of it moving (its shots, light and dark).
+            still = meetings.parent / f"ready-{short}-still"
+            still.mkdir()
+            window = asking_less_motion(Window(still, language, small=True, welcomed=False, args=()))
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}-still"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+            with window as browser:
+                wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+                press(browser, "welcome-skip")
+                shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
+                check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
+                      (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-ready-{short}-still-{theme}", theme)
         if not example_opens:
             # Started again, welcomed, still no meeting: the empty pane says what it says outside a first run.
             (meetings / "ready").mkdir()
