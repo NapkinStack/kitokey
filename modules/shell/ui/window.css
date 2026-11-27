@@ -363,9 +363,10 @@ body.small-window .frame { display: none; }
 #small .bar-row button { flex: none; }
 #small .bar-lock[aria-pressed="true"] { color: var(--ok); }
 #small .bar-lock .lock { color: inherit; }
-#small .bar-separator { flex: none; width: 1px; height: 20px; margin: 0 var(--sp-1); background: var(--color-divider); }
+/* The row's items spaced by its gap alone (Round 4): the separator, the handle and the meters keep no margin of their own. */
+#small .bar-separator { flex: none; width: 1px; height: 20px; background: var(--color-divider); }
 /* The mark alone, in the accent: the handle; recording, its dot red and larger (the decider, 2026-11-08). */
-#small .handle { display: grid; place-items: center; margin-right: 8px; color: var(--accent); cursor: grab; }
+#small .handle { display: grid; place-items: center; color: var(--accent); cursor: grab; }
 .mark { display: block; width: 20px; height: 20px; fill: currentColor; }
 .mark .arms { fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
 .mark .live, .handle.live .mark .rest { display: none; }
@@ -385,7 +386,7 @@ body.small-window .frame { display: none; }
 #small .small-rest, #small .small-live { padding: 8px 16px 14px; border-top: 1px solid var(--line); }
 /* A thin meter for each side in the row (D90, board 5): its icon, its trace 14 px high; a side silent two
    minutes, or with nothing to record, dashed and its icon crossed, said in a grey line under the row. */
-#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; margin-left: 8px; }
+#small .meters { display: flex; flex-direction: column; gap: 4px; width: 120px; }
 /* A meeting's page while it records (#1076, #1112): in the who-spoke area, its time large at the centre, as Voice
    Memos and Granola show a live meeting, the two sides' levels — the bar's meters — under it. */
 .live-now { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 100px; padding: 8px 0; }
