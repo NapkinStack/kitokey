@@ -15,8 +15,7 @@ The service's synthesis is not deterministic: the same words, voices and speed g
 another run. ElevenLabs says « All our Default voices will expire on December 31, 2026 »
 (https://elevenlabs.io/docs/capabilities/voices, read on 2026-11-27); whether the four voices here
 are Default voices is not established. If they are, the clips already made stay, but after that
-date this script can no longer make them again with these voices. Terms of the sound, and what they
-do not establish: `ui/example/LICENSE`.
+date this script can no longer make them again with these voices. Credit: `ui/example/LICENSE`.
 """
 
 import array
