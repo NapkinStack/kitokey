@@ -1362,14 +1362,6 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as a status. When: online service ignored: meeting
     /// confidential. At most: no limit. Placeholders: none.
     pub models_unused_confidential: &'static str,
-    /// Under the bar's row at rest, « Avancé » closed: the models chosen for the next recording, named
-    /// short (D91) — one, or more joined by « · ».
-    /// Shows: the recording bar, as a help line. When: at rest: models kept for next recording.
-    /// At most: no limit. Placeholders: {} the models kept, joined by « · ».
-    pub bar_models_kept: &'static str,
-    /// Shows: the recording bar, as a help line. When: same, one model. At most: no limit.
-    /// Placeholders: {} the model kept.
-    pub bar_model_kept: &'static str,
     /// « Vérifier le son » (D88, board 7): its title, and its row in Settings.
     /// Shows: « Vérifier le son » (D88), its title, opened from Settings, « Général » or the bar;
     /// and its row there. When: always. At most: one line. Placeholders: none.
@@ -2387,8 +2379,6 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "The transcription model chosen for this meeting is no longer installed — the one in Settings will be used.",
             models_gone_minutes: "The summary service chosen for this meeting is no longer set up — the one in Settings will be used.",
             models_unused_confidential: "Confidential meeting: the online service isn’t used — everything stays on this computer.",
-            bar_models_kept: "Models: {}",
-            bar_model_kept: "Model: {}",
             check_sound: "Check the sound",
             check_sound_says: "Test your microphone and meeting audio before recording.",
             check_unavailable: "Unavailable",
@@ -2934,8 +2924,6 @@ pub fn window(language: Language) -> Window {
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus installé\u{a0}: celui des Réglages sera utilisé.",
             models_gone_minutes: "Le service choisi pour le compte rendu de cette réunion n’est plus configuré\u{a0}: celui des Réglages sera utilisé.",
             models_unused_confidential: "Réunion confidentielle\u{a0}: le service en ligne choisi n’est pas utilisé, tout se fait sur cet ordinateur.",
-            bar_models_kept: "Modèles retenus\u{a0}: {}",
-            bar_model_kept: "Modèle retenu\u{a0}: {}",
             check_sound: "Vérifier le son",
             check_sound_says: "Testez votre micro et le son de la réunion avant d’enregistrer.",
             check_unavailable: "Indisponible",
