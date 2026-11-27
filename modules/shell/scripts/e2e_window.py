@@ -6601,6 +6601,10 @@ def gallery_shown(now: dt.datetime) -> None:
                                             ".filter((e) => e.getClientRects().length).map((e) => e.dataset.state)")
             check(f"{short}, {theme}: the engine card ready, to download, to install, its key missing (D122)",
                   {"ready", "download", "install", "key"} <= set(states), states)
+            # Each card's words in one column, the radio alone in its own: its state under its name, never beside the radio.
+            off = browser.execute_script("return [...document.querySelectorAll('#gallery .engine-card')].map((c) =>"
+                                         " Math.round(c.querySelector('.state').getBoundingClientRect().left - c.querySelector('.name').getBoundingClientRect().left))")
+            check(f"{short}, {theme}: each engine card's state under its name", off and set(off) == {0}, off)
             chosen = ("return [...document.querySelectorAll('#gallery .engine-cards')]"
                       ".map((g) => g.querySelector('input:checked')?.closest('.engine-card').dataset.engine ?? null)")
             before = browser.execute_script(chosen)

@@ -67,8 +67,8 @@
 .engine-card label { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-1) var(--sp-2); align-items: baseline; cursor: pointer; }
 .engine-card input { margin: 0; accent-color: var(--color-accent); }
 .engine-card .name { font-weight: 600; }
-.engine-card .where, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
-.engine-card .state { font-size: var(--fs-small); color: var(--color-text-soft); }
+.engine-card .where, .engine-card .state, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
+.engine-card .state { font-weight: 600; }
 .engine-card[data-state="ready"] .state { color: var(--color-success); }
 .engine-card .default { font-size: var(--fs-caption); color: var(--color-accent); }
 .engine-card details { font-size: var(--fs-small); color: var(--color-text-soft); }
