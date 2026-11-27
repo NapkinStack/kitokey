@@ -1,0 +1,18 @@
+---
+// /<lang>/legal/: the legal notice (the decider, 2026-11-27). The publisher's details from the build's
+// environment (src/lib/legal.mjs), the director by office, the host's own public details. No person's name.
+import Page from "../layouts/Page.astro";
+import { publisher, director, host } from "../lib/legal.mjs";
+import { say } from "../lib/words.mjs";
+const { lang } = Astro.props;
+const [pub, name, form, capital, registration, vat, seat, contact, head, hosted, address, phone] = say("legalFields", lang);
+const rows = [[name, publisher.LEGAL_NAME], [form, publisher.LEGAL_FORM], [capital, publisher.LEGAL_CAPITAL], [registration, publisher.LEGAL_REGISTRATION],
+  [vat, publisher.LEGAL_VAT], [seat, publisher.LEGAL_SEAT], [contact, publisher.LEGAL_CONTACT], [head, director(lang)]];
+---
+<Page lang={lang} title={`${say("legal", lang)} · Kitokey`} description={say("local", lang)} path="legal/" kind="wrap prose">
+  <h1>{say("legal", lang)}</h1>
+  <h2>{pub}</h2>
+  <dl class="legal">{rows.map(([k, v]) => <><dt>{k}</dt><dd>{v}</dd></>)}</dl>
+  <h2>{hosted}</h2>
+  <dl class="legal"><dt>{name}</dt><dd>{host.name}</dd><dt>{address}</dt><dd>{host.address}</dd><dt>{phone}</dt><dd>{host.phone}</dd></dl>
+</Page>

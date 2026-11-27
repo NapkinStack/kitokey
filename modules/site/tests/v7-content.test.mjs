@@ -19,9 +19,10 @@ test("the price is said in dollars in English, in euros in French, wherever it i
   const fr = text(await page("fr"));
   assert.match(en, /Free trial, then \$69 once\./);
   assert.equal((en.match(/\$69/g) ?? []).length, 3, "the hero, the card and the last call");
-  assert.doesNotMatch(en, /€/);
+  // The price alone: the made-up meetings quote their own sums (« €18,400 »), never Kitokey's price.
+  assert.doesNotMatch(en, /€ ?69|69 ?€/);
   assert.equal((fr.match(/69 €/g) ?? []).length, 3);
-  assert.doesNotMatch(fr, /\$/);
+  assert.doesNotMatch(fr, /\$ ?69|69 ?\$/);
 });
 
 test("the privacy section links no policy: the footer does", async () => {
@@ -37,7 +38,7 @@ test("the privacy section links no policy: the footer does", async () => {
 test("the hero's note begins with v7's sparkles", async () => {
   for (const lang of ["fr", "en"]) {
     const prov = (await page(lang)).match(/<article class="mcard"[\s\S]*?<div class="prov">([\s\S]*?)<\/div>/)?.[1] ?? "";
-    assert.match(prov, /^<svg[^>]*>[\s\S]*?M12 3\.5 13\.6 8\.4/, `/${lang}/: no sparkles before « ${text(prov).trim()} »`);
+    assert.match(prov, /^<svg[^>]*><use href="#i-sparkles"\/><\/svg>/, `/${lang}/: no sparkles before « ${text(prov).trim()} »`);
   }
 });
 
