@@ -1,8 +1,7 @@
 // kitokey.com, site v7 (validated by the decider on 2026-11-26): the header's hairline once the page has scrolled,
 // the compact bar's two meters, and the hero's background, a dot-matrix spectrogram of the two voices. Decorative:
 // the canvas is aria-hidden. It runs at most 30 frames a second, only while the hero is on screen and the tab
-// visible, and stops on its pause button, keeping its frame (WCAG 2.2.2); under reduced motion it draws one still
-// frame and the button stays hidden, nothing moving.
+// visible; under reduced motion it draws one still frame.
 (() => {
   "use strict";
   const root = document.documentElement;
@@ -33,8 +32,7 @@
   if (!cv?.getContext || !card || !pitch) return;
   const ctx = cv.getContext("2d");
   const cols = {};
-  let w = 0, h = 0, t = 4, last = 0, raf = 0, onScreen = true, paused = false;
-  const pause = hero.querySelector(".voices-pause");
+  let w = 0, h = 0, t = 4, last = 0, raf = 0, onScreen = true;
   const dark = () => root.dataset.site === "dark";
   const readCols = () => {
     const cs = getComputedStyle(root);
@@ -88,7 +86,7 @@
     ctx.setTransform(r, 0, 0, r, 0, 0);
     readCols(); draw();
   };
-  const running = () => onScreen && !paused && !document.hidden && !reduce.matches && cv.offsetWidth > 0;
+  const running = () => onScreen && !document.hidden && !reduce.matches && cv.offsetWidth > 0;
   const frame = (now) => {
     raf = 0;
     if (!running()) { last = 0; return; }
@@ -102,13 +100,7 @@
   new IntersectionObserver((e) => { onScreen = e[0].isIntersecting; sync(); }).observe(hero);
   if ("ResizeObserver" in window) new ResizeObserver(size).observe(hero);
   document.addEventListener("visibilitychange", sync);
-  const showPause = () => { if (pause) pause.hidden = reduce.matches; };
-  pause?.addEventListener("click", () => {
-    paused = !paused;
-    pause.setAttribute("aria-pressed", String(paused));
-    sync();
-  });
-  reduce.addEventListener("change", () => { showPause(); size(); sync(); });
+  reduce.addEventListener("change", () => { size(); sync(); });
   new MutationObserver(() => { readCols(); draw(); }).observe(root, { attributes: true, attributeFilter: ["data-site"] });
-  showPause(); size(); sync();
+  size(); sync();
 })();

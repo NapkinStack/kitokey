@@ -62,12 +62,6 @@ html[data-site="dark"] .halo::after { mix-blend-mode: screen; opacity: .04; }
 .assure .ico { color: var(--accent); }
 /* The two voices' spectrogram, decorative, behind the pitch and into the minutes card (public/hero.js). */
 .voices { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-/* Its pause (WCAG 2.2.2): two bars, a triangle once pressed; 44 px, at the hero's top right. */
-.voices-pause { position: absolute; right: 16px; top: 12px; z-index: 4; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border-subtle); background: color-mix(in srgb, var(--bg-surface) 80%, transparent); color: var(--text-secondary); cursor: pointer; display: grid; place-items: center; }
-.voices-pause:hover, .voices-pause:focus-visible { color: var(--text-primary); }
-.voices-pause[hidden] { display: none; }
-.voices-pause i { width: 8px; height: 10px; border-left: 2.5px solid currentColor; border-right: 2.5px solid currentColor; }
-.voices-pause[aria-pressed="true"] i { width: 0; height: 0; border-right: 0; border-left: 8px solid currentColor; border-top: 5px solid transparent; border-bottom: 5px solid transparent; margin-left: 2px; }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1 .l { animation: glide .8s var(--ease-out) both; }
   .hero h1 .l + .l { animation-delay: .1s; }
