@@ -299,9 +299,9 @@ D121's choice in the shell. P2.
 |---|---|---|
 | The cycle | The decider | Read this file and PDR-0008 from their pull request; approve it, or say what changes |
 | D126 | The decider | Read the ADR « a private summary without installing Ollama by hand » from its pull request; say (a) or (b), or what changes |
-| D120 | The decider | Read the gallery's shots from D120's pull request; say « charte ok », or what changes |
+| D120 | The decider | Done on 2026-11-27: the gallery approved (#1298) |
 | D120 | An agent | Once D120 is merged: publish `design-system/` as the « Design System » artifact, updated in place at each release, its commit in its README |
-| D121, D123, D126 | The decider | Read the before and after shots of each screen's pull request; say « ok », or what changes |
+| D120, D121, D123, D126 | An agent | Neither the pull request's author nor its verifier: compare its tokens value by value in both themes, its components and its before and after shots with the accepted v5 mock-up; validate when each difference is an accessibility fix held by a test or a part the pull request names as later, else bring it to the coordinator. The decider delegated this on 2026-11-27 |
 | D126 | The decider | On the package an agent built, run the first run from a new account: say how long it took to the first summary, on the example |
 
 ## Out of scope
