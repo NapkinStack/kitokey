@@ -2315,10 +2315,40 @@ def first_run_screens(now: dt.datetime) -> None:
                 got = browser.execute_script(progress)
                 check(f"{lang}: (2) under it, what is prepared: a progress, its size come and in all, and the time left",
                       bool(said) and got[0] == "progressbar" and got[2], got)
+                # Heard as it reads (the coordinator's audit of #1325): its value said in words, « 150 ko sur 1,2 Mo, environ 11 s ».
+                heard = browser.execute_script("const p = document.getElementById('first-progress'); return [p.getAttribute('aria-valuetext'), document.getElementById('first-progress-said').textContent]")
+                check(f"{lang}: (2) the progress's value said in words to a screen reader, as its line says it",
+                      bool(heard[0]) and len(re.findall(size, heard[0])) >= 2 and heard[0] == heard[1].replace(" · ", ", "), heard)
+                # Where it comes from, in words, as v5 says it: the host the model is fetched from, and that it is checked.
+                source = browser.execute_script("return document.querySelector('#first-sound .first-once')?.textContent ?? ''")
+                host = browser.execute_script("return window.__TAURI__.core.invoke('makings').then((m) => m.model_offer_host)")
+                check(f"{lang}: (2) where the engine comes from said in words, its host, and that it is checked (v5)",
+                      bool(host) and host in source and (lang != "fr" or ("Une seule fois." in source and "vérifié" in source)), [source, host])
+                # Its track seen on the card, 3:1 at least in both themes, as the steps' marks (WCAG 2.2 SC 1.4.11).
+                if lang == "fr":
+                    track, rgb = {}, lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        read = browser.execute_script("const p = getComputedStyle(document.getElementById('first-progress')), c = getComputedStyle(document.getElementById('first-sound'));"
+                                                      " return [p.borderTopWidth, p.borderTopColor, c.backgroundColor]")
+                        track[theme] = [read[0], round(contrast(rgb(read[1]), rgb(read[2])), 2)]
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    check("(2) the progress's track edged on the card, 3:1 at least, light and dark (WCAG 2.2 SC 1.4.11)",
+                          all(w == "1px" and r >= 3.0 for w, r in track.values()), track)
                 violations = axe_violations(browser)
                 check(f"{lang}: (2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
                 for theme in ("light", "dark"):
                     shot_themed(browser, f"d126-sound-{lang}-{theme}", theme)
+                # A narrow window: nothing wider than it, shot in both themes.
+                wide = browser.get_window_size()
+                browser.set_window_size(420, 860)
+                time.sleep(0.5)
+                fits = browser.execute_script("const e = document.documentElement; return [innerWidth, e.scrollWidth <= e.clientWidth]")
+                check(f"{lang}: (2) at the window's {fits[0]} px, nothing wider than the window", fits[0] <= 420 and fits[1], fits)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-sound-{lang}-small-{theme}", theme)
+                browser.set_window_size(wide["width"], wide["height"])
+                time.sleep(0.5)
                 if lang == "fr":
                     # « Retour »: screen (1) again, its heading focused, nothing listened to; then on again.
                     press(browser, "first-back")
