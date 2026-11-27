@@ -898,6 +898,7 @@ EXAMPLES["posting/v1/input.schema.json"][1].extend(
         {**_SEND, "dates": []},
         {**_SEND, "dates": [{**_DATE, "date": "27/11/2026"}]},
         {**_SEND, "dates": [{"date": "2026-11-27", "what": "x"}]},
+        {**_SEND, "dates": [{"id": "a1", "date": "2026-11-27", "who": "Léa"}]},
         {**_SEND, "dates": [{**_DATE, "what": "deux\nlignes"}]},
         {**_SEND, "dates_title": ""},
         {**_SEND, "dates_title": "deux\nlignes"},
@@ -917,6 +918,7 @@ EXAMPLES["posting/v1/payload.schema.json"][1].extend(
         {"title": "t", "summary": "", "actions": [], "key_points": [""]},
         {"title": "t", "summary": "", "actions": [], "key_points": "one"},
         {"title": "t", "summary": "", "actions": [], "dates": [{"what": "x", "who": None}]},
+        {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "x"}]},
         {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "", "who": None}]},
         {"title": "t", "summary": "", "actions": [], "dates": [{"date": "1 déc.", "what": "x", "who": None}]},
     ]
