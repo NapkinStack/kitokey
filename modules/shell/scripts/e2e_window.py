@@ -5435,6 +5435,67 @@ def speakers_named(now: dt.datetime) -> None:
     check("the naming is logged, never a name", lines and not any(name in line for line in lines for name in ("Sarah", "équipe", "Camille")), lines)
 
 
+def example_tried(now: dt.datetime) -> None:
+    """CR. D126: « Essayer sur un exemple » from the empty window. The example of the window's language, bundled
+    with Kitokey, is placed as a meeting of its own — its two tracks, its title saying it is an example — and runs
+    through the transcription and the minutes as any meeting does, its minutes following whatever Settings say
+    follows a recording. Sent nowhere, a destination set up."""
+    print("CR. an example tried from the empty window: placed, heard, written, sent nowhere (D126)")
+    calls = WORK / "send-calls.jsonl"
+    meetings = WORK / "example"
+    meetings.mkdir()
+    model = WORK / "example-model.bin"
+    model.write_bytes(b"made up")
+    exported = WORK / "example-export"
+    exported.mkdir()
+    # After a recording, the transcript alone: the example's minutes follow all the same. Written on this computer.
+    # Each summary exported to a folder chosen: the example's never is.
+    window = Window(meetings, "fr_FR.UTF-8", f'after = "transcript"\nmodel = "{model}"\nexport = "{exported}"\n'
+                    'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "qwen3:8b"\n')
+    with window as browser:
+        # A destination set up, as a person does: the example is sent there all the same never.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
+        press(browser, "destination-open")
+        browser.execute_script("document.getElementById('destination-kind-webhook').click()")
+        for field, value in (("destination-name", "#équipe"), ("destination-address", "https://hook.example/made-up-9c21")):
+            element = browser.find_element(By.ID, field)
+            element.clear()
+            element.send_keys(value)
+        press(browser, "destination-add")
+        set_up = wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#destinations li').length") == 1, 10)
+        check("one destination set up for this scenario", set_up)
+        calls.unlink(missing_ok=True)
+        browser.execute_script("location.hash = '#/'")
+        shown = wait_for(browser, lambda b: b.find_element(By.ID, "empty-example").is_displayed(), 10)
+        said = browser.execute_script("return document.getElementById('empty-example')?.textContent")
+        check("no meeting yet: « Essayer sur un exemple » beside the button that records", shown and said == "Essayer sur un exemple", said)
+        press(browser, "empty-example")
+        opened = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/example-fr", 10)
+        check("tried, its meeting's page opens", opened, browser.execute_script("return location.hash"))
+        folder = meetings / "example-fr"
+        placed = sorted(path.name for path in folder.iterdir()) if folder.is_dir() else []
+        check("placed as a meeting of its own: its two tracks, its clock, its language, its title",
+              {"session.json", "clock.jsonl", "local.flac", "remote.flac", "language", "title.txt"} <= set(placed), placed)
+        written = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('.card.minutes')")
+                           and (folder / "minutes.md").is_file(), 20)
+        check("heard, then written as any meeting — its minutes made though Settings say the transcript alone",
+              written and (folder / "transcript.jsonl").is_file(),
+              sorted(path.name for path in folder.iterdir()) if folder.is_dir() else [])
+        heard = (WORK / "hearing-args").read_text() if (WORK / "hearing-args").exists() else ""
+        check("its own folder heard, by the real step's program", str(folder) in heard, heard)
+        # Read from the row, as a title is: the sidebar's narrow `.day` clips it from WebDriver's visible text.
+        row_title = ("const r = [...document.querySelectorAll('#groups .session')].find(r => r.getAttribute('href').endsWith('/example-fr'));"
+                     " return r ? r.querySelector('.day').textContent : null")
+        listed = wait_for(browser, lambda b: b.execute_script(row_title) == "Exemple : point sur la version 2", 10)
+        check("listed by its title, which says it is an example", listed, browser.execute_script(row_title))
+        time.sleep(1)
+        check("sent nowhere, a destination set up (D126)", not calls.exists(),
+              calls.read_text() if calls.exists() else "")
+        check("exported nowhere, a folder chosen for each summary: the example is no meeting of the user's (D126)",
+              not any(exported.iterdir()), sorted(path.name for path in exported.iterdir()))
+
+
 def summary_sent(now: dt.datetime) -> None:
     """CL. D110, PDR-0007 §2–§6, posting/v1: a meeting's summary sent to a destination set up in Settings, on the
     user's gesture each time. No « Envoyer… » without a destination or without a summary; a confidential meeting's
@@ -16043,6 +16104,7 @@ def main() -> int:
     destinations_kept(now)
     summary_sent(now)
     confidential_sent(now)
+    example_tried(now)
     speakers_named(now)
     waveform_drawn(now)
     settings_version(now)

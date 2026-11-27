@@ -1053,6 +1053,9 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : words.none_do;
   document.getElementById("empty-record").textContent = words.record_start;
   document.getElementById("empty-record").hidden = recording || unreadable;
+  // The example a newcomer tries (D126); its voices' licence is in the package's notices.
+  document.getElementById("empty-example").textContent = words.example_try;
+  document.getElementById("empty-example").hidden = recording || unreadable;
   document.getElementById("empty-again").textContent = words.try_again;
   document.getElementById("empty-again").hidden = !unreadable;
 
@@ -6586,6 +6589,18 @@ document.getElementById("groups").addEventListener("keydown", (event) => {
 // The empty pane's own gesture (D61's board 5): the sidebar's, offered where the eye is.
 document.getElementById("empty-record").addEventListener("click", () => document.getElementById("record").click());
 document.getElementById("empty-again").addEventListener("click", () => refresh());
+// Placed as a meeting and opened: its page says it being heard, then written (D126).
+document.getElementById("empty-example").addEventListener("click", async () => {
+  const failed = document.getElementById("empty-failed");
+  failed.hidden = true;
+  try {
+    const { name } = await window.__TAURI__.core.invoke("example_tried");
+    location.hash = `#/meeting/${encodeURIComponent(name)}`;
+  } catch (why) {
+    failed.textContent = why;
+    failed.hidden = false;
+  }
+});
 // The purchase asked, then the licence read again by the shell: bought, nothing is said any more.
 // One purchase at a time: « Acheter » is disabled until the Store has answered (D83).
 document.getElementById("buy").addEventListener("click", async () => {
