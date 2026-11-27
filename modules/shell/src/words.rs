@@ -508,7 +508,8 @@ pub struct Window {
     /// At most: no limit. Placeholders: none.
     pub none: &'static str,
     /// Shows: the empty pane, a discreet line under its action (#775). When: no meeting in the folder.
-    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path.
+    /// At most: no limit, a path wraps. Placeholders: `{}`, the folder's whole path as people say it, from their
+    /// home (« Dossier personnel / Kitokey ») or from the root (#1232).
     pub none_folder: &'static str,
     /// The sidebar's search (D61): what its field says, and none of the meetings holding what is typed.
     /// No meeting yet: what to do.
@@ -516,7 +517,7 @@ pub struct Window {
     /// start. At most: no limit. Placeholders: none.
     pub none_do: &'static str,
     /// Shows: the window with no meeting, as an error. When: the meetings folder cannot be read.
-    /// At most: no limit. Placeholders: {} folder.
+    /// At most: no limit. Placeholders: {} the folder, as `none_folder` says it.
     pub list_unread: &'static str,
     /// Shows: the window with no meeting, as a help line. When: under that error: what to do.
     /// At most: no limit. Placeholders: none.
@@ -629,6 +630,20 @@ pub struct Window {
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
     pub more_actions: &'static str,
+    /// D121, a meeting's bar of actions: each its words beside its icon. « Partager »: the summary's sends, its copy
+    /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
+    /// characters. Placeholders: none.
+    pub meeting_share: &'static str,
+    /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
+    /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
+    pub meeting_dates: &'static str,
+    /// The engines that make the meeting again, and its versions. Shows: a meeting's page, the bar of actions, a
+    /// button. When: always. At most: about 12 characters. Placeholders: none.
+    pub meeting_redo: &'static str,
+    /// The rarer actions: renaming, opening the folder, the trash; its name for a screen reader `more_actions`, which
+    /// begins with it. Shows: a meeting's page, the bar of actions, a menu button. When: always. At most: about 8
+    /// characters. Placeholders: none.
+    pub meeting_more: &'static str,
     /// Shows: the window, as a format. When: a setting's name before its value: "{}:". At most: no
     /// limit. Placeholders: {} a setting's name.
     pub labelled: &'static str,
@@ -1341,6 +1356,22 @@ pub struct Window {
     /// The disclosure that holds an engine's id, address and size (D122). Shows: an engine card, as a
     /// disclosure. When: always, folded. At most: 12 characters. Placeholders: none.
     pub engine_details: &'static str,
+    /// The first run's first screen, its title (D126, mock-up v5's screen 1). Shows: the first run,
+    /// as its heading. When: Kitokey's first start. At most: about 40 characters. Placeholders: none.
+    pub first_title: &'static str,
+    /// Under the first run's title: what is asked, and that it is not final (D126). Shows: the first
+    /// run, under its heading. When: Kitokey's first start. At most: two lines. Placeholders: none.
+    pub first_lead: &'static str,
+    /// Leaves the choice to « Auto » and goes on (D126). Shows: the first run, as a button. When:
+    /// Kitokey's first start. At most: about 25 characters. Placeholders: none.
+    pub first_later: &'static str,
+    /// Goes on with the engine chosen (D126). Shows: the first run, as its primary button. When:
+    /// Kitokey's first start. At most: 12 characters. Placeholders: none.
+    pub first_next: &'static str,
+    /// Where the user is among the first run's screens, read by a screen reader on its three marks
+    /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
+    /// start. At most: about 20 characters. Placeholders: {} the screen's number.
+    pub first_step: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2130,6 +2161,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Components",
             gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
             more_actions: "More actions",
+            meeting_share: "Share",
+            meeting_dates: "Calendar",
+            meeting_redo: "Redo",
+            meeting_more: "More",
             labelled: "{}:",
             minutes_title: "Summary",
             transcript_title: "Transcript",
@@ -2372,6 +2407,11 @@ pub fn window(language: Language) -> Window {
             engine_install: "To install",
             engine_key: "Key missing",
             engine_details: "Details",
+            first_title: "Two questions, and you’re ready.",
+            first_lead: "Who writes your summaries? You can change it later, meeting by meeting.",
+            first_later: "I’ll choose later",
+            first_next: "Continue",
+            first_step: "Step {} of 3",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2669,6 +2709,10 @@ pub fn window(language: Language) -> Window {
             gallery_title: "Composants",
             gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
             more_actions: "Plus d’actions",
+            meeting_share: "Partager",
+            meeting_dates: "Agenda",
+            meeting_redo: "Refaire",
+            meeting_more: "Plus",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
             transcript_title: "Transcription",
@@ -2917,6 +2961,11 @@ pub fn window(language: Language) -> Window {
             engine_install: "À installer",
             engine_key: "Clé manquante",
             engine_details: "Détails",
+            first_title: "Deux questions, et c’est prêt.",
+            first_lead: "Qui écrit vos comptes rendus\u{202f}? Vous pourrez changer plus tard, réunion par réunion.",
+            first_later: "Je choisirai plus tard",
+            first_next: "Continuer",
+            first_step: "Étape {} sur 3",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",

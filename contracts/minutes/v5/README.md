@@ -36,7 +36,7 @@ files in the session's folder · blue: its consumers.
 | `currency` | Optional: that price's currency, an ISO 4217 code. `cost` and `currency` come both or neither |
 | `made_in` | Optional: how long the making took, in seconds, from its start to the file written whole — a JSON number at least zero, `3.2`. The producer's own measure of this version, never the meeting's length. Absent when not measured |
 | `structure` | The structure the minutes were made in: its name, bare — lowercase letters, digits and `_`, at most 40 characters. The six this version names are below; a reader takes any other name as a name only |
-| `sections` | The sections, in their order, as one JSON array on its line: an object for each, `{"id": …, "about": …}` — `id` lowercase letters, digits and `_`, at most 40 characters, each once; `about` one line, at most 200 characters, saying what goes in the section, in English, as the producer asked it of the model |
+| `sections` | The sections, in their order, as one JSON array on its line: an object for each, `{"id": …, "about": …}` — `id` lowercase letters, digits and `_`, at most 40 characters, each once; `about` one line, at most 200 characters, saying what goes in the section as the producer asked it of the model: in English for the six structures below; for a format a person made (`summarising/v1`'s `--format`), in the person's own words, in any language |
 | `actions` | Optional: the `id` of the section that holds the meeting's actions — one of `sections`. Absent when the structure has none |
 
 Then one section of second level for each object of `sections`, in its order — at least one, at
