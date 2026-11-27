@@ -367,7 +367,7 @@ pub enum Part {
     Dates,
 }
 
-/// A date of `posting/v1`'s `dates`, as exporting/v1's: its passage — the transcript's words — never read.
+/// A date of `posting/v1`'s `dates`: its passage — the transcript's words — never read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Date {
     pub date: String,
