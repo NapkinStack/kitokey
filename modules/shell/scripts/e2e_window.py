@@ -9494,12 +9494,15 @@ def keys_taught(now: dt.datetime) -> None:
         chord(browser, Keys.ESCAPE)
         check("Ctrl+, opens Settings; Échap goes back to the meeting", opened and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3),
               browser.execute_script(hash_))
-        # On the list, Ctrl+F reaches the sidebar's search.
+        # On the list alone — a narrow window: a wide one shows the first meeting beside it (D61), and Ctrl+F then
+        # searches that meeting's text —, Ctrl+F reaches the sidebar's search.
+        browser.set_window_size(800, 800)
         browser.execute_script("location.hash = '#/'")
-        wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').hidden"), 5)
+        alone = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').hidden"), 5)
         to_body(browser)
         chord(browser, Keys.CONTROL, "f")
-        check("Ctrl+F on the list: the focus in the sidebar's « Rechercher »", browser.execute_script(focused)[0] == "find", browser.execute_script(focused))
+        check("Ctrl+F on the list alone: the focus in the sidebar's « Rechercher »", alone and browser.execute_script(focused)[0] == "find", browser.execute_script(focused))
+        browser.set_window_size(1100, 800)
         # « ? »: the sheet, a modal dialog listing every shortcut; Échap closes it, the focus back where it was.
         to_body(browser)
         chord(browser, "?")
