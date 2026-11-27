@@ -6053,7 +6053,7 @@ def bar_after_stop(now: dt.datetime) -> None:
                 line = browser.execute_script(
                     "const s = document.getElementById('small-last-said'), o = document.getElementById('small-last-open');"
                     " const r = s.getBoundingClientRect(), b = o.getBoundingClientRect(), high = parseFloat(getComputedStyle(s).lineHeight);"
-                    " const t = s.firstChild, end = t.textContent.indexOf('.') + 1, first = document.createRange(); first.setStart(t, 0); first.setEnd(t, end);"
+                    " const t = s.firstChild, end = t.textContent.indexOf('.', t.textContent.indexOf(': ') + 2) + 1, first = document.createRange(); first.setStart(t, 0); first.setEnd(t, end);"
                     " const f = [...first.getClientRects()];"
                     " return {lines: Math.round(r.height / high), first: t.textContent.slice(0, end), whole: f.length > 0 && f.every((x) => x.bottom <= r.bottom + 0.5 && x.right <= r.right + 0.5),"
                     " title: s.title, live: document.getElementById('small-last-live').textContent,"
