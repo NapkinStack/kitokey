@@ -1316,7 +1316,7 @@ const ROLES: [&str; 26] = [
 
 /// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
 /// trace, a recording's dot, the focus ring 3:1 (1.4.11).
-const ROLE_PAIRS: [(&str, &str, f64); 35] = [
+const ROLE_PAIRS: [(&str, &str, f64); 36] = [
     ("--color-text", "--color-canvas", 4.5),
     ("--color-text", "--color-surface", 4.5),
     ("--color-text", "--color-raised", 4.5),
@@ -1347,6 +1347,8 @@ const ROLE_PAIRS: [(&str, &str, f64); 35] = [
     ("--color-private", "--color-surface", 4.5),
     ("--color-edge", "--color-surface", 3.0),
     ("--color-edge", "--color-canvas", 3.0),
+    // A neutral chip on a chosen card, its ground the card's tint: edged so that it stands out (#1312's audit).
+    ("--color-edge", "--color-tint", 3.0),
     ("--color-accent", "--color-canvas", 3.0),
     ("--color-record", "--color-surface", 3.0),
     ("--color-voice-you", "--color-surface", 3.0),
@@ -1586,4 +1588,85 @@ fn a_cards_radio_is_ringed_in_the_edge_role() {
         assert!(dot.contains("var(--color-accent)"), "{checked}: {dot}");
     }
     assert!(ROLE_PAIRS.contains(&("--color-edge", "--color-surface", 3.0)));
+}
+
+/// #1312's audit against mock-up v5: a component's class may share a name with one of window.css's global rules —
+/// the window's own, until its screens come over — only if the component sets again each property that rule sets:
+/// `.progress .label` took window.css's `.label` capitals and letter-spacing. The chip's icon at 16 px, as v5's
+/// `.ico`; the toast 72 px above the window's foot, as v5 sets it, clear of a bar of actions there; a card's radio
+/// centred on its name's line; a neutral chip on a chosen card edged in the edge role.
+#[test]
+fn a_component_takes_no_global_class_and_sits_as_v5_sets_it() {
+    let names = |body: &str| -> Vec<String> {
+        body.split(';')
+            .filter_map(|part| part.split_once(':'))
+            .map(|(key, _)| key.trim().to_string())
+            .collect()
+    };
+    let component = rules(COMPONENTS);
+    let mut leaks = vec![];
+    for (selectors, body) in rules(OUTSIDE) {
+        for one in selectors.split(',').map(str::trim) {
+            if !(one.starts_with('.') && one[1..].chars().all(|c| c.is_ascii_alphanumeric() || c == '-')) {
+                continue;
+            }
+            let wearing: Vec<&(String, String)> = component
+                .iter()
+                .filter(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .any(|part| part.split('.').skip(1).any(|class| format!(".{class}") == one))
+                })
+                .collect();
+            if wearing.is_empty() {
+                continue;
+            }
+            // The classes it is worn with in one compound (`.button.primary`): their rules apply to it too.
+            let with: Vec<String> = wearing
+                .iter()
+                .flat_map(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .filter(|compound| compound.split('.').skip(1).any(|class| format!(".{class}") == one))
+                        .flat_map(|compound| compound.split('.').skip(1).map(|class| format!(".{class}")).collect::<Vec<_>>())
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let set: Vec<String> = component
+                .iter()
+                .filter(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .any(|compound| {
+                            let classes: Vec<String> = compound.split('.').skip(1).map(|class| format!(".{class}")).collect();
+                            !classes.is_empty() && classes.iter().all(|class| with.contains(class))
+                        })
+                })
+                .flat_map(|(_, theirs)| names(theirs))
+                .collect();
+            let set_again = |name: &String| {
+                set.contains(name)
+                    || (name.starts_with("font-") && set.iter().any(|s| s == "font"))
+                    || (name.starts_with("padding") && set.iter().any(|s| s == "padding"))
+                    || (name.starts_with("margin") && set.iter().any(|s| s == "margin"))
+                    || (name == "min-height" && set.iter().any(|s| s == "height"))
+            };
+            leaks.extend(
+                names(&body)
+                    .into_iter()
+                    .filter(|name| !set_again(name))
+                    .map(|name| format!("{one} {name}")),
+            );
+        }
+    }
+    assert_eq!(leaks, Vec::<String>::new());
+    assert_eq!(given(COMPONENTS, ".chip.warning > svg", "width").as_deref(), Some("16px"));
+    assert_eq!(given(COMPONENTS, ".chip.warning > svg", "height").as_deref(), Some("16px"));
+    assert_eq!(
+        given(COMPONENTS, ".toast", "bottom").as_deref(),
+        Some("calc(var(--sp-8) * 2 + var(--sp-2))")
+    );
+    assert_eq!(given(COMPONENTS, ".engine-card input", "align-self").as_deref(), Some("center"));
+    let edged = given(COMPONENTS, ".engine-card:has(input:checked) .chip.neutral", "outline").unwrap_or_default();
+    assert!(edged.ends_with("solid var(--color-edge)"), "{edged}");
 }
