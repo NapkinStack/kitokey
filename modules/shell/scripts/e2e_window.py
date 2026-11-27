@@ -7785,6 +7785,8 @@ def meeting_actions_bar(now: dt.datetime) -> None:
                   and [said["trash"], True] in got.get("confirm", []), [got, browser.execute_script("return document.activeElement?.textContent.trim()")])
             found = axe_violations(browser)
             check(f"{short}, {theme}: the dialog open, no violation of axe's WCAG 2.2 A and AA rules (D121)", found == [], found)
+            # Shot for the eye against v5's screens: the bar under the dialog's scrim, the dialog asking.
+            shot_themed(browser, f"ma-trash-asked-{short}-{theme}", theme)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             kept = wait_for(browser, lambda b: b.execute_script(dialog) is None and b.execute_script(focused) == "more-open", 3)
             check(f"{short}: Escape keeps the meeting, the focus back on « {said['more']} » (D121)", kept and dated.is_dir(), browser.execute_script(focused))
