@@ -119,7 +119,9 @@ function showFirstSound(words, offered, back) {
   bar.append(element("i"));
   const got = element("span", "says", "");
   got.id = "first-progress-said";
-  getting.append(label, bar, got, element("span", "says first-once", words.first_once));
+  // Once, from where, and checked: the host it comes from, as the first run's assistant says it (v5's « Depuis … »).
+  const once = element("span", "says first-once", words.first_once);
+  getting.append(label, bar, got, once);
   getting.hidden = offered?.auto_hearing.state !== "download";
   made.append(getting);
   let first = null;
@@ -137,6 +139,8 @@ function showFirstSound(words, offered, back) {
     got.textContent = speed > 0 && held < bytes
       ? fill(words.first_got_left, size(held, words), size(bytes, words), length((bytes - held) / speed))
       : fill(words.first_got, size(held, words), size(bytes, words));
+    // Heard as it reads, its parts joined by a comma rather than a dot a screen reader would say.
+    bar.setAttribute("aria-valuetext", got.textContent.replace(" · ", ", "));
   };
   const works = firstButton("first-works", "primary with-icon", words.first_works, () => end(() => {
     firstRunEnded = true;
@@ -176,6 +180,9 @@ function showFirstSound(words, offered, back) {
     }, 100));
   });
   if (!getting.hidden) {
+    invoke("makings").then((read) => {
+      if (read?.model_offer_host) once.textContent = `${words.first_once} ${fill(words.welcome_fetch_from, read.model_offer_host)}`;
+    }).catch(() => {});
     polls.push(setInterval(async () => {
       const read = await invoke("makings").catch(() => null);
       if (!open || !read) return;

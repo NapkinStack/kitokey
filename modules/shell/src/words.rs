@@ -1388,8 +1388,8 @@ pub struct Window {
     /// How far it came and how long is left (D126). Shows: under the progress. When: it downloads.
     /// At most: about 40 characters. Placeholders: {} the size come, {} the whole size, {} the time left.
     pub first_got_left: &'static str,
-    /// That it comes once, and is checked (D126). Shows: under the progress. When: it downloads.
-    /// At most: one line. Placeholders: none.
+    /// That it comes once (D126), before `welcome_fetch_from`, which says where from and that it is checked.
+    /// Shows: under the progress. When: it downloads. At most: one line. Placeholders: none.
     pub first_once: &'static str,
     /// Back to the first screen (D126). Shows: the first run's second screen, as a button. When:
     /// always there. At most: 12 characters. Placeholders: none.
@@ -2442,7 +2442,7 @@ pub fn window(language: Language) -> Window {
             first_getting: "Downloading the listening engine",
             first_got: "{} of {}",
             first_got_left: "{} of {} · about {}",
-            first_once: "Only once. Checked when it arrives.",
+            first_once: "Only once.",
             first_back: "Back",
             first_works: "It works",
             models_own_note: "For this meeting only; Settings stay the same.",
@@ -3004,7 +3004,7 @@ pub fn window(language: Language) -> Window {
             first_getting: "Téléchargement du moteur d’écoute",
             first_got: "{} sur {}",
             first_got_left: "{} sur {} · environ {}",
-            first_once: "Une seule fois. Vérifié à l’arrivée.",
+            first_once: "Une seule fois.",
             first_back: "Retour",
             first_works: "Ça marche",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",

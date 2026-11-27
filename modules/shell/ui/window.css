@@ -534,7 +534,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .first-meter[data-side="far"] > i { background: var(--color-voice-others); }
 .first-getting { display: grid; gap: var(--sp-2); }
 .first-getting[hidden] { display: none; }
-.first-progress { height: 8px; border-radius: var(--r-xs); background: var(--color-sunken); overflow: hidden; }
+/* Its track edged in the edge role: 3:1 on the card, where the sunken ground alone is 1.1:1 (WCAG 2.2 SC 1.4.11). */
+.first-progress { height: 8px; border: 1px solid var(--color-edge); border-radius: var(--r-xs); background: var(--color-sunken); overflow: hidden; }
 .first-progress > i { display: block; width: 0; height: 100%; border-radius: var(--r-xs); background: var(--color-accent); }
 .first-once { font-size: var(--fs-caption); }
 .first-steps { display: flex; gap: var(--sp-1); }
