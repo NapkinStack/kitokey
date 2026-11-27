@@ -4696,7 +4696,7 @@ def bar_window(now: dt.datetime) -> None:
     with Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
         wait_for(browser, lambda b: b.find_element(By.ID, "small-hide").is_displayed(), 8)
         got = browser.execute_script("const h = document.getElementById('small-hide'); return [h.getAttribute('aria-label'), h.title, h.getBoundingClientRect().height, h.textContent.trim(), outerHeight - innerHeight]")
-        check("« Masquer la barre »: an icon of 28 px, named by its words; no title bar over the row", got[:4] == ["Masquer la barre", "Masquer la barre", 28, ""] and got[4] == 0, got)
+        check("« Masquer la barre »: an icon of 32 px, named by its words; no title bar over the row", got[:4] == ["Masquer la barre", "Masquer la barre", 32, ""] and got[4] == 0, got)
         check("shown, the tray offers no « Afficher la barre d’enregistrement »", "Afficher la barre d’enregistrement" not in tray_labels(), tray_labels())
         press(browser, "small-record")
         wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed() and tray_colour() == "red", 10)
@@ -9372,6 +9372,8 @@ def confidential_locked(now: dt.datetime) -> None:
                 check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
+                # Half a second after the start: a press within it is the same one (D68), and ■ below would be lost.
+                time.sleep(0.6)
                 made = wait_for(browser, lambda b: list(taping.glob("*/session.json")), 5)
                 folder = next(taping.glob("*/session.json")).parent if made else taping
                 got = browser.execute_script(lock) or {}
@@ -15449,7 +15451,7 @@ def main() -> int:
             start = browser.find_element(By.ID, "small-record")
             check("opened from the menu the first time, the bar, at rest, alone", start.get_attribute("aria-label") == "Démarrer un enregistrement" and browser.window_handles == [small], (start.get_attribute("aria-label"), browser.window_handles))
             check("the recording's gesture has the focus", browser.execute_script("return document.activeElement.id") == "small-record")
-            # The bar as the decider's boards draw it (D90): one row, its buttons icons alone, 28 px, each
+            # The bar as the decider's boards draw it (D90): one row, its buttons icons alone, 32 px, each
             # named by its words — its tooltip too, the shortcut beside ● when the desktop granted one.
             row = ("const shown = (q) => [...document.querySelectorAll(q)].filter(b => b.getClientRects().length);"
                    "return {size: [innerWidth, innerHeight], row: document.querySelector('#small .bar-row').getBoundingClientRect().height,"
@@ -15458,8 +15460,8 @@ def main() -> int:
             rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 48], 5)
             got = browser.execute_script(row)
             check("at rest the bar is 440 × 48: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 48 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
-            check("●, « Plus d’options », the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
-                  [b[0] for b in got["buttons"]] == ["small-record", "small-more", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
+            check("●, « Plus d’options », the whole window and « Masquer la barre », each 32 px, an icon alone named by its words, its tooltip the same",
+                  [b[0] for b in got["buttons"]] == ["small-record", "small-more", "small-full", "small-hide"] and all(b[1] == b[2] == 32 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
                   and got["buttons"][2][4] == "Ouvrir la fenêtre complète", got["buttons"])
             keys = browser.execute_script("return window.__TAURI__.core.invoke('header')")["shortcut"]
             check("●'s tooltip: « Démarrer un enregistrement », the shortcut beside when granted", got["buttons"][0][5] == (f"Démarrer un enregistrement ({keys})" if keys else "Démarrer un enregistrement"), [got["buttons"][0][5], keys])
@@ -15477,11 +15479,11 @@ def main() -> int:
             check("Démarrer un enregistrement records in the same window", browser.window_handles == [small], browser.window_handles)
             live = ("const s = document.getElementById('small-stop'); const d = document.querySelector('#small .handle .dot'); const t = document.querySelector('#small .bar-row .time');"
                     "return {stop: [s.getBoundingClientRect().height, s.getBoundingClientRect().width, s.textContent.trim(), s.getAttribute('aria-label'), s.closest('.bar-row') !== null],"
-                    " dot: [getComputedStyle(d).fill === getComputedStyle(s).backgroundColor, d.getAttribute('r')], time: [t.getClientRects().length, getComputedStyle(t).fontVariantNumeric], record: document.getElementById('small-record').getClientRects().length,"
+                    " dot: [getComputedStyle(d).fill === (() => { const p = document.createElement('i'); p.style.color = 'var(--color-record)'; document.body.append(p); const c = getComputedStyle(p).color; p.remove(); return c; })(), d.getAttribute('r')], time: [t.getClientRects().length, getComputedStyle(t).fontVariantNumeric], record: document.getElementById('small-record').getClientRects().length,"
                     " scroll: [document.scrollingElement.scrollHeight, document.scrollingElement.clientHeight], width: innerWidth}")
             got = browser.execute_script(live)
-            check("recording: ■ in the row, 28 px, an icon named « Arrêter l’enregistrement »; ● gone", got["stop"] == [28, 28, "", "Arrêter l’enregistrement", True] and got["record"] == 0, got)
-            check("the handle's dot red and larger; the time in the row, in tabular figures", got["dot"] == [True, "2.2"] and got["time"] == [1, "tabular-nums"], got)
+            check("recording: ■ in the row, 32 px, an icon named « Arrêter l’enregistrement »; ● gone", got["stop"] == [32, 32, "", "Arrêter l’enregistrement", True] and got["record"] == 0, got)
+            check("the handle's dot red — the recording's red, ■ neutral (D125) — and larger; the time in the row, in tabular figures", got["dot"] == [True, "2.2"] and got["time"] == [1, "tabular-nums"], got)
             check("as at rest, 440 × 48: the row alone, its meters in it (D90)", wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 48], 3), browser.execute_script("return [innerWidth, innerHeight]"))
             shot(browser, "6-small")
             fits = browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
