@@ -188,19 +188,14 @@ gives way to Auto (D74). A part the contract refuses reads as absent, and is nev
 confidential meeting is heard and written on this computer alone.
 
 They are chosen in **« Avancé »** ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
-closed by default, the same in the bar opened and in each *Refaire…*: two lists, the transcription's
+closed by default, in each *Refaire…* — the compact bar chooses no engine (D122, D125) —: two lists, the transcription's
 model and the minutes', under « Pour cette réunion seule ; les Réglages ne changent pas. », each
 « Réglages : … » first — Settings' model never offered a second time —, then the Whisper models listed,
 SpeechAnalyzer where Settings hear by it, the service Settings set, and Ollama's models here
 (`models_offered`). A native list never wraps: a chosen name wider than its list is said whole under
 it, at 12 px, measured again whenever the list's width changes (a `ResizeObserver`) or a choice is made. A confidential meeting is offered no service: Settings' entry says who makes it here
 — Whisper, Ollama on this computer —, a service it chose is said unused, never shown chosen, and
-`meeting_models_chosen` refuses one; the bar draws « Avancé » again as the meeting is said
-confidential or not. Settings unreadable, it is offered from those last read, and said. At rest, the choice is the next
-recording's (`next_models_kept`), kept in `next-models.json` beside the settings, written whole,
-Kitokey started again too: its `models.json` once its folder holds `session.json`, then none for
-the one after; « Avancé » closed, it is said under the row, naming them — « Modèles gardés : small ·
-Qwen3 8b » —, and given with « Avancé » to a screen reader. Recording, it is that meeting's at once. In *Refaire…* it is kept once
+`meeting_models_chosen` refuses one. Settings unreadable, it is offered from those last read, and said. In *Refaire…* it is kept once
 *Refaire* is pressed — *Annuler* changes nothing —, then the transcript is made again by them
 (`transcript_redo_own`) or the minutes. The transcript made again is made alone: where the meeting
 has minutes, its panel says they are kept, to make again after (the decider, 2026-11-18, D113). A model gone is said on the meeting's page and in « Avancé ».
