@@ -6063,6 +6063,9 @@ def bar_after_stop(now: dt.datetime) -> None:
                       ended and failed and line["lines"] == 2 and line["whole"] and line["title"] == line["live"] == meeting + not_made and line["after"] and line["fits"],
                       [ended, browser.execute_script(said), browser.execute_script(shown), line])
                 shot_themed(browser, f"d92-bar-failed-{short}-{theme}", theme)
+                # The other theme too, its roles put on the page (D125: the bar's shots in both).
+                other = "dark" if theme == "light" else "light"
+                shot_themed(browser, f"d92-bar-failed-{short}-{other}", other)
                 found = axe_violations(browser)
                 check(f"{short}: the failure said in the bar, axe's WCAG 2.2 A and AA rules: no violation (D125)", found == [], found)
                 # D109: a summary written, but not to the export folder that refuses it: said here too, as its page says it.
@@ -9382,6 +9385,8 @@ def confidential_locked(now: dt.datetime) -> None:
             with window as browser:
                 check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
                 shot_themed(browser, f"cp-rest-{short}-{theme}", theme)
+                found = axe_violations(browser)
+                check(f"{short}, {theme}: the bar at rest, axe's WCAG 2.2 A and AA rules: no violation (D125)", found == [], found)
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 # Half a second after the start: a press within it is the same one (D68), and ■ below would be lost.
@@ -9395,6 +9400,8 @@ def confidential_locked(now: dt.datetime) -> None:
                       got.get("shown") and got["tag"] == "BUTTON" and got["type"] == "button" and got["pressed"] == "false" and got["label"] == named
                       and got["title"] == named and got["drawn"] and got["inside"] and got["row"] and got["others"] == [], got)
                 shot_themed(browser, f"cp-unpressed-{short}-{theme}", theme)
+                found = axe_violations(browser)
+                check(f"{short}, {theme}: the bar recording, axe's WCAG 2.2 A and AA rules: no violation (D125)", found == [], found)
                 browser.execute_script("document.getElementById('small-lock').click()")
                 pressed = wait_for(browser, lambda b: b.execute_script(lock)["pressed"] == "true" and (folder / "confidential").exists(), 3)
                 got = browser.execute_script(lock)
