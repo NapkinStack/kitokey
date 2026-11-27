@@ -65,22 +65,6 @@ test("the root sends a reader to the French landing, English one link away", asy
   assert.match(html, /href="\/en\/" hreflang="en"/);
 });
 
-// The channels' brands as their owners allow (the decider, 2026-11-26; BRANDS.md): Slack in words,
-// its terms forbidding to distribute its logo without a written licence; Discord's symbol, its own file unaltered.
-test("Slack is named in words alone, Discord by its own symbol, unaltered", async () => {
-  const { createHash } = await import("node:crypto");
-  const symbol = await readFile(join(dist, "img", "brands", "discord-symbol-blurple.svg"));
-  assert.equal(createHash("sha256").update(symbol).digest("hex"), "d06eaa51e78a9984ebbd3fbc82f0245ac2ecb5bf0150f537204397c1da5c7bd8");
-  for (const lang of ["en", "fr"]) {
-    const html = await page(lang);
-    const colours = ["#E01E5A", "#36C5F0", "#2EB67D", "#ECB22E"].filter((c) => html.toUpperCase().includes(c));
-    assert.ok(colours.length < 2, `/${lang}/ draws Slack's colours together: ${colours}`);
-    const logos = html.match(/<ul class="ch-logos"[^>]*>([\s\S]*?)<\/ul>/)?.[1] ?? "";
-    assert.match(logos, /<li><span>Slack<\/span><\/li>/, `/${lang}/: Slack is not in words alone`);
-    assert.match(logos, /<li><img class="os-logo" src="\/img\/brands\/discord-symbol-blurple\.svg"[^>]*><span>Discord<\/span><\/li>/, `/${lang}/: Discord not by its own symbol`);
-  }
-});
-
 test("each hardware card says, in both languages, the figures README.md gives its way of working, and only those", async () => {
   const readme = await readFile(installSource, "utf8");
   const section = readme.slice(readme.indexOf("**What a computer needs**"));
@@ -94,18 +78,4 @@ test("each hardware card says, in both languages, the figures README.md gives it
       assert.equal(/vulkan/i.test(lines.join(" ")), /vulkan/i.test(ways[i]), `${lang}, « ${title} »: Vulkan said or not as README.md does`);
     });
   }
-});
-
-// The export's card promises only what the window offers today: Markdown, the one format the shell asks the
-// export for; HTML, Word, subtitles and PDF come back to the page with the screen that offers them (D121). The
-// site declares no contract of the export's (D108).
-test("the export card promises Markdown alone, the one format the window offers", () => {
-  for (const [language, said] of [["en", "As Markdown."], ["fr", "En Markdown."]]) {
-    const card = landing.cases[language].find(([icon]) => icon === "export");
-    assert.equal(card[2], said, language);
-    for (const format of ["HTML", "Word", "subtitles", "sous-titres", "PDF"]) {
-      assert.ok(!card.join(" ").includes(format), `${language}: ${format}`);
-    }
-  }
-  assert.ok(!/docx|srt|vtt/.test(landing.cases.keeps), landing.cases.keeps);
 });

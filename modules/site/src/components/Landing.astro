@@ -7,22 +7,23 @@ import Icons from "./Icons.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
 import "../styles/walk.css";
+import "../styles/middle.css";
 // Each system by its owner's own mark, unaltered (BRANDS.md); Apple's white one on the dark theme.
 const MARKS = { linux: "tux.svg", windows: "windows-logo-2021.svg", apple: "apple-logo-black.svg" };
 
 const { lang } = Astro.props;
 const t = (key) => w[key][lang];
-const [howId, privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const [howId, privacyId, whoId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
 const wk = t("walk");
+const sv = t("sovereign");
+const wh = t("who");
+const rd = t("ready");
+const readyId = lang === "fr" ? "fonctions" : "features";
 const wTitles = wk.tabs.map(([title]) => title);
 const [h1a, h1b, lead] = t("hero");
 const [buyLine, storeSoon, linuxFree, macSoon] = t("buy");
 const [sceneAlt, callTitle, you, when, confidential, mTitle, mMeta, mProv, mHigh, mText, mActs, acts] = t("scene");
 const [cta, follow] = t("cta");
-const [chH, chP, chWith] = t("channels");
-const [pEyebrow, pH, pLead] = t("privacy");
-const [localTitle, localAlt] = t("local");
-const [uEyebrow, uH, uLead] = t("uses");
 const [sEyebrow, sH, sLead, sNote] = t("systems");
 const [gEyebrow, gH, gLead, copy, osLabel, copied, failed] = t("install");
 const [needsH, needs] = t("needs");
@@ -151,53 +152,46 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
     </div>
   </section>
 
-  <section class="channels" aria-labelledby="ch-h">
+  <section class="mid" id={privacyId} aria-labelledby={`${privacyId}-h`}>
     <div class="wrap">
-      <div class="card ch-card reveal">
-        <div class="ch-text"><span class="tile" set:html={ico("send")} /><h2 id="ch-h">{chH}</h2><p>{chP}</p></div>
-        <div class="ch-with"><p class="kicker">{chWith}</p>
-          <ul class="ch-logos" role="list">
-            <li><span>Slack</span></li>
-            <li><img class="os-logo" src="/img/brands/discord-symbol-blurple.svg" width="127" height="96" alt="" /><span>Discord</span></li>
-            <li><Fragment set:html={ico("webhook", "ico ch-hook")} /><span>Webhook</span></li>
-          </ul>
+      <div class="sh rise"><p class="kicker">{sv.kicker}</p><h2 id={`${privacyId}-h`}>{sv.h}</h2><p>{sv.lead}</p></div>
+      <div class="io rise">
+        <div class="box here">
+          <div class="box-h"><span class="tile" set:html={ico("laptop")} /><div><h3>{sv.here[0]}</h3><p>{sv.here[1]}</p></div></div>
+          <div class="items">{sv.stays.map(([icon, what, said]) => <div class="item"><Fragment set:html={ico(icon)} /><b>{what}</b><span class="d">{said}</span><span class="r here-i" role="img" aria-label={sv.here[2]} set:html={ico("laptop")} /></div>)}</div>
+        </div>
+        <div class="box">
+          <div class="box-h"><span class="tile" set:html={ico("cloud")} /><div><h3>{sv.leaves[0]}</h3><p>{sv.leaves[1]}</p></div></div>
+          <div class="items">{sv.chosen.map(([icon, what, said]) => <div class="item"><Fragment set:html={ico(icon)} /><b>{what}</b><span class="d">{said}</span><span class="r"><span class="sw2" role="img" aria-label={sv.leaves[2]}></span></span></div>)}</div>
         </div>
       </div>
+      <div class="proof rise">{sv.proof.map(([icon, title, said], i) => <article class="pf"><span class={i === 0 ? "tile priv" : "tile"} set:html={ico(icon)} /><h3>{title}</h3><p>{said}</p></article>)}</div>
+      <p class="io-link"><a href={`/${lang}/privacy/`}>{sv.policy}</a></p>
+      <div class="shot-ph" role="note"><div><b>{sv.shot[0]}</b>{sv.shot[1]}</div></div>
     </div>
   </section>
 
-  <section class="band" id={privacyId} aria-labelledby={`${privacyId}-h`}>
+  <section class="mid mid-band" id={whoId} aria-labelledby={`${whoId}-h`}>
     <div class="wrap">
-      <div class="section-head reveal">
-        <p class="eyebrow">{pEyebrow}</p>
-        <span class="padlock" set:html={ico("lock", "ico ico-xl")} />
-        <h2 id={`${privacyId}-h`}>{pH}</h2>
-        <p class="lead">{pLead}</p>
+      <div class="sh rise"><p class="kicker">{wh.kicker}</p><h2 id={`${whoId}-h`}>{wh.h}</h2></div>
+      <div class="cases rise">
+        {wh.cases.map(([icon, people, title, said, [meeting, when, locked]]) => (
+          <article class="case">
+            <span class="tile" set:html={ico(icon)} />
+            <p class="who-l">{people}</p>
+            <h3>{title}</h3>
+            <p>{said}</p>
+            <div class="lrow" aria-hidden="true"><b>{meeting}</b><span class="num">{when}</span><span class="sig">{locked && <Fragment set:html={ico("lock", "ico lock")} />}<Fragment set:html={ico("file")} /></span></div>
+          </article>
+        ))}
       </div>
-      <div class="privacy-grid">
-        <ul class="promises" role="list">
-          {t("promises").map(([icon, a, b]) => <li class="reveal"><Fragment set:html={ico(icon)} /><div><strong>{a}</strong><span set:html={b} /></div></li>)}
-        </ul>
-        <figure class="reveal window">
-          <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey<span class="wt-more"> · {localTitle}</span></span></div>
-          <picture>
-            <source media="(max-width: 699px)" srcset={`/img/local-m-${lang}.webp`} width="356" height="216" />
-            <img src={`/img/local-${lang}.webp`} width="620" height="370" alt={localAlt} loading="lazy" decoding="async" />
-          </picture>
-        </figure>
-      </div>
-      <p class="note proof">{t("proof")}</p>
     </div>
   </section>
 
-  <section class="section" id={usesId} aria-labelledby={`${usesId}-h`}>
+  <section class="mid" id={readyId} aria-labelledby={`${readyId}-h`}>
     <div class="wrap">
-      <div class="section-head reveal"><p class="eyebrow">{uEyebrow}</p><h2 id={`${usesId}-h`}>{uH}</h2><p class="lead">{uLead}</p></div>
-      <div class="uses">
-        {t("cases").map((c, i) => c.length === 4
-          ? <article class={`card use u-${i} reveal`}><span class="tile" set:html={ico(c[0])} /><p class="kicker">{c[1]}</p><h3>{c[2]}</h3><p>{c[3]}</p></article>
-          : <article class="card use u-after reveal"><span class="tile" set:html={ico(c[0])} /><h3>{c[1]}</h3><p>{c[2]}</p></article>)}
-      </div>
+      <div class="sh rise"><p class="kicker">{rd.kicker}</p><h2 id={`${readyId}-h`}>{rd.h}</h2><p>{rd.lead}</p></div>
+      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><span class="tile" set:html={ico(icon)} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
     </div>
   </section>
 
