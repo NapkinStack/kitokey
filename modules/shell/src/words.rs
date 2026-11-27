@@ -1280,6 +1280,61 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as a choice of a list. When: no model chosen in
     /// Settings. At most: about 30 characters. Placeholders: none.
     pub models_none: &'static str,
+    /// The engine cards' group for transcribing (D122), its legend. Shows: Settings, the first run and
+    /// Redo…, as a group's name. When: the engines that transcribe. At most: about 30 characters.
+    /// Placeholders: none.
+    pub engine_transcribe: &'static str,
+    /// The engine cards' group for writing the summary (D122), its legend. Shows: Settings, the first
+    /// run and Redo…, as a group's name. When: the engines that write. At most: about 30 characters.
+    /// Placeholders: none.
+    pub engine_write: &'static str,
+    /// The first engine card in Settings and the first run (D122): Kitokey chooses. Shows: an engine
+    /// card, as its name. When: no engine chosen. At most: 12 characters. Placeholders: none.
+    pub engine_auto: &'static str,
+    /// What « Auto » takes today, under its name (D122). Shows: an engine card, as where it runs.
+    /// When: « Auto ». At most: about 50 characters. Placeholders: {} the engine's name.
+    pub engine_auto_is: &'static str,
+    /// What « Auto » does, on its card (D122; the coordinator, 2026-11-26: never an online fallback).
+    /// Shows: an engine card, as its facts. When: « Auto » in Settings and the first run. At most:
+    /// about 60 characters. Placeholders: none.
+    pub engine_auto_says: &'static str,
+    /// The mark on a meeting's first engine card, Settings' own (D122). Shows: an engine card in
+    /// Redo…, as a mark. When: the engine Settings name. At most: 12 characters. Placeholders: none.
+    pub engine_default: &'static str,
+    /// Where an engine runs (D122). Shows: an engine card, as where it runs; the first run's second
+    /// card, as its name. When: this computer. At most: about 20 characters. Placeholders: none.
+    pub engine_here: &'static str,
+    /// What an engine on this computer is, on the first run's card (D122). Shows: an engine card, as
+    /// its facts. When: the first run. At most: about 60 characters. Placeholders: none.
+    pub engine_here_says: &'static str,
+    /// Where an engine runs (D122). Shows: an engine card, as where it runs. When: an online
+    /// service. At most: about 20 characters. Placeholders: none.
+    pub engine_online: &'static str,
+    /// The first run's third card (D122). Shows: an engine card, as its name. When: the first run.
+    /// At most: about 20 characters. Placeholders: none.
+    pub engine_online_kind: &'static str,
+    /// What an online service does, on the first run's card (D122; V8: what leaves, what stays). Shows:
+    /// an engine card, as its facts. When: the first run. At most: about 60 characters. Placeholders:
+    /// none.
+    pub engine_online_says: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: usable now. At most: 12
+    /// characters. Placeholders: none.
+    pub engine_ready: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: its model to download
+    /// first. At most: about 25 characters. Placeholders: {} its size.
+    pub engine_download: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: its program not on this
+    /// computer. At most: about 20 characters. Placeholders: none.
+    pub engine_install: &'static str,
+    /// An engine's state when its size is not known (D122). Shows: an engine card, as its state.
+    /// When: its model to download first, Ollama's. At most: about 20 characters. Placeholders: none.
+    pub engine_download_unsized: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: an online service with
+    /// no key kept. At most: about 20 characters. Placeholders: none.
+    pub engine_key: &'static str,
+    /// The disclosure that holds an engine's id, address and size (D122). Shows: an engine card, as a
+    /// disclosure. When: always, folded. At most: 12 characters. Placeholders: none.
+    pub engine_details: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2286,6 +2341,23 @@ pub fn window(language: Language) -> Window {
             models_minutes: "Summary model",
             models_settings: "From Settings: {}",
             models_none: "no model chosen",
+            engine_transcribe: "Transcription engine",
+            engine_write: "Summary engine",
+            engine_auto: "Auto",
+            engine_auto_is: "Today {}",
+            engine_auto_says: "Kitokey picks the best engine on this computer. Recommended. Nothing leaves.",
+            engine_default: "Default",
+            engine_here: "On this computer",
+            engine_here_says: "Private and free. A little slower.",
+            engine_online: "Online",
+            engine_online_kind: "Online service",
+            engine_online_says: "Faster. Only the text leaves, never the sound.",
+            engine_ready: "Ready",
+            engine_download: "To download · {}",
+            engine_download_unsized: "To download",
+            engine_install: "To install",
+            engine_key: "Key missing",
+            engine_details: "Details",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2810,6 +2882,23 @@ pub fn window(language: Language) -> Window {
             models_minutes: "Modèle du compte rendu",
             models_settings: "Celui des Réglages\u{a0}: {}",
             models_none: "aucun modèle choisi",
+            engine_transcribe: "Moteur de transcription",
+            engine_write: "Moteur de rédaction",
+            engine_auto: "Auto",
+            engine_auto_is: "Aujourd’hui {}",
+            engine_auto_says: "Kitokey choisit le meilleur moteur de cet ordinateur. Recommandé. Rien ne part.",
+            engine_default: "Par défaut",
+            engine_here: "Sur cet ordinateur",
+            engine_here_says: "Privé et gratuit. Un peu plus lent.",
+            engine_online: "En ligne",
+            engine_online_kind: "Service en ligne",
+            engine_online_says: "Plus rapide. Seul le texte part, jamais le son.",
+            engine_ready: "Prêt",
+            engine_download: "À télécharger · {}",
+            engine_download_unsized: "À télécharger",
+            engine_install: "À installer",
+            engine_key: "Clé manquante",
+            engine_details: "Détails",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",

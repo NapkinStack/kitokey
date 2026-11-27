@@ -2969,7 +2969,14 @@ fn a_notification_s_title_holds_50_characters() {
 #[test]
 fn every_sentence_of_the_window_is_read_by_the_code() {
     let root = env!("CARGO_MANIFEST_DIR");
-    let mut code = std::fs::read_to_string(format!("{root}/ui/window.js")).unwrap();
+    // The window's scripts, each: window.js and those beside it (D122's engines.js).
+    let mut code = String::new();
+    for entry in std::fs::read_dir(format!("{root}/ui")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_some_and(|extension| extension == "js") {
+            code += &std::fs::read_to_string(path).unwrap();
+        }
+    }
     for entry in std::fs::read_dir(format!("{root}/src")).unwrap() {
         let path = entry.unwrap().path();
         if path.extension().is_some_and(|extension| extension == "rs") && !path.ends_with("words.rs") {
