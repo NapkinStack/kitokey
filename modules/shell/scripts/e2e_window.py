@@ -2129,6 +2129,9 @@ def first_run_ready(now: dt.datetime) -> None:
             " document.getElementById('none-do').textContent, document.getElementById('empty-record').textContent,"
             " document.getElementById('empty-example').textContent,"
             " [...document.querySelectorAll('#sidebar .primary, #empty .primary')].filter((b) => b.offsetParent).length]")
+    # No disk path in a published shot (the decider, 2026-11-27): the bench's folder shown by its name alone.
+    neutral = ("const f = document.getElementById('empty-folder');"
+               " if (f) f.textContent = f.textContent.replace(/(dans|in) .*$/, '$1 Kitokey.')")
     for language, texts, example_opens in (
         ("fr_FR.UTF-8", ["Prêt. Enregistrez votre premier appel.",
                          "Kitokey écoute votre micro et le son de l’appel, puis écrit le compte rendu.",
@@ -2159,6 +2162,7 @@ def first_run_ready(now: dt.datetime) -> None:
                     time.sleep(0.3)
                 violations = axe_violations(browser)
                 check(f"{short}, {theme}: the third screen has no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                browser.execute_script(neutral)
                 shot(browser, f"d126-ready-{short}-{theme}")
                 if forced:
                     browser.execute_script("document.documentElement.style.cssText = ''")
@@ -2191,6 +2195,7 @@ def first_run_ready(now: dt.datetime) -> None:
                 check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
                       (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
                 for theme in ("light", "dark"):
+                    browser.execute_script(neutral)
                     shot_themed(browser, f"d126-ready-{short}-still-{theme}", theme)
         if not example_opens:
             # Started again, welcomed, still no meeting: the empty pane says what it says outside a first run.
