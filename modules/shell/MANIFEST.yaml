@@ -299,7 +299,7 @@ commands:
     && { [ "$(uname)" != Linux ] || ! command -v magick >/dev/null || bash scripts/icons.sh --check; }
     && { [ ! -f /usr/share/fonts/julietaula-montserrat-fonts/Montserrat-Bold.otf ]
     || ! python3 -c 'import fontTools' 2>/dev/null || python3 scripts/name.py --check; }
-    && { ! command -v node >/dev/null || node --check ui/window.js; }
+    && { ! command -v node >/dev/null || { node --check ui/window.js && node --check ui/engines.js; }; }
     && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings
   # And the licence's tests built for release, where the stand-in licence must never be read
   # (D83): a build for release is what the Store sells.

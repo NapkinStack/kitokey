@@ -329,7 +329,7 @@ const r = p.getBoundingClientRect(), cs = getComputedStyle(p);
 const left = r.left + p.clientLeft + parseFloat(cs.paddingLeft), right = r.left + p.clientLeft + p.clientWidth - parseFloat(cs.paddingRight);
 return [s.left, s.right, left, right]"""
 MONTHS_FR = "janvier février mars avril mai juin juillet août septembre octobre novembre décembre".split()
-# The page's ground, as `ui/window.css` sets it in each theme.
+# The page's ground, as `ui/tokens.css` sets it in each theme.
 GROUND = {"light": "rgb(242, 244, 247)", "dark": "rgb(21, 23, 28)"}
 # The lines saying who made a version, as they read (D93): a model a list in its line is said by the
 # option chosen — an element's text would hold every option of the list.
@@ -483,16 +483,19 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
 
 
 def tokens(theme: str) -> str:
-    """A theme's colours as `ui/window.css` sets them: the light ones first, the dark ones under
-    `prefers-color-scheme: dark`."""
-    css = (Path(__file__).parent.parent / "ui" / "window.css").read_text()
-    start = css.index(":root {", 0 if theme == "light" else css.index("prefers-color-scheme: dark")) + len(":root {")
-    return css[start:css.index("}", start)].replace("\n", " ").strip()
+    """A theme's roles as `ui/tokens.css` sets them: the light ones on `:root`, the dark ones under
+    Settings' dark (the same list as the system's, held by tests/look.rs)."""
+    css = re.sub(r"/\*.*?\*/", "", (Path(__file__).parent.parent / "ui" / "tokens.css").read_text(), flags=re.S)
+    start = css.index("--color-ground") if theme == "light" else css.index(':root[data-theme="dark"] {') + len(':root[data-theme="dark"] {')
+    block = css[start:css.index("}", start)].replace("color-scheme: dark;", "")
+    return " ".join(block.split())
 
 
 def shot_themed(browser, name: str, theme: str) -> None:
     """A screenshot in its theme: the system's, or, where the desktop shows the other one, the theme's
-    colours put on the page — a dark one on a light desktop as a light one on a dark desktop (D89)."""
+    roles put on the page itself — a dark one on a light desktop as a light one on a dark desktop (D89).
+    On the element's own style, as Settings' choice (D98) is not: the page applying that choice again
+    while the screenshot is taken changes nothing."""
     forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
     if forced:
         browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
@@ -14111,6 +14114,144 @@ def section(title: str):
         print(f"    ({title.split('.')[0]}: {time.monotonic() - began:.1f} s)")
 
 
+def engine_cards_drawn(now: dt.datetime) -> None:
+    """CS. D122: one engine card, the same structure wherever an engine is offered — a fieldset per job,
+    its legend the job, a native radio per card in its label, its state on the card (ready, to download,
+    to install, a key missing), « Auto » first in Settings and the first run, « Par défaut » first in a
+    meeting's Refaire; a confidential meeting offered no online engine; each choice said to its caller
+    with the card's state. Drawn by engineCards() itself, in its three scopes, from models_offered."""
+    print("CS. the engine card: one structure in its three scopes, « Auto » first, its state on the card, no online engine for a confidential meeting (D122)")
+
+    class Tags(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = json.dumps({"models": [{"name": "mistral:7b"}, {"name": "qwen3:8b"}]}).encode()
+            try:
+                self.send_response(200)
+                self.send_header("content-length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                pass
+
+        def log_message(self, *_):
+            pass
+
+    tags = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Tags)
+    threading.Thread(target=tags.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{tags.server_address[1]}"
+    meetings = WORK / "engine-cards"
+    session(meetings / "2026-11-26_10-00", now - dt.timedelta(hours=2), 30, {"local.wav": 1000})
+    session(meetings / "2026-11-26_11-00", now - dt.timedelta(hours=1), 30, {"local.wav": 1000})
+    (meetings / "2026-11-26_11-00" / "confidential").write_bytes(b"")
+    service = {"name": "OpenRouter", "address": "https://openrouter.ai/api/v1", "models": ["mistralai/mistral-small"]}
+    # Each scope drawn by engineCards() into the page, from the shell's own answer; each choice its
+    # caller is told, recorded.
+    mount = """
+        const done = arguments[arguments.length - 1]; const service = arguments[0];
+        (async () => {
+          const core = window.__TAURI__.core;
+          const next = await core.invoke('models_offered', { name: null });
+          const meeting = await core.invoke('models_offered', { name: '2026-11-26_10-00' });
+          const kept = await core.invoke('models_offered', { name: '2026-11-26_11-00' });
+          const host = document.createElement('div'); host.id = 'cs-cards'; document.body.append(host);
+          window.csTold = [];
+          const draw = (key, options) => {
+            const cards = engineCards({ words, ...options });
+            cards.box.dataset.cs = key;
+            cards.onChange((told) => window.csTold.push([key, told.value, told.state]));
+            host.append(cards.box);
+          };
+          draw('settings-write', { job: 'write', offered: next, scope: 'settings', services: [service] });
+          draw('settings-transcribe', { job: 'transcribe', offered: next, scope: 'settings', services: [] });
+          draw('meeting-write', { job: 'write', offered: meeting, scope: 'meeting', services: [service] });
+          draw('confidential-write', { job: 'write', offered: kept, scope: 'meeting', services: [service] });
+          draw('first', { job: 'write', offered: next, scope: 'first', services: [] });
+          return [next.auto_writing.model, next.auto_hearing.bytes];
+        })().then(done, (why) => done(String(why)));"""
+    # One structure, read the same way in every scope: the e2e's one reader of the card.
+    read = """
+        const box = document.querySelector(`fieldset[data-cs="${arguments[0]}"]`);
+        if (!box) return null;
+        return { job: box.dataset.job, legend: box.querySelector(':scope > legend')?.textContent ?? null,
+          cards: [...box.children].filter((c) => c.classList.contains('engine-card')).map((c) => {
+            const radio = c.querySelector(':scope > label > input[type=radio]');
+            return { engine: c.dataset.engine, job: c.dataset.job, state: c.dataset.state, at: c.dataset.where,
+              name: c.querySelector(':scope > label .name')?.textContent ?? null,
+              where: c.querySelector(':scope > label .where')?.textContent ?? null,
+              said: c.querySelector(':scope > label .state')?.textContent ?? null,
+              marked: c.querySelector(':scope > label .default') !== null,
+              details: c.querySelector(':scope > details > summary') !== null,
+              radio: radio ? [radio.name, radio.value, radio.checked, radio.disabled] : null };
+          }) };"""
+    # A data folder of the scenario's own: the Whisper models here are what it puts there, never what an
+    # earlier scenario of the run left in the shared one (the attest of a09a184 found the default model
+    # there, fetched by another scenario).
+    data = WORK / "data-engine-cards"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True)
+    window = Window(meetings, "fr_FR.UTF-8", 'reminder = false\n', ollama=base)
+    window.env.update(XDG_DATA_HOME=str(data))
+    with window as browser:
+        wait_for(browser, lambda b: b.execute_script("return typeof words === 'object' && words !== null"), 10)
+        auto = browser.execute_async_script(mount, service)
+        check("the scopes drawn by engineCards(), from models_offered", isinstance(auto, list), auto)
+        cards = {key: browser.execute_script(read, key) for key in ("settings-write", "settings-transcribe", "meeting-write", "confidential-write", "first")}
+        every = [card for key in cards if cards[key] for card in cards[key]["cards"]]
+        groups = [{card["radio"][0] for card in cards[key]["cards"]} for key in cards if cards[key]]
+        check("each scope one group of radios of its own: one name in a scope, none shared between two",
+              all(len(names) == 1 for names in groups) and len(set().union(*groups)) == len(groups), groups)
+        check("one structure in every scope: a fieldset per job, its legend, a native radio in each card's label, its state on the card, « Détails » behind",
+              all(cards.values()) and all(c["legend"] for c in cards.values()) and every
+              and all(card["radio"] and card["radio"][0].startswith(f"engine-{card['job']}-") and not card["radio"][3] and card["name"] and card["state"] in ("ready", "download", "install", "key")
+                      and card["at"] in ("here", "online") and card["said"] and card["details"] for card in every),
+              cards)
+        write = cards["settings-write"]["cards"]
+        check("Settings naming no writer: « Auto » first and chosen, ready with the recommended model Ollama holds, said on its card",
+              write[0]["engine"] == "auto" and write[0]["radio"][1:3] == ["", True] and write[0]["state"] == "ready" and write[0]["at"] == "here"
+              and "Qwen3" in (write[0]["where"] or "") and write[0]["said"] == "Prêt",
+              write[:1])
+        check("then each model Ollama holds, on this computer, and the service set up, online",
+              [c["engine"] for c in write[1:]] == ["ollama", "ollama", "service"] and [c["at"] for c in write[1:]] == ["here", "here", "online"],
+              write)
+        hear = cards["settings-transcribe"]["cards"]
+        check("to transcribe, no Whisper model in the scenario's folder: « Auto » the default one, to download at its size",
+              hear[0]["engine"] == "auto" and hear[0]["state"] == "download" and hear[0]["said"] == "À télécharger · 874 Mo".replace(" ", " ")
+              and hear[0]["radio"][2] and isinstance(auto, list) and auto[1] == 874_188_075,
+              hear)
+        (models / "ggml-large-v3-turbo-q8_0.bin").write_bytes(b"\0" * 16)
+        browser.execute_async_script("""
+            const done = arguments[arguments.length - 1];
+            window.__TAURI__.core.invoke('models_offered', { name: null }).then((offered) => {
+              const cards = engineCards({ words, job: 'transcribe', offered, scope: 'settings', services: [] });
+              cards.box.dataset.cs = 'settings-transcribe-here';
+              document.getElementById('cs-cards').append(cards.box);
+              done(true);
+            }, (why) => done(String(why)));""")
+        here = (browser.execute_script(read, "settings-transcribe-here") or {"cards": []})["cards"]
+        check("then the default Whisper model put in the scenario's folder: « Auto » ready, said « Prêt », the model named",
+              here and here[0]["engine"] == "auto" and here[0]["state"] == "ready" and here[0]["said"] == "Prêt"
+              and "Whisper large v3 turbo" in (here[0]["where"] or ""),
+              here[:1])
+        own = cards["meeting-write"]["cards"]
+        check("a meeting that chose none: « Par défaut » first, marked and chosen, then the engines",
+              own[0]["marked"] and own[0]["radio"][1:3] == ["", True] and sum(c["marked"] for c in own) == 1 and any(c["at"] == "online" for c in own),
+              own)
+        kept = cards["confidential-write"]["cards"]
+        check("a confidential meeting is offered no online engine (D60)", kept and all(c["at"] == "here" for c in kept), kept)
+        first = cards["first"]["cards"]
+        check("the first run: three cards by kind, « Auto » first and marked, then this computer, then online — its key missing",
+              [c["radio"][1] for c in first] == ["", "local", "online"] and first[0]["marked"] and first[0]["radio"][2]
+              and [c["state"] for c in first] == ["ready", "ready", "key"] and first[1]["at"] == "here" and first[2]["at"] == "online",
+              first)
+        # Each card chosen in turn, as a click on its radio: its caller told the card's value and state.
+        browser.execute_script("""for (const box of document.querySelectorAll('#cs-cards fieldset'))
+            for (const radio of box.querySelectorAll('input[type=radio]')) radio.click();""")
+        told = browser.execute_script("return window.csTold")
+        expected = [[key, card["radio"][1], card["state"]] for key in cards for card in cards[key]["cards"] if not card["radio"][2]]
+        check("each choice tells its caller the card's value and its state, once", sorted(map(tuple, told)) == sorted(map(tuple, expected)), (told, expected))
+    tags.shutdown()
+
+
 def main() -> int:
     now = dt.datetime.now().astimezone()
     began = time.monotonic()
@@ -14750,7 +14891,9 @@ def main() -> int:
         # key goes to the scenario's own keyring, which lives as long as the program.
         class Tags(http.server.BaseHTTPRequestHandler):
             def do_GET(self):
-                body = json.dumps({"models": [{"name": "qwen3:14b"}, {"name": "mistral:7b"}]}).encode()
+                # What it holds, as a check sets it (D122's « Auto »): nothing, or the recommended one second.
+                held = [] if (WORK / "ollama-empty").exists() else ["mistral:7b", "qwen3:8b"] if (WORK / "ollama-recommended").exists() else ["qwen3:14b", "mistral:7b"]
+                body = json.dumps({"models": [{"name": name} for name in held]}).encode()
                 self.send_response(200)
                 self.send_header("content-length", str(len(body)))
                 self.end_headers()
@@ -15123,6 +15266,8 @@ def main() -> int:
             invoke("minutes_redo", {"name": "2026-10-18_14-00", "provider": f"{ollama}/v1", "model": "mistral:7b"})
             wait_for(browser, lambda b: makings()["minutes"] is not None, 3)
             window.file.write_text(unchosen)
+            # No one chosen, and « Auto » not ready — Ollama here holding no model (D122).
+            (WORK / "ollama-empty").touch()
             invoke("minutes_asked", {"name": "2026-10-18_11-00"})
             wait_for(browser, lambda b: makings()["minutes_waiting"] == ["2026-10-18_11-00"], 3)
             (WORK / "slow-minutes").unlink()
@@ -15130,6 +15275,16 @@ def main() -> int:
             time.sleep(1)
             check("taken from the line with no one chosen: said on its page, no settings window opened over the user",
                   unsaid and browser.execute_script("return location.hash") == "#/meeting/2026-10-18_11-00", (makings(), browser.execute_script("return location.hash")))
+            # No one chosen, Ollama here holding the recommended model: « Auto » writes with it, and with
+            # it rather than the first held; nothing written to the settings (D122).
+            (WORK / "ollama-empty").unlink()
+            (WORK / "ollama-recommended").touch()
+            invoke("minutes_asked", {"name": "2026-10-18_11-00"})
+            auto_ = wait_for(browser, lambda b: makings()["minutes"] is None and not makings()["minutes_waiting"] and (WORK / "summary-args").read_text().split()[-1] == "qwen3:8b", 15)
+            (WORK / "ollama-recommended").unlink()
+            check("no one chosen, Ollama holding the recommended model: « Auto » writes with it here, Settings left as they were (D122)",
+                  auto_ and f"{ollama}/v1" in (WORK / "summary-args").read_text() and "minutes_provider" not in window.file.read_text(),
+                  (makings(), (WORK / "summary-args").read_text(), window.file.read_text()))
             window.file.write_text(settled)
             # The trash emptied of these, as the user would: the next check counts its own.
             for made_before in (WORK / "data" / "Trash" / "files").glob("minutes-before-*.md"):
@@ -15901,6 +16056,7 @@ def main() -> int:
     bar_window(now)
     bar_opened(now)
     bar_language(now)
+    engine_cards_drawn(now)
     bar_after_stop(now)
     summaries_to_a_folder(now)
     axe_first_surfaces(now)
