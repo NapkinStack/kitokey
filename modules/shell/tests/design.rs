@@ -256,7 +256,15 @@ fn the_index_its_book_and_its_components() {
         assert!(here().join("design-system/project").join(file).is_file(), "type.fonts: {file}");
     }
     for component in [
-        "Button", "Banner", "Dialog", "EngineCard", "Chip", "OptionCard", "Progress", "Toast", "Cover",
+        "Button",
+        "Banner",
+        "Dialog",
+        "EngineCard",
+        "Chip",
+        "OptionCard",
+        "Progress",
+        "Toast",
+        "Cover",
     ] {
         let folder = Path::new("design-system/project/components").join(component);
         let preview = read(folder.join("preview.html").to_str().unwrap());
