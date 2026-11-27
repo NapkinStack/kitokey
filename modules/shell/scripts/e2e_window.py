@@ -6049,7 +6049,8 @@ def bar_after_stop(now: dt.datetime) -> None:
                 failed = stop() and wait_for(browser, lambda b: b.execute_script(said) == meeting + not_made and b.execute_script(shown), 15)
                 # Two lines (D125), never one cut in its first words: the meeting and the cause's first sentence whole inside
                 # them, the whole of it its tooltip and its live region's; then « Ouvrir », after the words, inside the bar;
-                # the window as tall as it shows.
+                # the window as tall as it shows — waited for: bar_fit follows the page's size, after it.
+                wait_for(browser, lambda b: b.execute_script("return Math.abs(innerHeight - Math.ceil(document.getElementById('small').getBoundingClientRect().height)) <= 1"), 3)
                 line = browser.execute_script(
                     "const s = document.getElementById('small-last-said'), o = document.getElementById('small-last-open');"
                     " const r = s.getBoundingClientRect(), b = o.getBoundingClientRect(), high = parseFloat(getComputedStyle(s).lineHeight);"
