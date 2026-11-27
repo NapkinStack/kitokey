@@ -7445,6 +7445,11 @@ def meeting_exported(now: dt.datetime) -> None:
                 note = got.get("note")
                 check(f"{short}, {'confidential' if confidential else 'ordinary'}: the menu's line on a confidential meeting {'said' if confidential else 'absent'} (PDR-0007)",
                       (note is not None and note.startswith(words["note"])) if confidential else note is None, note)
+                if confidential:
+                    # The line is the menu's description, never one of its items: the menu as axe reads it (WAI-ARIA's menu).
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: « Partager » open on a confidential meeting, its line in it, no violation of axe's WCAG 2.2 A and AA rules",
+                          found == [], found)
                 ActionChains(browser).send_keys(Keys.ESCAPE).perform()
                 for kind, opener, head in (("pdf", "share-pdf", b"%PDF-"), ("md", "share-md", b"---")):
                     to = WORK / f"exported-{short}-{folder.name}.{kind}"
