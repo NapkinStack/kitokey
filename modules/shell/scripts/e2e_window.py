@@ -9405,6 +9405,148 @@ def confidential_locked(now: dt.datetime) -> None:
                 check(f"{short}, {theme}: stopped, at rest: no lock", rest and not browser.execute_script(lock)["shown"], browser.execute_script(lock))
 
 
+def keys_taught(now: dt.datetime) -> None:
+    """CX. D128a, Kitokey by the keyboard: Ctrl+R records and stops, Ctrl+F reaches the page's search, Ctrl+, opens
+    Settings, Ctrl+Maj+C copies the summary, Échap goes back, J and K the next and previous meeting, « ? » the sheet that
+    lists them all — a modal dialog, axe clean. Each said in its button's tooltip and to a screen reader
+    (aria-keyshortcuts). None taken while a field has the focus. J, K and « ? », a single key each, turned off by
+    Settings' « Raccourcis à une touche » (WCAG 2.2 SC 2.1.4), on by default; the Ctrl ones then still act."""
+    print("CX. Kitokey by the keyboard: Ctrl+R, Ctrl+F, Ctrl+,, Ctrl+Maj+C, Échap, J, K and « ? »'s sheet; said in the tooltips; "
+          "none taken in a field; the single keys turned off in Settings (D128, WCAG 2.1.4)")
+    meetings = WORK / "keys"
+    first, second = meetings / "2026-11-25_10-00", meetings / "2026-11-24_10-00"
+    for folder, ago in ((first, 2), (second, 3)):
+        session(folder, now - dt.timedelta(days=ago), 10, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-11-25T10:30:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    stand_in = ("window.__copied = []; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {"
+                " writeText: (text) => (window.__copied.push(text), Promise.resolve()),"
+                " write: async (items) => { for (const item of items) window.__copied.push(await (await item.getType('text/plain')).text()); }}})")
+    hash_ = "return location.hash"
+    focused = "const a = document.activeElement; return [a.id, a.tagName]"
+
+    def chord(browser, *keys: str) -> None:
+        """Keys held then the last pressed, as a person does: Ctrl and Maj down, the key, then up."""
+        actions = ActionChains(browser)
+        for key in keys[:-1]:
+            actions.key_down(key)
+        actions.send_keys(keys[-1])
+        for key in reversed(keys[:-1]):
+            actions.key_up(key)
+        actions.perform()
+        time.sleep(0.3)
+
+    def to_body(browser) -> None:
+        """The focus on the page itself, as after a click on its empty part."""
+        browser.execute_script("document.activeElement?.blur()")
+
+    window = Window(meetings, "fr_FR.UTF-8", "reminder = false\n")
+    with window as browser:
+        browser.set_window_size(1100, 800)
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#groups .session"), 10)
+        # Said where the gesture is: in the tooltip, and to a screen reader by aria-keyshortcuts.
+        said = browser.execute_script(
+            "const r = document.getElementById('record'), s = document.getElementById('settings-link');"
+            " return [r.title, r.getAttribute('aria-keyshortcuts'), s.title, s.getAttribute('aria-keyshortcuts')]")
+        check("« Démarrer un enregistrement » and « Réglages » say their shortcut in their tooltip and to a screen reader",
+              "Ctrl+R" in said[0] and said[1] == "Control+R" and "Ctrl+," in said[2] and said[3] == "Control+Comma", said)
+        rows = browser.execute_script("return [...document.querySelectorAll('#groups .session')].map((r) => r.getAttribute('href'))")
+        browser.execute_script("location.hash = arguments[0]", rows[0])
+        wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes"), 10)
+        copy = browser.execute_script("const c = document.getElementById('copy-minutes'); return [c.title, c.getAttribute('aria-keyshortcuts')]")
+        check("« Copier le compte rendu » says Ctrl+Maj+C in its tooltip and to a screen reader",
+              "Ctrl+Maj+C" in copy[0] and copy[1] == "Control+Shift+C", copy)
+        # J and K: the next and the previous meeting of the list, as Gmail and Linear move.
+        to_body(browser)
+        chord(browser, "j")
+        moved = wait_for(browser, lambda b: b.execute_script(hash_) == rows[1], 3)
+        to_body(browser)
+        chord(browser, "k")
+        back = wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3)
+        check("J: the next meeting of the list; K: the one before", moved and back, browser.execute_script(hash_))
+        # Ctrl+Maj+C: the summary copied, « Copié » said where the button says it.
+        browser.execute_script(stand_in)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, Keys.SHIFT, "c")
+        copied = wait_for(browser, lambda b: b.execute_script("return window.__copied.length") == 1, 3)
+        check("Ctrl+Maj+C: the summary copied, as « Copier le compte rendu » copies it",
+              copied and "Le budget est validé." in browser.execute_script("return window.__copied[0]"), browser.execute_script("return window.__copied"))
+        # Ctrl+F: the page's own search, its field focused.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "f")
+        check("Ctrl+F on a meeting: the focus in « Rechercher dans le texte »", browser.execute_script(focused)[0] == "search", browser.execute_script(focused))
+        # In a field, no shortcut is taken: what is typed is typed.
+        for key in ("j", "?"):
+            chord(browser, key)
+        chord(browser, Keys.CONTROL, "r")
+        typed = browser.execute_script("return [document.getElementById('search').value, location.hash, document.getElementById('record').classList.contains('live'), !!document.getElementById('keys-sheet')]")
+        check("in a field, J and « ? » are typed, Ctrl+R records nothing, the page stays", typed == ["j?", rows[0], False, False], typed)
+        browser.execute_script("const f = document.getElementById('search'); f.value = ''; f.dispatchEvent(new Event('input'))")
+        # Ctrl+, then Échap: Settings, and back where the user was.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, ",")
+        opened = wait_for(browser, lambda b: b.execute_script(hash_) == "#/settings", 3)
+        to_body(browser)
+        chord(browser, Keys.ESCAPE)
+        check("Ctrl+, opens Settings; Échap goes back to the meeting", opened and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3),
+              browser.execute_script(hash_))
+        # On the list, Ctrl+F reaches the sidebar's search.
+        browser.execute_script("location.hash = '#/'")
+        time.sleep(0.5)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "f")
+        check("Ctrl+F on the list: the focus in the sidebar's « Rechercher »", browser.execute_script(focused)[0] == "find", browser.execute_script(focused))
+        # « ? »: the sheet, a modal dialog listing every shortcut; Échap closes it, the focus back where it was.
+        to_body(browser)
+        chord(browser, "?")
+        sheet = ("const d = document.getElementById('keys-sheet'); return d && d.open ? {modal: d.matches(':modal'), title: d.getAttribute('aria-labelledby') &&"
+                 " document.getElementById(d.getAttribute('aria-labelledby')).textContent, rows: [...d.querySelectorAll('tr')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),"
+                 " kbd: d.querySelectorAll('kbd').length} : null")
+        shown = wait_for(browser, lambda b: b.execute_script(sheet) is not None, 3)
+        got = browser.execute_script(sheet) or {}
+        wanted = ("Ctrl+R", "Ctrl+K", "Ctrl+F", "Ctrl+,", "Ctrl+Maj+C", "Échap", "J", "K", "?")
+        check("« ? »: the sheet, a modal dialog named « Raccourcis clavier », each shortcut a row with its keys",
+              shown and got.get("modal") and got.get("title") == "Raccourcis clavier" and all(any(w in r for r in got["rows"]) for w in wanted) and got["kbd"] >= len(wanted), got)
+        violations = axe_violations(browser)
+        check("the sheet: no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+        for theme in ("light", "dark"):
+            shot_themed(browser, f"cx-sheet-fr-{theme}", theme)
+        chord(browser, Keys.ESCAPE)
+        check("Échap closes the sheet", wait_for(browser, lambda b: b.execute_script(sheet) is None, 3), browser.execute_script(sheet))
+        # Ctrl+R: a recording starts; again, it stops.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "r")
+        live = wait_for(browser, lambda b: b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+        time.sleep(0.6)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "r")
+        stopped = wait_for(browser, lambda b: not b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+        check("Ctrl+R: a recording starts; Ctrl+R again: it stops", live and stopped)
+        # Settings: « Raccourcis à une touche », on by default; off, J and « ? » act no more, Ctrl+, still does.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "single-keys"), 10)
+        switch = "const b = document.getElementById('single-keys'); return [b.checked, b.getAttribute('role'), b.closest('label')?.textContent ?? '']"
+        got = browser.execute_script(switch)
+        check("Settings offer « Raccourcis à une touche », a switch, on by default", got[0] is True and got[1] == "switch" and "Raccourcis à une touche" in got[2], got)
+        browser.find_element(By.ID, "single-keys").click()
+        kept = wait_for(browser, lambda b: "single_keys = false" in window.file.read_text(), 3)
+        browser.execute_script("location.hash = arguments[0]", rows[0])
+        wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes"), 10)
+        to_body(browser)
+        chord(browser, "j")
+        chord(browser, "?")
+        still = browser.execute_script("return [location.hash, !!document.getElementById('keys-sheet')?.open]")
+        to_body(browser)
+        chord(browser, Keys.CONTROL, ",")
+        ctrl = wait_for(browser, lambda b: b.execute_script(hash_) == "#/settings", 3)
+        check("turned off: kept in the settings; J and « ? » act no more; Ctrl+, still opens Settings (WCAG 2.2 SC 2.1.4)",
+              kept and still == [rows[0], False] and ctrl, [window.file.read_text(), still, browser.execute_script(hash_)])
+
+
 def dates_mentioned(now: dt.datetime) -> None:
     """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
     print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
@@ -15852,6 +15994,7 @@ def main() -> int:
     store_shots(now)
     actions_rows(now)
     dates_mentioned(now)
+    keys_taught(now)
     confidential_locked(now)
     announced(now)
     heard_checked(now)
