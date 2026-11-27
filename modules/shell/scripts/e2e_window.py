@@ -2123,16 +2123,21 @@ def first_run_screens(now: dt.datetime) -> None:
     checked and saying what it resolves to, « Sur cet ordinateur », « Service en ligne », each with its facts; the
     download of what « Auto » needs starts at once, before any click, but only what downloads without an install —
     Whisper's model; Ollama absent, « Auto » to write says it is to install and nothing is pulled; « Je choisirai plus
-    tard » keeps « Auto », nothing written for who writes, and ends on screen (3), the empty window said ready (CU).
-    Screen (2), the sound checked while it downloads, comes in the next pull request. The first start's own checks,
+    tard » keeps « Auto », nothing written for who writes, and goes on to screen (2): the sound checked inline, its two
+    meters moving, under it a progress of what is prepared, its size come and in all and the time left; « Retour »
+    back to (1); « Ça marche » ends on screen (3), the empty window said ready (CU), the sound no longer listened to.
+    The first start's own checks,
     scenario Y's until D126 (their names kept): the full window opens on it, with --window or without, no sidebar
     beside it, welcomed written as soon as it is shown, the small window kept as the one reopened, never shown again
     once welcomed, nothing of its answers written when it is left midway."""
     print("CV. the first run: three engine cards, Auto's download at once, « Je choisirai plus tard » ends ready (D126)")
-    served, model = WORK / "served-first", os.urandom(300_000)
+    served, model = WORK / "served-first", os.urandom(1_200_000)
     served.mkdir()
     (served / "model.bin").write_bytes(model)
     asked = []
+    # Asked for at once on screen (1), its bytes held back until screen (2) shows, then served slowly (about 12 s):
+    # its coming, its size and the time left are seen there, whatever screen (1)'s checks took.
+    flowing = threading.Event()
 
     class Slow(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -2142,6 +2147,7 @@ def first_run_screens(now: dt.datetime) -> None:
             asked.append(self.path)
 
         def copyfile(self, source, sink):
+            flowing.wait(120)
             while chunk := source.read(30_000):
                 sink.write(chunk)
                 sink.flush()
@@ -2155,7 +2161,13 @@ def first_run_screens(now: dt.datetime) -> None:
              " c.querySelector('.default')?.textContent ?? null, c.querySelector('.facts')?.textContent.trim() ?? '',"
              " c.querySelector('.where')?.textContent.trim() ?? '']) : null")
     title = "const h = document.querySelector('#welcome h1'); return h && h.offsetParent ? h.textContent.trim() : null"
+    title2 = "const h = document.querySelector('#first-sound h1'); return h && h.offsetParent ? h.textContent.trim() : null"
     welcome = "return !document.getElementById('welcome').hidden && document.getElementById('welcome').innerText || ''"
+    meters = "return [...document.querySelectorAll('#first-sound .first-meter')].map((m) => [m.dataset.side, m.lastElementChild?.style.height ?? ''])"
+    # Its role, its words, and its value: what a screen reader says of it.
+    progress = ("const p = document.getElementById('first-progress'); return p ? [p.getAttribute('role'),"
+                " document.getElementById('first-progress-said')?.textContent.replace(/\\s/g, ' ') ?? '', p.hasAttribute('aria-valuenow')] : null")
+    size, left = r"\d[\d,.]*\s?(ko|Mo|Go|kB|MB|GB)", r"\d+\s?(s|min)\b"
     logs = WORK / "state" / "kitokey" / "logs"
     pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
 
@@ -2169,8 +2181,10 @@ def first_run_screens(now: dt.datetime) -> None:
 
     try:
         # The words of mock-up v5's screen 1, in French; the English ones are the same key's (words.rs).
-        for locale, lang, words in (("fr_FR.UTF-8", "fr", "Deux questions, et c’est prêt."), ("en_US.UTF-8", "en", None)):
+        for locale, lang, words, words2 in (("fr_FR.UTF-8", "fr", "Deux questions, et c’est prêt.", "On vérifie le son pendant que tout se prépare."),
+                                            ("en_US.UTF-8", "en", None, None)):
             asked.clear()
+            flowing.clear()
             window = started(lang, locale, [])
             pulled_before = pulls()
             with window as browser:
@@ -2246,11 +2260,48 @@ def first_run_screens(now: dt.datetime) -> None:
                 browser.set_window_size(wide["width"], wide["height"])
                 time.sleep(0.5)
                 press(browser, "first-later")
+                sound = wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                flowing.set()
+                text = window.file.read_text()
+                check(f"{lang}: (1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (2)",
+                      sound and "minutes_provider" not in text and "minutes_model" not in text, (browser.execute_script(welcome), text))
+                shown = browser.execute_script(title2)
+                check(f"{lang}: (2) its title, mock-up v5's", shown and (words2 is None or shown == words2), shown)
+                step = browser.execute_script("const s = document.getElementById('first-steps'); return s ? [s.getAttribute('aria-label'), [...s.children].map((i) => i.classList.contains('on'))] : null")
+                check(f"{lang}: (2) its steps « 2 of 3 »", step is not None and step[1] == [True, True, False] and (lang != "fr" or step[0] == "Étape 2 sur 3"), step)
+                listening = "return window.__TAURI__.core.invoke('sound_check_now').then((n) => n.open, () => null)"
+                check(f"{lang}: (2) the microphone and the call listened to while it shows", browser.execute_script(listening) is True, browser.execute_script(listening))
+                # The capture stand-in hears 40 % on the microphone and 5 % on the call (scenario AZ's levels).
+                moving = wait_for(browser, lambda b: b.execute_script(meters) == [["near", "40%"], ["far", "5%"]], 5)
+                check(f"{lang}: (2) the sound checked inline: two meters, the microphone and the call, each moving with its level",
+                      moving, browser.execute_script(meters))
+                said = wait_for(browser, lambda b: (p := b.execute_script(progress)) and len(re.findall(size, p[1])) >= 2 and re.search(left, p[1]), 8)
+                got = browser.execute_script(progress)
+                check(f"{lang}: (2) under it, what is prepared: a progress, its size come and in all, and the time left",
+                      bool(said) and got[0] == "progressbar" and got[2], got)
+                violations = axe_violations(browser)
+                check(f"{lang}: (2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-sound-{lang}-{theme}", theme)
+                if lang == "fr":
+                    # « Retour »: screen (1) again, its heading focused, nothing listened to; then on again.
+                    press(browser, "first-back")
+                    back = wait_for(browser, lambda b: b.execute_script(title) is not None and b.execute_script(title2) is None, 5)
+                    focus = browser.execute_script("return document.activeElement.id")
+                    check("(2) « Retour »: screen (1) again, its heading focused, the sound no longer listened to",
+                          back and focus == "welcome-heading" and wait_for(browser, lambda b: b.execute_script(listening) is False, 3),
+                          (browser.execute_script(title), focus, browser.execute_script(listening)))
+                    press(browser, "first-later")
+                    wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                press(browser, "first-works")
                 ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
                                  and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
                 text = window.file.read_text()
-                check(f"{lang}: (1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (3), the empty window said ready (CU)",
+                check(f"{lang}: (2) « Ça marche »: nothing written for who writes, then screen (3), the empty window said ready (CU)",
                       ready and "minutes_provider" not in text and "minutes_model" not in text, (browser.find_element(By.ID, "none").text, text))
+                # Listened to while screen (2) showed (above), and no longer once it is left.
+                closed = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+                check(f"{lang}: (2) left, the sound no longer listened to", closed, browser.execute_script(listening))
                 if lang == "fr":
                     check("the window left is not changed: the small one stays the one reopened (D35)", "window =" not in text, text)
             if lang == "fr":
@@ -2272,6 +2323,7 @@ def first_run_screens(now: dt.datetime) -> None:
             browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
         check("left midway, nothing of its answers is written", window.file.read_text() == before, window.file.read_text())
     finally:
+        flowing.set()
         server.shutdown()
 
 
@@ -2308,6 +2360,9 @@ def first_run_ready(now: dt.datetime) -> None:
             asked = wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
             check(f"{short}: not welcomed, the first run opens on its first question", asked)
             press(browser, "first-later")
+            # Screen (2), the sound checked, then « Ça marche » (CV holds it).
+            wait_for(browser, lambda b: b.find_elements(By.ID, "first-works") and b.find_element(By.ID, "first-works").is_displayed(), 10)
+            press(browser, "first-works")
             shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
             check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
                   shown, browser.execute_script(pane))
@@ -2350,6 +2405,8 @@ def first_run_ready(now: dt.datetime) -> None:
             with window as browser:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
                 press(browser, "first-later")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "first-works") and b.find_element(By.ID, "first-works").is_displayed(), 10)
+                press(browser, "first-works")
                 shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
                 check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
                       (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
