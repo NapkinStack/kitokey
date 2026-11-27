@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "A format a person made",
+  "description": "summarising/v1 — the file `--format` names: the structure's name, its sections and the one that holds the actions, as minutes/v5's front matter says them. What a schema cannot say is on the contract's page: each id once, `actions` one of them.",
+  "type": "object",
+  "properties": {
+    "structure": {
+      "description": "The format's name as the minutes write it; never one of the six structures minutes/v5 names.",
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,40}$",
+      "not": {
+        "enum": [
+          "general",
+          "one_to_one",
+          "stand_up",
+          "client_call",
+          "interview",
+          "project_review"
+        ]
+      }
+    },
+    "sections": {
+      "description": "The sections, in their order: one to six.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]{1,40}$"
+          },
+          "about": {
+            "description": "What goes in the section, in the person's own words, any language.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "not": {
+              "pattern": "[\\n\\r]"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "about"
+        ]
+      }
+    },
+    "actions": {
+      "description": "The id of the section that holds the actions; absent when the format has none.",
+      "type": "string",
+      "pattern": "^[a-z0-9_]{1,40}$"
+    }
+  },
+  "required": [
+    "structure",
+    "sections"
+  ]
+}
