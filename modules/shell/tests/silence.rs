@@ -30,6 +30,11 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     (
+        "formats_offered",
+        2,
+        "returns no `Result`: it cannot fail — Refaire's list and the summary's format named (D130)",
+    ),
+    (
         "dates_file_chosen",
         1,
         "returns an `Option`, `None` when the user closes the dialog: nothing chosen, nothing to say (D115)",

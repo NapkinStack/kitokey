@@ -30,7 +30,7 @@ use kitokey_shell::microphone;
 use kitokey_shell::{
     autostart,
     confidential::{self, Left, Wait, What},
-    context, correction, dates, desktop, engines, example, exporting, keys,
+    context, correction, dates, desktop, engines, example, exporting, formats, keys,
     licence::{self, Licence},
     log,
     meeting::{self, Read, Transcript},
@@ -146,6 +146,9 @@ struct Shell {
     /// The model each meeting's last minutes were asked with, when one was named (a Refaire…):
     /// tried again, with that one (D25).
     minutes_tried: Mutex<HashMap<PathBuf, Option<(String, String)>>>,
+    /// The format a *Refaire…* chose for its meeting (D130), its structure: that making alone;
+    /// none, Settings' default.
+    format_chosen: Mutex<HashMap<PathBuf, String>>,
     /// The sessions whose transcripts wait for the one being made, or for the model — in
     /// the order they were asked, each once; made again as a *Refaire…* asked (D25, D59).
     waiting: Mutex<VecDeque<(PathBuf, Option<Again>, Cancel)>>,
@@ -411,6 +414,7 @@ fn main() {
             busy_meetings,
             freed,
             minutes_redo,
+            formats_offered,
             making_cancelled,
             context_shown,
             context_saved,
@@ -581,6 +585,7 @@ fn main() {
                 served: Mutex::new(None),
                 minutes_made: Mutex::new(HashMap::new()),
                 minutes_tried: Mutex::new(HashMap::new()),
+                format_chosen: Mutex::new(HashMap::new()),
                 asked_again: Mutex::new(HashMap::new()),
                 waiting: Mutex::new(VecDeque::new()),
                 examples: Mutex::default(),
@@ -1260,8 +1265,14 @@ fn minutes_redo(
     name: String,
     provider: Option<String>,
     model: Option<String>,
+    format: Option<String>,
 ) -> Result<(), Told> {
     let folder = session_folder(&shell, &name)?;
+    // The format chosen in its dialog, for this making (D130); none, Settings' default.
+    match format {
+        Some(format) => shell.format_chosen.lock().unwrap().insert(folder.clone(), format),
+        None => shell.format_chosen.lock().unwrap().remove(&folder),
+    };
     // The settings' model, as they name it now, when none is chosen: still a redo, which waits
     // its turn behind the meeting's own making — never taken for a second first one.
     let chosen = match provider.zip(model) {
@@ -1273,6 +1284,37 @@ fn minutes_redo(
     };
     write_minutes(&app, folder, None, chosen);
     Ok(())
+}
+
+/// A format as *Refaire…* offers it and the summary's line names it (D130): its structure, a
+/// person's own name — a built-in one is named by the page's words —, and whether it is the default.
+#[derive(serde::Serialize)]
+struct FormatOffered {
+    structure: String,
+    name: Option<String>,
+    default: bool,
+    shown: bool,
+}
+
+/// The formats: those offered in Settings' order, then the built-in ones hidden — a summary written
+/// in one still names it.
+#[tauri::command]
+fn formats_offered(shell: State<'_, Shell>) -> Vec<FormatOffered> {
+    let formats = shell.settings().formats;
+    let shown = formats.shown();
+    let hidden = formats::BUILT_IN.iter().copied().filter(|built| !shown.contains(built));
+    shown
+        .iter()
+        .copied()
+        .map(|structure| (structure, true))
+        .chain(hidden.map(|structure| (structure, false)))
+        .map(|(structure, offered)| FormatOffered {
+            structure: structure.into(),
+            name: formats.own(structure).map(|format| format.name.clone()),
+            default: formats.default == structure,
+            shown: offered,
+        })
+        .collect()
 }
 
 /// « Annuler » on a meeting's page (D92, the decider's word of 2026-11-13): what is being made of
@@ -4384,6 +4426,7 @@ fn write_minutes_from(
     shell.stopped.lock().unwrap().remove(&folder);
     minuting(app, true);
     let app = app.clone();
+    let formats = settings.formats.clone();
     // The keyring may ask the user first: never on the window's and the tray's thread.
     std::thread::spawn(move || {
         let shell = app.state::<Shell>();
@@ -4412,13 +4455,24 @@ fn write_minutes_from(
             // Cancelled while the keyring was asked: never started (D92).
             Err(std::io::Error::other("cancelled"))
         } else {
-            Summarising::start(
-                &program("kitokey-summary", "KITOKEY_SUMMARY"),
-                &folder,
-                &provider,
-                &model,
-                key.as_deref(),
-            )
+            // In the format chosen for it, else Settings' default (D130): its file, when it is a
+            // person's own, written beside the settings.
+            let chosen = shell.format_chosen.lock().unwrap().remove(&folder);
+            let structure = chosen.unwrap_or_else(|| formats.default.clone());
+            let beside = settings::file().and_then(|file| file.parent().map(|folder| folder.join("formats")));
+            beside
+                .ok_or_else(|| std::io::Error::other("this system names no folder for settings"))
+                .and_then(|beside| formats::argument(&formats, &structure, &beside))
+                .and_then(|shape| {
+                    Summarising::start_as(
+                        &program("kitokey-summary", "KITOKEY_SUMMARY"),
+                        &folder,
+                        &provider,
+                        &model,
+                        key.as_deref(),
+                        &shape,
+                    )
+                })
         };
         let events = match started {
             Ok((making, events)) => {

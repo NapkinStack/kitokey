@@ -705,3 +705,19 @@ fn an_about_of_200_characters_is_within_its_bounds() {
         "200 characters is the most, not too many"
     );
 }
+
+/// D130: the format the minutes were written in, as v5's front matter names it — the summary's
+/// line of provenance says it; v1 to v4 name none.
+#[test]
+fn minutes_v5_say_their_structure_and_earlier_ones_none() {
+    let Read::Present(minutes) = read_v5(&v5_example()) else {
+        panic!("v5's own example not read")
+    };
+    assert_eq!(minutes.structure.as_deref(), Some("project_review"));
+    let own = v5_example().replace("structure: project_review", "structure: point_client_hebdo");
+    let Read::Present(minutes) = read_v5(&own) else {
+        panic!("not read: {own}")
+    };
+    assert_eq!(minutes.structure.as_deref(), Some("point_client_hebdo"));
+    assert_eq!(present(&third("", "- a", "- d")).structure, None);
+}
