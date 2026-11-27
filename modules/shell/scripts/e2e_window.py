@@ -14110,10 +14110,10 @@ def engine_cards_drawn(now: dt.datetime) -> None:
 
 
 def formats_redone(now: dt.datetime) -> None:
-    """CW. D130: Refaire… offers the formats — the six built in by their names, a person's own after them,
+    """CZ. D130: Refaire… offers the formats — the six built in by their names, a person's own after them,
     the default marked and chosen —; the summary is written in the one chosen, through summarising/v1's
     `--structure` or `--format`, and its line names it. The summary is the stand-in's."""
-    print("CW. Refaire… offers the formats, the default marked; the summary written in the one chosen names it (D130)")
+    print("CZ. Refaire… offers the formats, the default marked; the summary written in the one chosen names it (D130)")
     meetings = WORK / "formats-redone"
     meeting = meetings / "2026-11-27_09-00"
     session(meeting, now - dt.timedelta(days=1), 10, {"local.wav": 1000})
@@ -14149,7 +14149,7 @@ def formats_redone(now: dt.datetime) -> None:
               listed == [["general", "Général", False], ["one_to_one", "Point individuel", False], ["stand_up", "Point d’équipe", False],
                          ["client_call", "Appel client", False], ["project_review", "Revue de projet", False],
                          ["point_client", "Point client (par défaut)", True]], listed)
-        shot(browser, "cw-redo-formats")
+        shot(browser, "cz-redo-formats")
         press(browser, "redo-panel-cancel")
         redone(browser, None)
         given = args.read_text().split()
@@ -14165,7 +14165,7 @@ def formats_redone(now: dt.datetime) -> None:
                          == "Format\u00a0«\u00a0Point client\u00a0»", 10)
         check("the summary written in it names its format on its line",
               named, browser.execute_script("return document.getElementById('minutes-format')?.textContent"))
-        shot(browser, "cw-minutes-format")
+        shot(browser, "cz-minutes-format")
         redone(browser, "stand_up")
         given = args.read_text().split()
         check("another built-in chosen: --structure and its name, for that making", given[-2:] == ["--structure", "stand_up"], given)
