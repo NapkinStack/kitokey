@@ -138,6 +138,8 @@ const ICONS = {
   "circle-check": [["circle", { cx: 12, cy: 12, r: 10 }], "m9 12 2 2 4-4"],
   // Lucide's user-pen (ISC): the speakers named (#1205).
   "user-pen": ["M11.5 15H7a4 4 0 0 0-4 4v2", "M21.378 16.626a1 1 0 0 0-3.004-3.004l-4.01 4.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z", ["circle", { cx: 10, cy: 7, r: 4 }]],
+  info: [["circle", { cx: 12, cy: 12, r: 10 }], "M12 16v-4", "M12 8h.01"],
+  "triangle-alert": ["m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3", "M12 9v4", "M12 17h.01"],
   pencil: ["M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z", "m15 5 4 4"],
 };
 function icon(name) {
@@ -153,6 +155,129 @@ function icon(name) {
     svg.append(shape);
   }
   return svg;
+}
+
+// A question the platform asks (D120, PDR-0008): its own modal `<dialog>` — the rest of the window inert, Escape
+// answering no —, its title, what it says, its safe answer first and focused, the other destructive when the
+// action deletes. The focus back where it was. True if the user said yes.
+function ask({ title, says, cancel, confirm, destructive = false }) {
+  const back = document.activeElement;
+  const dialog = element("dialog", "dialog");
+  const heading = element("h2", "", title);
+  heading.id = "ask-title";
+  dialog.setAttribute("aria-labelledby", heading.id);
+  const no = element("button", "button secondary", cancel);
+  const yes = element("button", `button ${destructive ? "destructive" : "primary"}`, confirm);
+  for (const answer of [no, yes]) answer.type = "button";
+  no.dataset.role = "cancel";
+  const actions = element("div", "actions");
+  actions.append(no, yes);
+  dialog.append(heading, element("p", "", says), actions);
+  document.body.append(dialog);
+  return new Promise((answered) => {
+    const close = (said) => {
+      dialog.close();
+      dialog.remove();
+      if (back instanceof HTMLElement && back.isConnected) back.focus();
+      answered(said);
+    };
+    no.addEventListener("click", () => close(false));
+    yes.addEventListener("click", () => close(true));
+    dialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      close(false);
+    });
+    dialog.showModal();
+    no.focus();
+  });
+}
+
+// The design system's gallery (D120, `#/gallery`, linked from nowhere): each component in each of its states,
+// in the window's language and theme, as `components.css` draws it — for the eye and for the e2e (CT).
+function showGallery(words) {
+  const page = document.getElementById("gallery");
+  const [buttons, banners, dialogs, engines] = words.gallery_parts;
+  const specimen = (made, component, state) => {
+    made.dataset.component = component;
+    made.dataset.state = state;
+    return made;
+  };
+  const button = (kind, label, state, glyph) => {
+    const made = element("button", `button ${kind}${["hover", "pressed", "focus"].includes(state) ? ` ${state}` : ""}`, glyph ? undefined : label);
+    made.type = "button";
+    if (glyph) {
+      made.setAttribute("aria-label", label);
+      made.title = label;
+      made.append(icon(glyph));
+    }
+    if (state === "disabled") made.disabled = true;
+    return specimen(made, "button", state);
+  };
+  const section = (title, ...parts) => {
+    const part = element("section", "gallery-part");
+    part.append(element("h2", "", title), ...parts);
+    return part;
+  };
+  const row = (...parts) => {
+    const made = element("div", "gallery-row");
+    made.append(...parts);
+    return made;
+  };
+  const banner = (tone, glyph, said) => {
+    const made = element("div", `banner ${tone}`);
+    made.append(icon(glyph), element("p", "", said));
+    return specimen(made, "banner", tone);
+  };
+  const shown = (state, title, says, cancel, confirm, destructive) => {
+    const made = element("div", "dialog");
+    made.setAttribute("role", "group");
+    made.setAttribute("aria-label", title);
+    const actions = element("div", "actions");
+    const no = element("button", "button secondary", cancel);
+    const yes = element("button", `button ${destructive ? "destructive" : "primary"}`, confirm);
+    for (const answer of [no, yes]) answer.type = "button";
+    actions.append(no, yes);
+    made.append(element("h2", "", title), element("p", "", says), actions);
+    return specimen(made, "dialog", state);
+  };
+  const opener = element("button", "button secondary", words.trash_meeting);
+  opener.type = "button";
+  opener.id = "gallery-dialog-open";
+  opener.addEventListener("click", () =>
+    ask({ title: words.trash_ask, says: words.trash_restore, cancel: words.trash_cancel, confirm: words.trash_confirm, destructive: true }));
+  const destination = "Atlas";
+  page.replaceChildren(
+    element("h1", "", words.gallery_title),
+    section(buttons,
+      row(button("primary", words.record_start, "primary"), button("secondary", words.open_folder, "secondary"),
+        button("ghost", words.trash_cancel, "ghost"), button("icon", words.copy_minutes, "icon", "copy"),
+        button("destructive", words.trash_confirm, "destructive")),
+      row(button("secondary", words.open_folder, "hover"), button("secondary", words.open_folder, "pressed"),
+        button("secondary", words.open_folder, "focus"), button("primary", words.record_starting, "disabled"))),
+    section(banners, banner("info", "info", words.trash_restore), banner("private", "lock", words.confidential_says),
+      banner("warning", "triangle-alert", words.minutes_ai)),
+    section(dialogs,
+      shown("confirm", fill(words.send_to, destination), fill(words.send_confidential_ask, destination), words.send_cancel, words.send_confirm, false),
+      shown("destructive", words.trash_ask, words.trash_restore, words.trash_cancel, words.trash_confirm, true),
+      row(opener)),
+    section(engines, ...galleryEngines(words)));
+}
+
+// The engine cards as D122 draws them (`engines.js`), from invented offers: their four states, and three groups
+// side by side — a radio chosen in one leaves the others' as they were.
+function galleryEngines(words) {
+  const local = "http://127.0.0.1:11434";
+  const offered = (writing) => ({
+    auto_hearing: { model: "ggml-small.bin", state: "ready", bytes: 487601967 },
+    auto_writing: { model: "qwen3:8b", provider: local, state: writing, bytes: 5225376000 },
+    whisper: [], ollama: [], apple: false, service: null, engine: "whisper", model: "ggml-small.bin",
+    minutes_provider: null, minutes_model: null, ollama_address: local, confidential: false, chosen: {},
+  });
+  return [
+    engineCards({ job: "transcribe", offered: offered("download"), words, scope: "first" }).box,
+    engineCards({ job: "write", offered: offered("download"), words, scope: "first" }).box,
+    engineCards({ job: "write", offered: offered("install"), words, scope: "settings" }).box,
+  ];
 }
 
 // « Plus d’actions » (D89): the rarer actions behind one button, as WAI-ARIA's menu button has it —
@@ -6415,6 +6540,17 @@ async function draw(mine, again) {
   const settings = location.hash === "#/settings";
   // The first run's assistant, alone in the window: no header, no other page (D58).
   const welcoming = /^#\/welcome(\/again)?$/.test(location.hash);
+  const gallery = document.getElementById("gallery");
+  gallery.hidden = location.hash !== "#/gallery";
+  if (!gallery.hidden) {
+    document.getElementById("frame").hidden = true;
+    document.getElementById("welcome").hidden = true;
+    if (gallery.dataset.shown !== words.gallery_title) showGallery(words);
+    gallery.dataset.shown = words.gallery_title;
+    return;
+  }
+  gallery.replaceChildren();
+  delete gallery.dataset.shown;
   document.getElementById("frame").hidden = welcoming;
   const welcome = document.getElementById("welcome");
   welcome.hidden = !welcoming;
