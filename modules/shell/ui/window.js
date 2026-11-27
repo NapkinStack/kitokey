@@ -187,8 +187,25 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
       event.preventDefault();
       close(false);
     });
+    roundTheDialog(dialog);
     dialog.showModal();
     no.focus();
+  });
+}
+
+// A modal dialog's Tab and Shift+Tab go round its controls (WAI-ARIA APG, Dialog (Modal)): past its last, its first;
+// before its first, its last. The platform's `<dialog>` alone lets one Tab stop on the dialog itself (ines, after #1298).
+function roundTheDialog(dialog) {
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab") return;
+    const stops = [...dialog.querySelectorAll(FOCUSABLE)].filter((stop) => stop.getClientRects().length);
+    if (!stops.length) return;
+    const [first, last] = [stops[0], stops[stops.length - 1]];
+    const at = document.activeElement;
+    if (event.shiftKey ? at === first || at === dialog : at === last || at === dialog) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    }
   });
 }
 
@@ -196,7 +213,7 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
 // in the window's language and theme, as `components.css` draws it — for the eye and for the e2e (CT).
 function showGallery(words) {
   const page = document.getElementById("gallery");
-  const [buttons, banners, dialogs, engines] = words.gallery_parts;
+  const [buttons, banners, dialogs, engines, chips, options, progresses, toasts] = words.gallery_parts;
   const specimen = (made, component, state) => {
     made.dataset.component = component;
     made.dataset.state = state;
@@ -260,7 +277,81 @@ function showGallery(words) {
       shown("confirm", fill(words.send_to, destination), fill(words.send_confidential_ask, destination), words.send_cancel, words.send_confirm, false),
       shown("destructive", words.trash_ask, words.trash_restore, words.trash_cancel, words.trash_confirm, true),
       row(opener)),
-    section(engines, ...galleryEngines(words)));
+    section(engines, ...galleryEngines(words)),
+    section(chips, row(...galleryChips(words))),
+    section(options, galleryOptions(words)),
+    section(progresses, galleryProgress(words)),
+    section(toasts, row(...[["copied", words.minutes_copied], ["saved", words.saved]].map(([state, said]) => {
+      const made = element("div", "toast");
+      made.setAttribute("role", "status");
+      made.append(icon("check"), element("span", "", said));
+      return specimen(made, "toast", state);
+    }))));
+}
+
+// D120 2b's chip in its five tones, each with words it says in the window.
+function galleryChips(words) {
+  return [["neutral", words.transcript], ["accent", words.engine_default], ["success", words.engine_ready, "check"],
+    ["private", words.confidential_chip, "lock"], ["warning", words.engine_key, "triangle-alert"]].map(([tone, said, glyph]) => {
+    const made = element("span", `chip ${tone}`);
+    if (glyph) made.append(icon(glyph));
+    made.append(said);
+    made.dataset.component = "chip";
+    made.dataset.state = tone;
+    return made;
+  });
+}
+
+// D120 2b's option card: where an engine runs, a radio group of two, the first chosen; a third at rest kept focused.
+function galleryOptions(words) {
+  const box = element("div", "option-cards");
+  box.setAttribute("role", "radiogroup");
+  box.setAttribute("aria-label", words.gallery_parts[5]);
+  const card = (state, glyph, title, says, checked) => {
+    const made = element("label", `option-card${state === "focus" ? " focus" : ""}`);
+    const radio = element("input");
+    radio.type = "radio";
+    radio.name = "gallery-option";
+    radio.checked = checked;
+    const tile = element("span", "tile");
+    tile.append(icon(glyph));
+    const text = element("span");
+    text.append(element("span", "title", title), element("span", "says", says));
+    made.append(radio, tile, text);
+    made.dataset.component = "option-card";
+    made.dataset.state = state;
+    return made;
+  };
+  box.append(card("checked", "hard-drive", words.engine_here, words.engine_here_says, true),
+    card("rest", "globe", words.engine_online, words.engine_online_says, false),
+    card("focus", "globe", words.engine_online_kind, words.engine_online_says, false));
+  return box;
+}
+
+// D120 2b's progress: a summary being written, about three minutes left, its cancel; heard, then writing.
+function galleryProgress(words) {
+  const made = element("div", "progress");
+  made.dataset.component = "progress";
+  made.dataset.state = "running";
+  const label = element("div", "label");
+  const cancel = element("button", "button ghost", words.making_cancel);
+  cancel.type = "button";
+  label.append(icon("file-text"), element("b", "", words.minutes_making), element("span", "left", fill(words.making_left, 3)), cancel);
+  const bars = element("div", "bars");
+  for (const [name, now] of [[words.transcript, 100], [words.minutes_making, 38]]) {
+    const bar = element("div", "bar");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", name);
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-valuenow", String(now));
+    const done = element("i");
+    done.style.width = `${now}%`;
+    bar.append(done);
+    bars.append(bar);
+  }
+  made.append(label, bars);
+  return made;
 }
 
 // The engine cards as D122 draws them (`engines.js`), from invented offers: their four states, and three groups

@@ -18,9 +18,10 @@ function engineCard(job, group, { engine, value, name, at, state, said, facts, m
   radio.value = value;
   radio.checked = checked;
   label.append(radio, element("span", "name", name));
-  if (mark) label.append(element("span", "default", mark));
+  // « Par défaut » and the state are D120's chips: the default in the accent, ready a success, a key missing a warning.
+  if (mark) label.append(element("span", "default chip accent", mark));
   label.append(element("span", "where", said.where ?? (at === "online" ? said.online : said.here)));
-  label.append(element("span", "state", said.state));
+  label.append(element("span", `state chip ${{ ready: "success", key: "warning" }[state] ?? "neutral"}`, said.state));
   if (facts) label.append(element("span", "facts", facts));
   const more = element("details");
   more.append(element("summary", "", said.details), ...details.filter(Boolean).map((line) => element("p", "detail", line)));

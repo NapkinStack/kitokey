@@ -1410,7 +1410,16 @@ fn read_outside_the_roles(style: &str) -> Vec<String> {
 
 #[test]
 fn a_component_reads_roles_and_scales_alone() {
-    for drawn in [".button", ".banner", ".dialog", ".engine-card", ".chip", ".option-card", ".progress", ".toast"] {
+    for drawn in [
+        ".button",
+        ".banner",
+        ".dialog",
+        ".engine-card",
+        ".chip",
+        ".option-card",
+        ".progress",
+        ".toast",
+    ] {
         assert!(
             rules(COMPONENTS).iter().any(|(selector, _)| selector.starts_with(drawn)),
             "{drawn} is not drawn"
@@ -1439,16 +1448,18 @@ fn a_components_red_is_a_recording_or_a_deletion() {
     assert_eq!(found, Vec::<String>::new());
 }
 
-/// The rules whose selector list names `one`, an `:is(…)` read as the list it holds: each body, in order.
+/// The rules whose selector list names `one`, an `:is(…)` read as the list it holds: each body, in order. A rule
+/// inside `@media` holds only when its query does: it is left out.
 fn bodies_of(style: &str, one: &str) -> Vec<String> {
     rules(style)
         .into_iter()
         .filter(|(selectors, _)| {
-            selectors
-                .replace(":is(", "")
-                .replace(')', "")
-                .split(',')
-                .any(|part| part.trim() == one)
+            !selectors.contains('@')
+                && selectors
+                    .replace(":is(", "")
+                    .replace(')', "")
+                    .split(',')
+                    .any(|part| part.trim() == one)
         })
         .map(|(_, body)| body)
         .collect()
@@ -1491,10 +1502,19 @@ fn a_chip_says_its_tone_and_its_words_read_on_it() {
         }
     }
     assert_eq!(below, Vec::<String>::new());
-    assert_eq!(given(COMPONENTS, ".chip.success", "background").as_deref(), Some("var(--color-success-ground)"));
-    assert_eq!(given(COMPONENTS, ".chip.warning", "background").as_deref(), Some("var(--color-warning-ground)"));
+    assert_eq!(
+        given(COMPONENTS, ".chip.success", "background").as_deref(),
+        Some("var(--color-success-ground)")
+    );
+    assert_eq!(
+        given(COMPONENTS, ".chip.warning", "background").as_deref(),
+        Some("var(--color-warning-ground)")
+    );
     // The older chips are not the design system's: no rule of components.css names `.chip` alone.
-    assert!(bodies_of(COMPONENTS, ".chip").is_empty(), "components.css restyles the window's older chips");
+    assert!(
+        bodies_of(COMPONENTS, ".chip").is_empty(),
+        "components.css restyles the window's older chips"
+    );
 }
 
 /// D120 2b, after v5's `.ico`: a button's icon and a banner's drawn at a 1.75 stroke; window.css's `.glyph` stays at 2
@@ -1525,9 +1545,18 @@ fn an_icon_is_drawn_at_its_stroke_a_press_sinks_a_card_is_edged() {
 #[test]
 fn a_dialog_and_a_toast_pop_and_not_for_who_asked_for_less_motion() {
     let style = without_css_comments(COMPONENTS);
-    assert_eq!(given(COMPONENTS, ".dialog", "animation").as_deref(), Some("pop var(--d-slow) var(--ease-out)"));
-    assert_eq!(given(COMPONENTS, ".toast", "animation").as_deref(), Some("pop var(--d-base) var(--ease-out)"));
-    assert!(style.contains("@keyframes pop { from { transform: scale(.98); opacity: 0; } }"), "the pop");
+    assert_eq!(
+        given(COMPONENTS, ".dialog", "animation").as_deref(),
+        Some("pop var(--d-slow) var(--ease-out)")
+    );
+    assert_eq!(
+        given(COMPONENTS, ".toast", "animation").as_deref(),
+        Some("pop var(--d-base) var(--ease-out)")
+    );
+    assert!(
+        style.contains("@keyframes pop { from { transform: scale(.98); opacity: 0; } }"),
+        "the pop"
+    );
     assert!(
         style.contains("@media (prefers-reduced-motion: reduce) { .dialog, .toast { animation: none; } }"),
         "less motion"
