@@ -6,12 +6,15 @@ import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
+import "../styles/walk.css";
 // Each system by its owner's own mark, unaltered (BRANDS.md); Apple's white one on the dark theme.
 const MARKS = { linux: "tux.svg", windows: "windows-logo-2021.svg", apple: "apple-logo-black.svg" };
 
 const { lang } = Astro.props;
 const t = (key) => w[key][lang];
-const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const [howId, privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
+const wk = t("walk");
+const wTitles = wk.tabs.map(([title]) => title);
 const [h1a, h1b, lead] = t("hero");
 const [buyLine, storeSoon, linuxFree, macSoon] = t("buy");
 const [sceneAlt, callTitle, you, when, confidential, mTitle, mMeta, mProv, mHigh, mText, mActs, acts] = t("scene");
@@ -31,6 +34,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
   <script slot="head" src="/site.js" defer is:inline></script>
   <script slot="head" src="/hero.js" defer is:inline></script>
+  <script slot="head" src="/walk.js" defer is:inline></script>
   <Icons />
   <section class="hero" aria-labelledby="h1">
     <canvas class="voices" aria-hidden="true"></canvas>
@@ -74,6 +78,75 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           <p class="mh">{mActs}</p>
           {acts.map(([who, what, day]) => <div class="act-row"><span class="who">{who}</span><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}
         </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="walk-band" id={howId} aria-labelledby={`${howId}-h`}>
+    <div class="wrap">
+      <div class="sh"><p class="kicker">{wk.kicker}</p><h2 id={`${howId}-h`}>{wk.h}</h2></div>
+      <div class="walk" id="walk">
+        <div class="wsteps" role="tablist" aria-label={wk.steps}>
+          {wk.tabs.map(([title, said], i) => (
+            <button type="button" class={i === 1 ? "wtab priv" : "wtab"} role="tab" id={`wtab-${i + 1}`} aria-selected={i === 0 ? "true" : "false"} aria-controls="wstage" tabindex={i === 0 ? "0" : "-1"}><span class="wn">{i + 1}</span><b>{title}</b><span class="d">{said}</span><span class="pg"><i></i></span></button>
+          ))}
+        </div>
+        <div class="wstage" id="wstage" role="tabpanel" data-step="1" aria-labelledby="wtab-1">
+          <p class="sr-only w-said">{wk.tabs[0][1]}</p>
+          <div class="w-bar cbar sm" aria-hidden="true">
+            <span class="rec"></span><span class="tm num" id="wtime">00:00:00</span>
+            <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span>
+            <span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span>
+            <span class="lockt"><Fragment set:html={ico("unlock", "ico i-off")} /><Fragment set:html={ico("lock", "ico i-on")} /></span>
+            <span class="stop"><i></i></span>
+          </div>
+          <span class="w-lockchip chip chip-private" aria-hidden="true"><Fragment set:html={ico("lock")} />{wk.lockOn}</span>
+          <div class="w-cloud" aria-hidden="true"><b>{wk.cloud[0]}</b><span>{wk.cloud[1]}</span></div>
+          {wk.lanes.map(([who, from], i) => <div class={`w-lane ${i ? "ot" : "me"}`} aria-hidden="true"><div class="lh"><Fragment set:html={ico(i ? "speaker" : "mic")} />{who} <small>{from}</small></div><div class="lane" data-lane={i ? "ot" : "me"}></div></div>)}
+          <svg class="w-flow" aria-hidden="true"><path class="f-me" d="M300 194 C320 194 322 210 340 214" /><path class="f-ot" d="M300 312 C320 312 322 236 340 232" /></svg>
+          <p class="w-note" aria-hidden="true"><Fragment set:html={ico("check")} />{wk.note}</p>
+          <div class="w-ban2" aria-hidden="true"><Fragment set:html={ico("lock")} /><span>{wk.banner}</span></div>
+          <div class="w-call" aria-hidden="true">
+            <div class="callwin"><div class="cb">{t("scene")[1]}</div><div class="cg">
+              {[["Camille", "ot", "c"], ["Hugo", "ot", "h"], ["Léa", "ot", "l"], [t("scene")[2], "me", "s"]].map(([name, who, letter]) => (
+                <div class="ct" data-who={who}><span>{name}</span><div class={`av av-${letter}`}>{letter.toUpperCase()}</div></div>
+              ))}
+            </div></div>
+          </div>
+          <article class="w-page" aria-hidden="true">
+            <div class="hdr"><span class="num">{t("scene")[3]}</span><span class="chip chip-private"><Fragment set:html={ico("lock")} />{t("scene")[4]}</span></div>
+            <div class="ttl">{t("scene")[5]}</div>
+            <div class="meta">{wk.meta}</div>
+            <div class="acts"><span class="share">{wk.share}</span><span class="sp"></span><span class="privpill"><Fragment set:html={ico("lock")} />{t("scene")[4]}<span class="sw"></span></span></div>
+            <div class="tabs"><span class="tab t-min">{wk.tabsPage[0]}</span><span class="tab t-tr">{wk.tabsPage[1]}</span></div>
+            <div class="w-body">
+              <div class="w-tr">{wk.lines.map(([time, side, said]) => <div class="w-trl"><span class="t">{time}</span><span><b class={side ? "by-ot" : "by-me"}>{wk.lanes[side][0]}</b>{said}</span></div>)}</div>
+              <div class="w-min">
+                <div class="w-prog"><div class="lb"><b>{wk.writing[0]}</b><small>{wk.writing[1]}</small></div><div class="bar"><i></i></div></div>
+                <div class="prov reveal-in">{t("scene")[7]}</div>
+                <p class="mh reveal-in">{t("scene")[8]}</p>
+                <p class="reveal-in">{wk.text}</p>
+                <p class="mh reveal-in">{t("scene")[10]}</p>
+                {t("scene")[11].slice(0, 2).map(([who, what, day]) => <div class="act-row reveal-in"><span class="who">{who}</span><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+      <div class="flow">
+        {wTitles.map((title, i) => (
+          <article class={i === 1 ? "step priv" : "step"}>
+            <div class="stage" aria-hidden="true">
+              {i === 0 && <div class="cbar sm"><span class="rec"></span><span class="tm num">00:00:12</span><span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="10"></span></span><span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="10"></span></span><span class="stop"><i></i></span></div>}
+              {i === 1 && <><span class="privpill on"><Fragment set:html={ico("lock")} />{t("scene")[4]}<span class="sw"></span></span><div class="pbanner"><Fragment set:html={ico("lock")} /><span>{wk.banner}</span></div></>}
+              {i === 2 && <div class="mini"><div class="mini-h">{wk.tabsPage[1]}</div>{wk.lines.slice(0, 2).map(([time, side, said]) => <div class="mini-l"><span class="t">{time}</span><span><b class={side ? "by-ot" : "by-me"}>{wk.lanes[side][0]}</b>{said}</span></div>)}</div>}
+              {i === 3 && <div class="mini"><div class="mini-h">{wk.tabsPage[0]}</div><div class="mini-p">{wk.mini[0]}</div>{wk.mini[1].map(([who, what, day]) => <div class="mini-act"><b>{who}</b><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}</div>}
+            </div>
+            <p class="n">{i + 1}</p>
+            <h3>{i === 1 && <Fragment set:html={ico("lock")} />}{title}</h3>
+            <p>{wk.cards[i]}</p>
+          </article>
+        ))}
       </div>
     </div>
   </section>
