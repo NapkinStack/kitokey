@@ -6348,10 +6348,14 @@ def gallery_shown(now: dt.datetime) -> None:
             for group in ("#gallery .option-cards input:checked", "#gallery .engine-cards input:checked"):
                 browser.execute_script("document.querySelector(arguments[0]).focus()", group)
                 before = browser.execute_script(ringed)
-                sent = real_keys("ff53")
+                # → from any radio but the last, ← from the last: WebKitGTK's arrows stop at a group's ends.
+                last = browser.execute_script(
+                    "const a = document.activeElement, g = a.closest('.engine-cards, .option-cards'); return !!g && [...g.querySelectorAll('input[type=radio]')].at(-1) === a")
+                there, back = ("ff51", "ff53") if last else ("ff53", "ff51")
+                sent = real_keys(there)
                 arrowed.append([sent, before, browser.execute_script(ringed)])
-                real_keys("ff51")
-            check(f"{short}, {theme}: a card's radio reached by → shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
+                real_keys(back)
+            check(f"{short}, {theme}: a card's radio reached by an arrow shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
                   all(sent and before and got and got[0] != before[0] and got[1] and got[2] == "solid" and got[3] >= 2
                       for sent, before, got in arrowed), arrowed)
             found = axe_violations(browser)
