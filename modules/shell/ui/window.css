@@ -361,6 +361,8 @@ body.small-window .frame { display: none; }
 #small .bar-row .icon-button { width: 32px; min-height: 32px; }
 /* The row's buttons keep their 32 px: the meters give way where the row is full. */
 #small .bar-row button { flex: none; }
+/* No focus ring in the row until the keyboard is used (D125): `keyed`, set by a key, taken away by the pointer. */
+#small:not(.keyed) .bar-row button:focus-visible { outline: none; }
 #small .bar-lock[aria-pressed="true"] { color: var(--ok); }
 #small .bar-lock .lock { color: inherit; }
 /* The row's items spaced by its gap alone (Round 4): the separator, the handle and the meters keep no margin of their own. */

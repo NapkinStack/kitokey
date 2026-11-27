@@ -5242,6 +5242,10 @@ function showSmall(words) {
   };
   const fits = new ResizeObserver(fit);
   fits.observe(page);
+  // The row's focus ringed once the keyboard is used, never before it nor after the pointer (D125): WebKit rings a
+  // focus the bar gives by script — ● at its opening, ■ after ● — as if a key had been pressed.
+  document.addEventListener("keydown", () => page.classList.add("keyed"), true);
+  document.addEventListener("pointerdown", () => page.classList.remove("keyed"), true);
   const toFull = iconButton("maximize-2", words.small_full, "small-full");
   toFull.addEventListener("click", () => full());
   const handle = element("span", "handle");
