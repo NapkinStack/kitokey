@@ -13512,6 +13512,16 @@ def pages_seen(now: dt.datetime) -> None:
                         whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].split("/") if p)
                         check(f"{theme}, {width} px: the meetings' folder heard whole by a screen reader, its whole path its description (#1232)",
                               folder["heard"] == whole_said and folder["hidden"], [folder["heard"], whole_said, folder["hidden"]])
+                    if page == "meeting":
+                        # The bar never squeezes the name (the coordinator's audit of #1301 against v5): at any width, the
+                        # meeting's name on two lines at most and its date on one, as main drew them before the bar.
+                        lines = browser.execute_script(
+                            "const lines = (e) => { if (!e) return null; const r = document.createRange(); r.selectNodeContents(e);"
+                            " return new Set([...r.getClientRects()].filter((b) => b.width > 0).map((b) => Math.round(b.top))).size; };"
+                            "const head = document.querySelector('#meeting .meeting-head');"
+                            "return {name: lines(head.querySelector('h1')), date: lines(head.querySelector('.on'))}")
+                        check(f"{theme}, {width} px: the meeting's name on two lines at most, its date on one, the bar beside or under them",
+                              lines["name"] is not None and lines["name"] <= 2 and lines["date"] == 1, lines)
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
 
 
