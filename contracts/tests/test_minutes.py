@@ -160,3 +160,15 @@ def test_the_six_structures_name_their_sections_and_where_actions_are():
         "interview": ["background", "answers", "questions", "next_steps"],
         "project_review": ["status", "risks", "decisions", "actions"],
     }
+
+
+def test_about_is_english_for_the_six_structures_and_the_persons_words_for_a_format_they_made():
+    """D129: a format a person made keeps its `about` as they wrote it, in their language; a reader shows it."""
+    page = " ".join(PAGE.read_text().split())
+    row = page.split("| `sections` |", 1)[1].split(" | `actions` |", 1)[0]
+    assert "in English for the six structures below" in row
+    assert "for a format a person made (`summarising/v1`'s `--format`), in the person's own words" in row
+    assert "in English, as the producer asked it of the model" not in row
+    keys, _ = front_matter(example())
+    french = swapped(example(), keys["sections"][0]["about"], "Ce qui a été décidé, et pourquoi.")
+    assert refusal(french) is None
