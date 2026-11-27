@@ -78,7 +78,7 @@ test("the Markdown folder is never said to hold every summary: confidential meet
 test("#still in the address keeps every group in place, for a capture", async () => {
   const js = await readFile(join(dist, "site.js"), "utf8");
   assert.match(js, /location\.hash !== "#still"/);
-  assert.match(js, /querySelectorAll\("\.reveal, \.rise"\)/);
+  assert.match(js, /querySelectorAll\("\.rise"\)/);
 });
 
 // As for the hero and the walkthrough: the old page's rules reach these sections only by the classes named here,

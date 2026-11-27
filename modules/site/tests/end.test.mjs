@@ -76,7 +76,8 @@ const SHARED = { wrap: "the page's container", ico: "a pictogram's box", "sr-onl
 
 test("the end takes no style of the old page by a class they share, but the ones named", async () => {
   const source = await readFile(new URL("../src/components/Landing.astro", import.meta.url), "utf8");
-  const parts = [...source.matchAll(/<section class="end[\s\S]*?<\/section>/g)].map((m) => m[0]).join("\n");
+  // The install section is site.css's, its commands' block styled there.
+  const parts = [...source.matchAll(/<section class="end[\s\S]*?<\/section>/g)].map((m) => m[0]).filter((p) => !p.includes("id={installId}")).join("\n");
   const classes = new Set([...parts.matchAll(/class=\{?["`]([^"`]+)["`]/g)].flatMap((m) => m[1].replace(/\$\{[^}]*\}/g, "").split(/\s+/)).filter(Boolean));
   for (const name of ["ico", "chev"]) classes.add(name);
   const css = (await readFile(new URL("../src/styles/site.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");

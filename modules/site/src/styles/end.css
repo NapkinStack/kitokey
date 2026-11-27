@@ -7,6 +7,7 @@
 .end h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.1vw, 42px); line-height: 1.1; letter-spacing: -.02em; margin: 0; }
 .end h3 { font-family: var(--display); font-weight: 700; margin: 0; }
 .end p { margin: 0; }
+.end .sh .sub { font-size: 18px; color: var(--text-secondary); margin-top: var(--sp-4); }
 .end .ico { width: 20px; height: 20px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .end .tile { width: 44px; height: 44px; border-radius: var(--r-md); display: grid; place-items: center; background: var(--bg-tint); color: var(--accent); flex: none; }
 .end .tile .ico { width: 20px; height: 20px; }

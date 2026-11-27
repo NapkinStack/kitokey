@@ -115,6 +115,12 @@ html[data-site="dark"] .callwin { outline: 1px solid rgb(255 255 255/.1); }
 .act-row .chip { height: 22px; font-size: 12px; padding: 0 8px; gap: 4px; }
 .act-row .chip .ico, .chip .ico { width: 13px; height: 13px; }
 
+/* ---- A group rising into place as it enters (public/site.js adds .in); still under reduced motion and on #still ---- */
+html.js-reveal .rise > * { opacity: 0; transform: translateY(12px); transition: opacity .4s var(--ease-out), transform .4s var(--ease-out); }
+html.js-reveal .rise > :nth-child(2) { transition-delay: 60ms; }
+html.js-reveal .rise > :nth-child(n+3) { transition-delay: 120ms; }
+html.js-reveal .rise.in > * { opacity: 1; transform: none; }
+
 /* ---- The footer ---- */
 .foot { border-top: 1px solid var(--border-subtle); padding: 40px 0 56px; }
 .foot .wrap { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; }
