@@ -2198,10 +2198,44 @@ def first_run_screens(now: dt.datetime) -> None:
                     time.sleep(2)
                     check("(1) Ollama absent: « Auto » says it is to install, and nothing impossible is started — no model pulled",
                           auto == "install" and pulls() == pulled_before, (auto, pulls() - pulled_before))
+                # Mock-up v5's screen 1 (the coordinator's audit of #1307): its card 760 px wide on a window that has room,
+                # with its step indicator and its shadow, the page's two halos behind it; the three cards on one line;
+                # no card saying twice where it runs; « Continuer » its chevron after its words.
+                frame = browser.execute_script(
+                    "const w = document.getElementById('welcome'), c = document.getElementById('first-choice'), s = document.getElementById('first-steps');"
+                    " return {width: Math.round(c.getBoundingClientRect().width), shadow: getComputedStyle(c).boxShadow !== 'none',"
+                    " halos: ['::before', '::after'].map((p) => getComputedStyle(w, p).content !== 'none' && getComputedStyle(w, p).content !== 'normal'),"
+                    " steps: s ? [s.getAttribute('role'), s.getAttribute('aria-label'), s.children.length, [...s.children].map((i) => i.classList.contains('on'))] : null}")
+                check(f"{lang}: (1) as v5 draws it: the card 760 px wide, its shadow, the two halos behind it, its steps « 1 of 3 »",
+                      frame["width"] == 760 and frame["shadow"] and frame["halos"] == [True, True] and frame["steps"] is not None
+                      and frame["steps"][0] == "img" and (lang != "fr" or frame["steps"][1] == "Étape 1 sur 3")
+                      and frame["steps"][2:] == [3, [True, False, False]], frame)
+                placed = "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; })"
+                at = browser.execute_script(placed)
+                check(f"{lang}: (1) at the window's {browser.execute_script('return innerWidth')} px, the three cards on one line, as v5 sets them",
+                      len(at) == 3 and len({top for top, _ in at}) == 1, at)
+                twice = browser.execute_script("return [...document.querySelectorAll('#welcome .engine-card')].map((c) => [c.querySelector('.name').textContent, c.querySelector('.where')?.textContent ?? null])")
+                check(f"{lang}: (1) no card says twice where it runs: its line of place never its name again",
+                      len(twice) == 3 and all(name != where for name, where in twice), twice)
+                go = browser.execute_script("const b = document.getElementById('first-next'); return [b.textContent.trim(), !!b.lastElementChild?.matches('svg.glyph[aria-hidden=true]')]")
+                check(f"{lang}: (1) « Continuer » its chevron after its words, hidden from a screen reader (v5)",
+                      go[1] and go[0] in ("Continuer", "Continue"), go)
                 violations = axe_violations(browser)
                 check(f"{lang}: (1) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
                 for theme in ("light", "dark"):
                     shot_themed(browser, f"d126-choice-{lang}-{theme}", theme)
+                # A narrow window: one card a line, nothing wider than the window, shot in both themes.
+                wide = browser.get_window_size()
+                browser.set_window_size(420, 860)
+                time.sleep(0.5)
+                at = browser.execute_script(placed)
+                fits = browser.execute_script("const e = document.documentElement; return [innerWidth, e.scrollWidth <= e.clientWidth]")
+                check(f"{lang}: (1) at the window's {fits[0]} px, one card a line, nothing wider than the window",
+                      fits[0] <= 420 and fits[1] and len(at) == 3 and len({left for _, left in at}) == 1 and len({top for top, _ in at}) == 3, (fits, at))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-choice-{lang}-small-{theme}", theme)
+                browser.set_window_size(wide["width"], wide["height"])
+                time.sleep(0.5)
                 press(browser, "first-later")
                 ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
                                  and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
