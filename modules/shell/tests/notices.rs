@@ -104,9 +104,9 @@ fn each_licence_in_the_notices_carries_its_text() {
     }
 }
 
-/// What the window draws or ships that is no crate: Lucide's icons, Montserrat's outlines and the
-/// example meeting's voices (D126). Their licences are written into about.hbs from `ui/LUCIDE-LICENSE`,
-/// `ui/MONTSERRAT-OFL.txt` and `ui/example/LICENSE`, and must stay
+/// What the window draws or ships that is no crate: Lucide's icons, Montserrat's outlines, the example
+/// meeting's voices (D126) and the titles' face (D120). Their licences are written into about.hbs from
+/// `ui/LUCIDE-LICENSE`, `ui/MONTSERRAT-OFL.txt`, `ui/example/LICENSE` and `ui/BRICOLAGE-OFL.txt`, and must stay
 /// those files, word for word — line ends aside: a Windows checkout writes them as \r\n.
 #[test]
 fn the_notices_carry_lucides_and_montserrats_licences_as_their_files_say() {
@@ -115,6 +115,7 @@ fn the_notices_carry_lucides_and_montserrats_licences_as_their_files_say() {
         ("ui/LUCIDE-LICENSE", include_str!("../ui/LUCIDE-LICENSE")),
         ("ui/MONTSERRAT-OFL.txt", include_str!("../ui/MONTSERRAT-OFL.txt")),
         ("ui/example/LICENSE", include_str!("../ui/example/LICENSE")),
+        ("ui/BRICOLAGE-OFL.txt", include_str!("../ui/BRICOLAGE-OFL.txt")),
     ] {
         let escaped = text
             .replace("\r\n", "\n")
