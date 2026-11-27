@@ -729,7 +729,9 @@ class Window:
         greeted = "welcomed = true\n" if welcomed else ""
         self.args = list(args)
         self.file.write_text(f'sessions = "{sessions}"\n{opened}{greeted}{more}')
-        self.env = dict(os.environ, XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
+        # Its home this run's folder: every folder of the scenarios is said from it (« Dossier personnel / … »), never
+        # from the machine's root (#1297).
+        self.env = dict(os.environ, HOME=str(WORK), XDG_CONFIG_HOME=str(config), XDG_DATA_HOME=str(WORK / "data"), XDG_STATE_HOME=str(WORK / "state"), LANGUAGE="")
         # An Ollama and a keyring of the scenario's, never the user's own.
         self.env.update(LANG=language, LC_ALL=language, KITOKEY_OLLAMA=ollama, KITOKEY_KEYRING="memory", KITOKEY_SUMMARY=str(SUMMARY), KITOKEY_EXPORT=str(EXPORTER), KITOKEY_TRANSCRIPTION=str(HEARING), KITOKEY_CAPTURE=str(RECORDER), KITOKEY_SEND=str(SENDER), KITOKEY_BROWSER=str(BROWSER))
 
@@ -13466,7 +13468,7 @@ def pages_seen(now: dt.datetime) -> None:
                               and folder["last"][0] == folder["value"].rstrip("/").rsplit("/", 1)[-1] and folder["last"][1] and folder["last"][2]
                               and folder["tip"] == folder["value"] and not folder["none"], folder)
                         # Heard whole (ines, #1232): its name what it shows (WCAG 2.5.3), its description every folder, as people say it.
-                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].split("/") if p)
+                        whole_said = ("/ " if folder["value"].startswith("/") else "") + " / ".join(p for p in folder["value"].replace("~", "Dossier personnel", 1).split("/") if p)
                         check(f"{theme}, {width} px: the meetings' folder heard whole by a screen reader, its whole path its description (#1232)",
                               folder["heard"] == whole_said and folder["hidden"], [folder["heard"], whole_said, folder["hidden"]])
                     shot_themed(browser, f"d89-{page}-{width}-{theme}", theme)
@@ -14982,8 +14984,8 @@ def main() -> int:
             elsewhere = WORK / "elsewhere" / "Kitokey"
             # Its name as heard, the whole path (#1232); what is drawn may be cut in its middle.
             spoken = browser.execute_script("return document.getElementById('sessions-shown-path')?.textContent ?? null")
-            # Outside the home folder, from the root: / tmp / … / chosen.
-            check("the sessions' folder is shown as people say it", spoken == "/ " + " / ".join(chosen.parts[1:]), spoken)
+            # In the home folder, from it: its word, then the folder.
+            check("the sessions' folder is shown as people say it", spoken == "Dossier personnel / chosen", spoken)
 
             def folder_field():
                 # A click on the folder as said makes it a path to type.
