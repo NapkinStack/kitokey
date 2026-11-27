@@ -172,3 +172,23 @@ test("the formats' scene: its switches edged at 3:1 at least against their groun
     }
   });
 });
+
+test("no compound word breaks between two lines, at 1440 and 420 px, in both languages", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const width of [1440, 420]) {
+        const page = await browser.newPage({ colorScheme: "light", viewport: { width, height: 900 } });
+        await page.goto(`${origin}/${lang}/#still`, { waitUntil: "networkidle" });
+        await page.evaluate(() => document.fonts.ready);
+        const split = await page.evaluate(() => [...document.querySelectorAll(".nb")]
+          .filter((w) => w.getClientRects().length > 1).map((w) => w.textContent));
+        const count = await page.evaluate(() => document.querySelectorAll(".nb").length);
+        if (count === 0) found.push([lang, width, "no .nb at all"]);
+        for (const word of split) found.push([lang, width, word]);
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
