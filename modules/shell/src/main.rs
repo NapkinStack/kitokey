@@ -345,6 +345,12 @@ fn main() {
     // What the shell does is logged — never what was said — in the user's state folder (ADR-0007).
     let _run = log::start("shell");
     tracing::info!("shell.started");
+    // What the bar kept for the next recording before D125, never read again: removed, said once.
+    if let Some(folder) = settings::file().as_deref().and_then(Path::parent) {
+        for name in settings::leftovers_removed(folder) {
+            tracing::info!(file = name, "shell.leftover_removed");
+        }
+    }
     let app = tauri::Builder::default()
         // One Kitokey per session: a second start hands its arguments over and leaves — from
         // the applications' menu (`--window`) its window opens; started again with the session,

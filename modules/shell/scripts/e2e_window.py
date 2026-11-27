@@ -13829,11 +13829,13 @@ def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:
     meetings.mkdir()
     window = Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)
     # A choice for the next meeting kept by a Kitokey before D125, beside the settings as it kept them:
-    # never read again, so never applied to a recording without being shown (lina's point on #1299).
+    # removed at start, never read, so never applied to a recording without being shown (lina's point on #1299).
     (window.file.parent / "next-models.json").write_text(json.dumps({"minutes": {"provider": "http://127.0.0.1:9/v1", "model": "stale:1b"}}))
     (window.file.parent / "next-language.txt").write_text("de\n")
     with window as browser:
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
+        left = [name for name in ("next-models.json", "next-language.txt") if (window.file.parent / name).exists()]
+        check("started: the bar's next choices an earlier Kitokey kept are removed, nothing left behind", left == [], left)
         browser.execute_script("document.getElementById('small-more').click()")
         wait_for(browser, opened, 3)
         time.sleep(1)
