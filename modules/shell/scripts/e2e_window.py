@@ -2402,6 +2402,21 @@ def first_run_ready(now: dt.datetime) -> None:
                 said = browser.execute_script(pane)
                 check(f"{short}: started again, welcomed: the empty pane is the ordinary one, « Record » not said ready",
                       drawn and said[0] != texts[0] and said[2] != texts[2], said)
+    # « Service en ligne », then « Continuer »: Settings, at the services, where its key is asked; back from them, the
+    # first run ends on screen (3) all the same (lina's reading of #1307).
+    online = WORK / "ready-online"
+    online.mkdir()
+    window = Window(online, "fr_FR.UTF-8", small=True, welcomed=False, args=())
+    window.env.update(XDG_DATA_HOME=str(WORK / "data-ready-online"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+    with window as browser:
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#welcome .engine-card[data-engine=online] input"), 10)
+        browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
+        press(browser, "first-next")
+        at_settings = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/settings", 10)
+        browser.execute_script("location.hash = '#/'")
+        ready = wait_for(browser, lambda b: (b.execute_script(pane) or [None])[0] == "Prêt. Enregistrez votre premier appel.", 10)
+        check("« Service en ligne », then « Continuer »: Settings, at the services; back from them, screen (3) says ready",
+              at_settings and ready, [browser.execute_script("return location.hash"), browser.execute_script(pane)])
 
 
 def first_run(now: dt.datetime) -> None:
