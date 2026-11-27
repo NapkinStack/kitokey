@@ -56,20 +56,31 @@ fn a_format_made_is_kept_under_a_name_of_its_own_offered_after_the_built_in() {
 fn a_format_is_refused_outside_minutes_v5_s_bounds() {
     let mut formats = Formats::default();
     let long = "é".repeat(201);
+    let long_name = "x".repeat(41);
     let cases: Vec<(&str, Vec<Section>, Option<usize>, Refused)> = vec![
         ("", weekly(), None, Refused::Name),
         ("   ", weekly(), None, Refused::Name),
         ("a\nb", weekly(), None, Refused::Name),
-        (&"x".repeat(41), weekly(), None, Refused::Name),
+        (&long_name, weekly(), None, Refused::Name),
         ("Vide", vec![], None, Refused::Sections),
-        ("Sept", (0..7).map(|n| section(&format!("S{n}"), "x")).collect(), None, Refused::Sections),
+        (
+            "Sept",
+            (0..7).map(|n| section(&format!("S{n}"), "x")).collect(),
+            None,
+            Refused::Sections,
+        ),
         ("Sans titre", vec![section(" ", "x")], None, Refused::Section(0)),
         ("Titre long", vec![section(&"t".repeat(41), "x")], None, Refused::Section(0)),
         ("Sans contenu", vec![section("A", "x"), section("B", "")], None, Refused::Section(1)),
         ("Deux lignes", vec![section("A", "x\ny")], None, Refused::Section(0)),
         ("Trop long", vec![section("A", &long)], None, Refused::Section(0)),
         // Two titles that would be one section's id.
-        ("Deux fois", vec![section("Suites", "x"), section("suites", "y")], None, Refused::Section(1)),
+        (
+            "Deux fois",
+            vec![section("Suites", "x"), section("suites", "y")],
+            None,
+            Refused::Section(1),
+        ),
         ("Actions", weekly(), Some(3), Refused::Actions),
     ];
     for (name, sections, actions, why) in cases {
