@@ -217,6 +217,15 @@ fn the_input_names_known_parts_once_each_and_the_dates_a_title_when_they_are_sen
             json!({"dates": [{"id": "A 1", "date": "2026-11-27", "what": "x"}]}),
             "an id out of its shape",
         ),
+        // One past input.schema.json's bounds, the id's 64 characters and the day's digits (sam's P6 on #1322).
+        (
+            json!({"dates": [{"id": "a".repeat(65), "date": "2026-11-27", "what": "x"}]}),
+            "an id of 65 characters",
+        ),
+        (
+            json!({"dates": [{"id": "a1", "date": "2026-ab-27", "what": "x"}]}),
+            "a day of letters",
+        ),
         (json!({"dates": [{"date": "2026-11-27", "what": "x"}]}), "no id"),
         (json!({"dates": [{"id": "a1", "date": "2026-11-27", "what": ""}]}), "no what"),
         (
