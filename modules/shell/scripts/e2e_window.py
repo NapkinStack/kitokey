@@ -6580,6 +6580,10 @@ def gallery_shown(now: dt.datetime) -> None:
             wanted = [f"{component}:{state}" for component, states in GALLERY.items() for state in states]
             check(f"{short}, {theme}: each component in each of its states", all(one in shown for one in wanted),
                   sorted(set(wanted) - set(shown)))
+            # A banner of the components is its own: window.css's `.banner` (#770's strip) gives it no margin.
+            insets = browser.execute_script("return [...document.querySelectorAll('#gallery .banner')].map((b) =>"
+                                            " Math.round(b.getBoundingClientRect().left - b.closest('.gallery-part').querySelector('h2').getBoundingClientRect().left))")
+            check(f"{short}, {theme}: each banner aligned on its section's title", insets and set(insets) == {0}, insets)
             heights = browser.execute_script("return [...document.querySelectorAll('#gallery .button')].filter((e) => e.getClientRects().length)"
                                              ".map((e) => Math.round(e.getBoundingClientRect().height))")
             check(f"{short}, {theme}: each button 32 px high (D89)", heights and set(heights) == {32}, heights)
@@ -6624,7 +6628,12 @@ def gallery_shown(now: dt.datetime) -> None:
                 time.sleep(0.3)
                 wide = browser.execute_script("return document.documentElement.scrollWidth <= innerWidth")
                 check(f"{short}, {theme}: at {width} px nothing overflows", wide, browser.execute_script("return [document.documentElement.scrollWidth, innerWidth]"))
-                shot(browser, f"ct-gallery-{width}-{short}-{theme}")
+                # Each section brought to the top, one screenshot each: the window shows a part of the gallery at once.
+                parts = browser.execute_script("return document.querySelectorAll('#gallery .gallery-part').length")
+                for part in range(parts):
+                    browser.execute_script("document.querySelectorAll('#gallery .gallery-part')[arguments[0]].scrollIntoView({block: 'start'})", part)
+                    time.sleep(0.2)
+                    shot(browser, f"ct-gallery-{part + 1}-{width}-{short}-{theme}")
 
 
 # What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
