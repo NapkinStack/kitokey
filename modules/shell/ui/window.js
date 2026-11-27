@@ -1129,6 +1129,9 @@ function paintRefused(refused) {
   buy.hidden = !refused;
 }
 
+// A first run just ended (D126): its third screen is the empty window, said ready, until a meeting is there.
+let firstRunEnded = false;
+
 function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
@@ -1171,12 +1174,16 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   const weight = document.getElementById("weight");
   weight.hidden = sessions.length === 0;
   // A folder that cannot be read is no empty list: said, and tried again (D67).
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : words.none;
+  // Once a meeting is there, the first run is over for good: removed again, the window says its ordinary words.
+  if (sessions.length > 0) firstRunEnded = false;
+  const ready = firstRunEnded && !unreadable && sessions.length === 0;
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : ready ? words.ready_title : words.none;
   // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
   document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
   document.getElementById("empty-folder").hidden = unreadable;
-  document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : words.none_do;
-  document.getElementById("empty-record").textContent = words.record_start;
+  document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : ready ? words.ready_says : words.none_do;
+  // Its style stays the pane's: the sidebar's « Démarrer un enregistrement » is the window's one primary action.
+  document.getElementById("empty-record").textContent = ready ? words.ready_record : words.record_start;
   document.getElementById("empty-record").hidden = recording || unreadable;
   // The example a newcomer tries (D126); its voices' licence is in the package's notices.
   document.getElementById("empty-example").textContent = words.example_try;
@@ -6189,6 +6196,8 @@ async function showWelcome(again, words) {
     }
   };
   const done = (hash = "#/") => {
+    // A first run's assistant answered: its third screen, the meetings' empty window said ready (D126).
+    if (!again && hash === "#/") firstRunEnded = true;
     location.hash = hash;
   };
 
