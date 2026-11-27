@@ -2176,6 +2176,9 @@ def first_run_screens(now: dt.datetime) -> None:
             with window as browser:
                 drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
                 got = browser.execute_script(cards)
+                # Where a screen reader starts: the screen's heading, focused when it is drawn (lina's reading of #1307).
+                focused = browser.execute_script("const a = document.activeElement; return [a.id, a.tagName, a.textContent.trim()]")
+                check(f"{lang}: (1) drawn, the focus on its heading", focused[0] == "welcome-heading" and focused[1] == "H1", focused)
                 if lang == "fr":
                     check("started without --window, not welcomed, no meeting: the full window opens on the assistant",
                           drawn and not browser.find_elements(By.ID, "small-record"), browser.execute_script(welcome))
@@ -2217,6 +2220,17 @@ def first_run_screens(now: dt.datetime) -> None:
                         browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
                         halo[theme] = browser.execute_script("const w = document.getElementById('welcome'); return ['::before', '::after'].map((p) => getComputedStyle(w, p).opacity)")
                     browser.execute_script("document.documentElement.style.cssText = ''")
+                    # Each step's mark at 3:1 at least on the card, as WCAG 2.2 SC 1.4.11 asks of what a graphic says (lina, #1307):
+                    # v5's inactive marks, --bg-sunken on the card, are at 1.1:1.
+                    marks, rgb = {}, lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        read = browser.execute_script("const c = document.getElementById('first-choice'); return [getComputedStyle(c).backgroundColor,"
+                                                      " [...document.querySelectorAll('#first-steps > i')].map((i) => getComputedStyle(i).backgroundColor)]")
+                        marks[theme] = [round(contrast(rgb(m), rgb(read[0])), 2) for m in read[1]]
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    check("(1) each step's mark, done or to come, at 3:1 at least on the card, light and dark (WCAG 2.2 SC 1.4.11)",
+                          all(len(v) == 3 and min(v) >= 3.0 for v in marks.values()), marks)
                     check("(1) the halos dimmed as v5 dims them, 0.25 in light and 0.12 in dark, each theme its token",
                           halo == {"light": ["0.25", "0.25"], "dark": ["0.12", "0.12"]}, halo)
                 placed = "return [...document.querySelectorAll('#welcome .engine-card')].map((c) => { const r = c.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left)]; })"
