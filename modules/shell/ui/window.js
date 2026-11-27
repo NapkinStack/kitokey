@@ -1177,9 +1177,9 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
   // Once a meeting is there, the first run is over for good: removed again, the window says its ordinary words.
   if (sessions.length > 0) firstRunEnded = false;
   const ready = firstRunEnded && !unreadable && sessions.length === 0;
-  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folder) : ready ? words.ready_title : words.none;
+  document.getElementById("none").textContent = unreadable ? fill(words.list_unread, folderSaid(folder, words)) : ready ? words.ready_title : words.none;
   // Where Kitokey looks, said under the action, never in the sentence (#775): a path is no title.
-  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folder);
+  document.getElementById("empty-folder").textContent = unreadable ? "" : fill(words.none_folder, folderSaid(folder, words));
   document.getElementById("empty-folder").hidden = unreadable;
   document.getElementById("none-do").textContent = unreadable ? words.list_unread_do : ready ? words.ready_says : words.none_do;
   // Its style stays the pane's: the sidebar's « Démarrer un enregistrement » is the window's one primary action.
@@ -2076,6 +2076,12 @@ function modelOnPage(page, words, step, version, go, doing, fallback, box = go) 
 
 // A folder as the desktop's choosers show one (#1232): its icon, then its path on one line — the folders before its
 // own cut with « … » when the line is short, its own name always whole —, the whole path its tooltip.
+// A folder as people say it (#1232): from their home, « Dossier personnel / Kitokey », or from the root, « / mnt / … ».
+function folderSaid(path, words) {
+  const said = path.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
+  return path.startsWith("/") ? `/ ${said}` : said;
+}
+
 function pathShown(said, whole, id) {
   const shown = element("button", "path");
   shown.id = id;
@@ -4740,8 +4746,7 @@ function showSettings(shown, minutes, words) {
   path.spellcheck = false;
   path.hidden = true;
   // Shown as the board says it — Dossier personnel / Kitokey —; a click makes it a path to type.
-  const said = shown.sessions_said.replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
-  const folderShown = pathShown(shown.sessions_said.startsWith("/") ? `/ ${said}` : said, shown.sessions_said, "sessions-shown");
+  const folderShown = pathShown(folderSaid(shown.sessions_said, words), shown.sessions_said, "sessions-shown");
   folderShown.type = "button";
   whereSaid.id = "sessions-label";
   folderShown.setAttribute("aria-labelledby", "sessions-label sessions-shown");
@@ -4783,10 +4788,9 @@ function showSettings(shown, minutes, words) {
   exportPath.disabled = locked;
   exportPath.spellcheck = false;
   exportPath.hidden = true;
-  const exportAs = (shown.export_said ?? "").replace(/^~(?=\/|$)/, words.home).split("/").filter(Boolean).join(" / ");
   const exportShown =
     shown.export_said === null ? element("button", "path none", words.export_none)
-    : pathShown(shown.export_said.startsWith("/") ? `/ ${exportAs}` : exportAs, shown.export_said, "export-shown");
+    : pathShown(folderSaid(shown.export_said, words), shown.export_said, "export-shown");
   exportShown.type = "button";
   exportShown.id = "export-shown";
   exportShown.setAttribute("aria-labelledby", "export-label export-shown");
@@ -5531,106 +5535,6 @@ function showSmall(words) {
   });
   check.append(checkButton, element("span", "says", words.check_sound_says));
   rest.append(microphone, check);
-  // « Avancé » (D91), closed by default: the models of the next recording at rest — taken by it once it
-  // starts —, of the one recording while it runs. Read anew each time it opens.
-  const advanced = element("div", "small-advanced");
-  // What is drawn, and from what: drawn again only when what it offers changed, never under the user.
-  let advancedDrawn = { from: null, models: null };
-  let shownConfidential = null;
-  // Chosen at rest, « Avancé » closed: said under the row, naming them short, as the context kept is
-  // (D91); given with « Avancé » to a screen reader while it is shown.
-  const modelsKept = element("p", "says");
-  modelsKept.id = "small-models-kept";
-  modelsKept.hidden = true;
-  const keptNamed = (chosen) => {
-    const hear = chosen.transcription;
-    const named = [
-      !hear ? null : hear.engine === "whisper" ? spoken(hear.model).replace(/^Whisper /, "") : hear.engine === "service" ? hear.model : "SpeechAnalyzer",
-      chosen.minutes ? modelSaid(chosen.minutes.model) : null,
-    ].filter(Boolean);
-    return named.length === 0 ? "" : fill(named.length === 1 ? words.bar_model_kept : words.bar_models_kept, named.join(" · "));
-  };
-  // Whether models are kept for the next recording, as the shell says it — read again at each change
-  // of state and after each choice at rest, never kept apart from it.
-  let nextChosen = false;
-  const readKept = async () => {
-    const offered = await invoke("models_offered", { name: null }).catch((why) => {
-      smallSaid("models", fill(words.models_not_read, why));
-      return null;
-    });
-    nextChosen = offered !== null && Boolean(offered.chosen.transcription || offered.chosen.minutes);
-    if (offered !== null) modelsKept.textContent = keptNamed(offered.chosen);
-    paintModelsKept();
-  };
-  const paintModelsKept = () => {
-    const open = !options.hidden && advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true";
-    modelsKept.hidden = recording !== false || !nextChosen || open;
-    const toggle = advancedDrawn.models?.toggle;
-    if (toggle && modelsKept.hidden) toggle.removeAttribute("aria-describedby");
-    else if (toggle) toggle.setAttribute("aria-describedby", modelsKept.id);
-  };
-  // Each ask numbered: an answer come after a later ask's is neither drawn nor said — the later one
-  // is (#815). Ollama answering late, an older answer, come last, closed « Avancé » under the user.
-  let advancedAsked = 0;
-  // `closing`: a close's ask, made only to drop an opening's answer — the user asked nothing to be read,
-  // so its failure is never said (#1142).
-  const advancedOf = async (opened, closing = false) => {
-    const name = meeting.name;
-    const asked = ++advancedAsked;
-    const offered = await invoke("models_offered", { name }).catch((why) => {
-      if (asked === advancedAsked && !closing) smallSaid("models", fill(words.models_not_read, why));
-      return null;
-    });
-    if (offered === null || asked !== advancedAsked) return;
-    smallSaid("models", null);
-    // Asked for another meeting than the bar's now — a start or a stop meanwhile —: the later ask draws.
-    if (meeting.name !== name) return;
-    const from = JSON.stringify([name, offered]);
-    // The same: left as it is, opened when asked — never closed under the user.
-    if (from === advancedDrawn.from && advancedDrawn.models) {
-      if (opened) advancedDrawn.models.unfold(true);
-      return;
-    }
-    const drawn = modelsAdvanced(words, "small", offered, async (chosen) => {
-      if (name !== null) return invoke("meeting_models_chosen", { name, chosen });
-      await invoke("next_models_kept", { chosen });
-      readKept();
-    });
-    drawn.unfold(opened);
-    // A close is an ask too: an opening's answer come after it is no longer the latest, and never opens
-    // « Avancé » again under the user (#1142).
-    drawn.toggle.addEventListener("click", () => {
-      if (drawn.toggle.getAttribute("aria-expanded") === "true") advancedOf(true).then(() => document.getElementById("small-advanced")?.focus());
-      else advancedOf(false, true);
-    });
-    // The control the focus is on stays the one focused once drawn again (showSmall's rule).
-    const focused = advanced.contains(document.activeElement) ? document.activeElement.id : null;
-    advanced.replaceChildren(drawn.box);
-    advancedDrawn = { from, models: drawn };
-    paintModelsKept();
-    if (focused) document.getElementById(focused)?.focus();
-  };
-
-  // The meeting's language (D99): the page's row, of the next meeting at rest — taken by it once it
-  // starts —, of the one recording while it runs. Read anew at each change of meeting.
-  const spokenBox = element("div", "small-language");
-  const languageOf = async () => {
-    const name = meeting.name;
-    const shown = await invoke("bar_language", { name }).catch((why) => {
-      smallSaid("language", fill(words.language_not_saved, why));
-      return null;
-    });
-    if (shown === null || meeting.name !== name) return;
-    smallSaid("language", null);
-    const save = name !== null ? (chosen) => invoke("language_set", { name, language: chosen }) : (chosen) => invoke("next_language_kept", { language: chosen });
-    const [row, said] = languageRow(save, shown.language, shown.languages, words, shown.meeting_language, shown.apple, shown.system_language,
-      "small-language", "small-language-said");
-    // The control the focus is on stays the one focused once drawn again (showSmall's rule).
-    const focused = spokenBox.contains(document.activeElement) ? document.activeElement.id : null;
-    spokenBox.replaceChildren(row, said);
-    if (focused) document.getElementById(focused)?.focus();
-  };
-
   const live = element("div", "small-live");
   // A thin meter for each side in the row (D90, board 5), named by its side and, in its tooltip, by
   // what it is recorded from (D33). Its health in a grey line under the row: a side silent for two
@@ -5710,9 +5614,6 @@ function showSmall(words) {
     unkeptSaid.textContent = [...unkept.values()].join("\n");
     unkeptSaid.hidden = unkept.size === 0;
   };
-  advancedOf(false);
-  languageOf();
-  readKept();
   const keep = async (last = false) => {
     const { name, typed } = meeting;
     if (name === null || typed === null || typed === meeting.saved) return;
@@ -5817,10 +5718,10 @@ function showSmall(words) {
     lastLine.hidden = text === "";
   };
   const lines = element("div", "bar-lines");
-  lines.append(lastLine, keptNext, modelsKept, announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(lastLine, keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid);
   const options = element("div", "bar-options");
   options.id = "small-options";
-  options.append(rest, live, advanced, spokenBox);
+  options.append(rest, live);
   options.hidden = true;
   // Escape anywhere in the bar folds them (board 5): the focus back on « Plus d’options » from inside
   // them, where it is from the row — a field's text left as it is.
@@ -5891,10 +5792,6 @@ function showSmall(words) {
       dot.setAttribute("cy", recording ? "6.2" : "5.6");
       // Each recording its own context: nothing of the one before.
       Object.assign(meeting, { name: null, saved: null, typed: null, refused: null });
-      // « Avancé » and what is said kept: of the next recording again, as the shell has them.
-      advancedOf(false);
-      languageOf();
-      readKept();
       mark.wanted = null;
       secret.box.checked = false;
       secret.row.classList.remove("on");
@@ -5912,7 +5809,6 @@ function showSmall(words) {
       // No list where capture lists none: nothing to change, nothing said of it.
       micNext.hidden = !recording || microphone.hidden;
       // Each state opens closed: the row alone.
-      advancedDrawn.models?.unfold(false);
       unfoldOptions(false, false);
       if (!recording) paintKeys();
       // Opened at rest, the recording's gesture has the focus; after, a focus left on nothing — ● or ■
@@ -5921,7 +5817,6 @@ function showSmall(words) {
       if (first && !recording) start.focus();
       else if (!first) refocus();
     }
-    paintModelsKept();
     if (!recording) {
       // A start that failed late: the shell has let it go, and no recording will come to give it back.
       if (start.disabled && !unanswered && !(await window.__TAURI__.core.invoke("header")).recording) {
@@ -5964,9 +5859,6 @@ function showSmall(words) {
       const another = meeting.name !== null;
       meeting.name = now.meeting;
       if (another) meeting.typed = null;
-      // « Avancé » now speaks of this meeting — or, stopped, of the next one —, closed as board 6 draws it.
-      advancedOf(false);
-      languageOf();
       if (now.meeting !== null) {
         const there = await invoke("context_shown", { name: now.meeting }).catch((why) => {
           smallSaid("context-read", fill(words.context_not_read, why));
@@ -5989,13 +5881,6 @@ function showSmall(words) {
     if (Date.now() - mark.refused >= 5000) marked();
     // The lock as the switch stands: the folder's word, or a turn not yet kept.
     locked.hidden = !(recording && secret.box.checked);
-    // Said confidential, or no longer: « Avancé » offers otherwise — no service then (D60) —, drawn
-    // again as it was, open or closed.
-    if (now.meeting !== null && now.confidential !== shownConfidential) {
-      shownConfidential = now.confidential;
-      advancedOf(advancedDrawn.models?.toggle.getAttribute("aria-expanded") === "true");
-    }
-    if (now.meeting === null) shownConfidential = null;
   };
   setInterval(tick, 100);
   setInterval(() => recording === false && paintKeys(), 1500);

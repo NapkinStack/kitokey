@@ -113,6 +113,8 @@ WAV, never a lost sample (`contracts/recording/v1`, *The tracks final*).
 
 ## Success criterion
 
+Read at 11-kitokey-on-sale-and-out-of-the-app's closure, 2026-11-27: met — D87's FLAC is written by libflac and read back equal by Symphonia in capture's `keep.rs`, transcription's `tracks.rs` and shell's `player.rs`, green on Linux (the attest's e2e) and in the Windows and macOS workflows on main at eb1e040, 2026-11-20; the bench's weights were recorded by D87's sheet (#708).
+
 > We will consider this was the right call if **every meeting capture compresses in D87's e2e and on the
 > bench is checked equal and read back equal by the transcription and the shell, on Linux, Windows and
 > macOS builds**, observed before **2026-11-21**.
