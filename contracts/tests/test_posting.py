@@ -121,3 +121,18 @@ def test_a_confidential_meeting_is_sent_only_with_its_confirmation_judged_before
     assert "for this send" in field
     assert "kept" not in field and "next send" not in field
     assert "a confidential meeting is never sent" not in flat
+
+
+def test_the_parts_chosen_are_sent_alone_the_title_always_and_never_a_dates_passage():
+    """D132: `parts` added in place, optional; absent, the summary is sent whole, as before."""
+    flat = " ".join(PAGE.split())
+    row = next(line for line in PAGE.splitlines() if line.startswith("| `parts` |"))
+    assert "The title is always sent and is never a part" in row
+    assert "Absent, the summary is sent whole, as before" in row
+    assert "**a date's `passage` is never sent**" in flat
+    chosen = " ".join(PAGE.split("### The parts chosen\n", 1)[1].split("\n## ", 1)[0].split())
+    assert "each kind receives the title and the parts named, and nothing else" in chosen
+    assert "never `id` or `passage`" in chosen
+    assert "`dates` asked and not given, is empty" in chosen
+    dates_title = next(line for line in PAGE.splitlines() if line.startswith("| `dates_title` |"))
+    assert "Required when `parts` names `dates` and `dates` is given" in dates_title
