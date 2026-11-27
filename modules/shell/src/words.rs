@@ -1286,6 +1286,61 @@ pub struct Window {
     /// Shows: the recording bar and Redo…, as a choice of a list. When: no model chosen in
     /// Settings. At most: about 30 characters. Placeholders: none.
     pub models_none: &'static str,
+    /// The engine cards' group for transcribing (D122), its legend. Shows: Settings, the first run and
+    /// Redo…, as a group's name. When: the engines that transcribe. At most: about 30 characters.
+    /// Placeholders: none.
+    pub engine_transcribe: &'static str,
+    /// The engine cards' group for writing the summary (D122), its legend. Shows: Settings, the first
+    /// run and Redo…, as a group's name. When: the engines that write. At most: about 30 characters.
+    /// Placeholders: none.
+    pub engine_write: &'static str,
+    /// The first engine card in Settings and the first run (D122): Kitokey chooses. Shows: an engine
+    /// card, as its name. When: no engine chosen. At most: 12 characters. Placeholders: none.
+    pub engine_auto: &'static str,
+    /// What « Auto » takes today, under its name (D122). Shows: an engine card, as where it runs.
+    /// When: « Auto ». At most: about 50 characters. Placeholders: {} the engine's name.
+    pub engine_auto_is: &'static str,
+    /// What « Auto » does, on its card (D122; the coordinator, 2026-11-26: never an online fallback).
+    /// Shows: an engine card, as its facts. When: « Auto » in Settings and the first run. At most:
+    /// about 60 characters. Placeholders: none.
+    pub engine_auto_says: &'static str,
+    /// The mark on a meeting's first engine card, Settings' own (D122). Shows: an engine card in
+    /// Redo…, as a mark. When: the engine Settings name. At most: 12 characters. Placeholders: none.
+    pub engine_default: &'static str,
+    /// Where an engine runs (D122). Shows: an engine card, as where it runs; the first run's second
+    /// card, as its name. When: this computer. At most: about 20 characters. Placeholders: none.
+    pub engine_here: &'static str,
+    /// What an engine on this computer is, on the first run's card (D122). Shows: an engine card, as
+    /// its facts. When: the first run. At most: about 60 characters. Placeholders: none.
+    pub engine_here_says: &'static str,
+    /// Where an engine runs (D122). Shows: an engine card, as where it runs. When: an online
+    /// service. At most: about 20 characters. Placeholders: none.
+    pub engine_online: &'static str,
+    /// The first run's third card (D122). Shows: an engine card, as its name. When: the first run.
+    /// At most: about 20 characters. Placeholders: none.
+    pub engine_online_kind: &'static str,
+    /// What an online service does, on the first run's card (D122; V8: what leaves, what stays). Shows:
+    /// an engine card, as its facts. When: the first run. At most: about 60 characters. Placeholders:
+    /// none.
+    pub engine_online_says: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: usable now. At most: 12
+    /// characters. Placeholders: none.
+    pub engine_ready: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: its model to download
+    /// first. At most: about 25 characters. Placeholders: {} its size.
+    pub engine_download: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: its program not on this
+    /// computer. At most: about 20 characters. Placeholders: none.
+    pub engine_install: &'static str,
+    /// An engine's state when its size is not known (D122). Shows: an engine card, as its state.
+    /// When: its model to download first, Ollama's. At most: about 20 characters. Placeholders: none.
+    pub engine_download_unsized: &'static str,
+    /// An engine's state (D122). Shows: an engine card, as its state. When: an online service with
+    /// no key kept. At most: about 20 characters. Placeholders: none.
+    pub engine_key: &'static str,
+    /// The disclosure that holds an engine's id, address and size (D122). Shows: an engine card, as a
+    /// disclosure. When: always, folded. At most: 12 characters. Placeholders: none.
+    pub engine_details: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2170,7 +2225,7 @@ pub fn window(language: Language) -> Window {
             general_title: "General",
             advanced_title: "Advanced",
             destinations_title: "Sending summaries",
-            destinations_said: "The channels you can send a summary to. Nothing is sent unless you ask, and never a confidential meeting.",
+            destinations_said: "The channels you can send a summary to. Nothing is sent unless you ask. A confidential meeting asks you to confirm once more.",
             destinations_none: "No destination yet.",
             destination_kinds: ["Webhook", "Discord", "Slack"],
             destination_fields: ["Kind", "Name", "Webhook address"],
@@ -2193,7 +2248,7 @@ pub fn window(language: Language) -> Window {
             send_unreadable: "Kitokey couldn’t read this meeting. Check its folder, then try again.",
             send_confidential: "This meeting is confidential: it’s sent only once you confirm.",
             send_no_summary: "There’s no summary to send yet.",
-            send_too_large: "The summary is too long for “{}”. Export it as a file instead.",
+            send_too_large: "This summary is too long for “{}”. Copy it to share it another way.",
             send_offline: "No connection: nothing was sent. Check your connection, then try again.",
             send_silent: "“{}” didn’t answer: the summary may have arrived; look in the channel before sending again.",
             send_gone: "“{}” no longer exists or was revoked. Set the destination up again, with a new address.",
@@ -2294,6 +2349,23 @@ pub fn window(language: Language) -> Window {
             models_minutes: "Summary model",
             models_settings: "From Settings: {}",
             models_none: "no model chosen",
+            engine_transcribe: "Transcription engine",
+            engine_write: "Summary engine",
+            engine_auto: "Auto",
+            engine_auto_is: "Today {}",
+            engine_auto_says: "Kitokey picks the best engine on this computer. Recommended. Nothing leaves.",
+            engine_default: "Default",
+            engine_here: "On this computer",
+            engine_here_says: "Private and free. A little slower.",
+            engine_online: "Online",
+            engine_online_kind: "Online service",
+            engine_online_says: "Faster. Only the text leaves, never the sound.",
+            engine_ready: "Ready",
+            engine_download: "To download · {}",
+            engine_download_unsized: "To download",
+            engine_install: "To install",
+            engine_key: "Key missing",
+            engine_details: "Details",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2327,7 +2399,7 @@ pub fn window(language: Language) -> Window {
                 "Audio only",
                 "Summaries and transcripts stay readable. Audio takes up almost all the space.",
             ],
-            free_whole: ["Whole meeting", "Audio, transcript and summary — nothing is kept."],
+            free_whole: ["Whole meeting", "The audio, the transcript and the summary go to the trash."],
             free_heaviest: "Largest first",
             free_older: "Select those older than 30 days",
             free_total: "freed · {} meetings",
@@ -2693,7 +2765,7 @@ pub fn window(language: Language) -> Window {
             general_title: "Général",
             advanced_title: "Avancé",
             destinations_title: "Envoi des comptes rendus",
-            destinations_said: "Les canaux où vous pourrez envoyer un compte rendu. Rien n’est envoyé sans que vous le demandiez, et jamais une réunion confidentielle.",
+            destinations_said: "Les canaux où vous pourrez envoyer un compte rendu. Rien n’est envoyé sans votre demande. Une réunion confidentielle vous demande une confirmation de plus.",
             destinations_none: "Aucune destination pour l’instant.",
             destination_kinds: ["Webhook", "Discord", "Slack"],
             destination_fields: ["Type", "Nom", "Adresse du webhook"],
@@ -2716,7 +2788,7 @@ pub fn window(language: Language) -> Window {
             send_unreadable: "Kitokey n’a pas pu lire cette réunion. Vérifiez son dossier, puis réessayez.",
             send_confidential: "Réunion confidentielle\u{a0}: elle n’est envoyée qu’après votre confirmation.",
             send_no_summary: "Pas encore de compte rendu à envoyer.",
-            send_too_large: "Compte rendu trop long pour « {} ». Exportez-le en fichier à la place.",
+            send_too_large: "Ce compte rendu est trop long pour « {} ». Copiez-le pour le partager autrement.",
             send_offline: "Pas de connexion : rien n’est parti. Vérifiez la connexion, puis réessayez.",
             send_silent: "« {} » n’a pas répondu : le compte rendu est peut-être arrivé ; regardez dans le canal avant de renvoyer.",
             send_gone: "« {} » n’existe plus ou a été révoqué. Reconfigurez la destination avec une nouvelle adresse.",
@@ -2820,6 +2892,23 @@ pub fn window(language: Language) -> Window {
             models_minutes: "Modèle du compte rendu",
             models_settings: "Celui des Réglages\u{a0}: {}",
             models_none: "aucun modèle choisi",
+            engine_transcribe: "Moteur de transcription",
+            engine_write: "Moteur de rédaction",
+            engine_auto: "Auto",
+            engine_auto_is: "Aujourd’hui {}",
+            engine_auto_says: "Kitokey choisit le meilleur moteur de cet ordinateur. Recommandé. Rien ne part.",
+            engine_default: "Par défaut",
+            engine_here: "Sur cet ordinateur",
+            engine_here_says: "Privé et gratuit. Un peu plus lent.",
+            engine_online: "En ligne",
+            engine_online_kind: "Service en ligne",
+            engine_online_says: "Plus rapide. Seul le texte part, jamais le son.",
+            engine_ready: "Prêt",
+            engine_download: "À télécharger · {}",
+            engine_download_unsized: "À télécharger",
+            engine_install: "À installer",
+            engine_key: "Clé manquante",
+            engine_details: "Détails",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",
@@ -2855,7 +2944,7 @@ pub fn window(language: Language) -> Window {
             ],
             free_whole: [
                 "La réunion entière",
-                "Audio, transcription et compte rendu\u{a0}: rien n’est conservé.",
+                "L’audio, la transcription et le compte rendu vont à la corbeille.",
             ],
             free_heaviest: "Les plus volumineuses d’abord",
             free_older: "Cocher celles de plus de 30 jours",
