@@ -1,0 +1,82 @@
+/* Kitokey's components (D120): each reads the design system's roles and scales in tokens.css, never a value
+   nor one of the window's older names (tests/look.rs). Their states are the platform's — :hover, :active,
+   :focus-visible, [disabled] —; the gallery (#/gallery) shows each at rest by a class of the same name. */
+
+/* A button (D89: 32 px high). Primary: the one action a view is for; secondary on the surface; ghost, words
+   alone; icon, a square with its name in `aria-label` and a tooltip; destructive, red, its action confirmed
+   in a dialog whose « Annuler » is focused (PDR-0008). */
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  height: 32px; padding: 0 var(--sp-3); border: 1px solid transparent; border-radius: var(--r-sm);
+  background: transparent; color: var(--color-text); font: 600 var(--fs-body) var(--font-text);
+  white-space: nowrap; cursor: pointer;
+  transition: background-color var(--d-instant) var(--ease-out);
+}
+.button.primary { background: var(--color-accent); color: var(--color-on-accent); }
+.button.primary:hover, .button.primary.hover { background: var(--color-accent-hover); }
+.button.secondary { background: var(--color-surface); border-color: var(--color-divider); border-bottom-color: var(--color-edge); }
+.button.secondary:hover, .button.secondary.hover, .button.ghost:hover, .button.ghost.hover,
+.button.icon:hover, .button.icon.hover { background: var(--color-hover); }
+.button.secondary:active, .button.secondary.pressed, .button.ghost:active, .button.ghost.pressed,
+.button.icon:active, .button.icon.pressed { background: var(--color-pressed); }
+.button.icon { width: 32px; padding: 0; }
+.button.destructive { background: var(--color-destructive); color: var(--color-on-destructive); }
+.button:focus-visible, .button.focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.button[disabled] { opacity: .45; cursor: not-allowed; }
+.button svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* A banner: what holds for the whole page — information, « Confidentielle », a warning —, its icon, its
+   words, an action at its end. Never red: red is a recording's or a deletion's. Always with its tone: the
+   settings' strip (#770) is `.banner` alone, window.css's, until its screen comes over (D123). */
+:is(.banner.info, .banner.private, .banner.warning) {
+  display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md); background: var(--color-tint); color: var(--color-text); font: var(--fs-body) var(--font-text);
+}
+:is(.banner.info, .banner.private, .banner.warning) > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.banner.private { background: var(--color-private-ground); }
+.banner.private > svg { stroke: var(--color-private); }
+.banner.warning { background: var(--color-warning-ground); }
+.banner.warning > svg { stroke: var(--color-warning); }
+:is(.banner.info, .banner.private, .banner.warning) p { margin: 0; flex: 1; }
+:is(.banner.info, .banner.private, .banner.warning) .button { margin-left: auto; }
+
+/* A dialog: the platform's own, modal (`<dialog>`, `showModal()`): the rest of the window inert, Escape
+   closing it, the focus back where it was. Its title in the titles' face; its actions at its end, the safe
+   one first and focused. */
+.dialog {
+  width: min(560px, calc(100vw - 32px)); padding: var(--sp-6); border: 0; border-radius: var(--r-xl);
+  background: var(--color-raised); color: var(--color-text); box-shadow: var(--e3); font: var(--fs-body) var(--font-text);
+}
+.dialog::backdrop { background: var(--color-scrim); }
+.dialog h2 { margin: 0 0 var(--sp-3); font: 700 var(--fs-title) var(--font-display); }
+.dialog p { margin: 0; color: var(--color-text-soft); }
+.dialog .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-6); }
+
+/* The engine card (D122's markup, sam's `engineCards()`): a group per job, each card a native radio in its
+   label — name, where it runs, its state, a sentence —, its details folded under it. */
+.engine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-3); margin: 0; padding: 0; border: 0; }
+.engine-cards > legend { margin-bottom: var(--sp-2); padding: 0; font: 600 var(--fs-small) var(--font-text); color: var(--color-text-soft); }
+.engine-card {
+  display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 1px solid var(--color-divider); border-radius: var(--r-lg);
+  background: var(--color-surface); color: var(--color-text); font: var(--fs-body) var(--font-text);
+}
+.engine-card:hover { border-color: var(--color-edge); }
+.engine-card:has(input:checked) { border-color: var(--color-accent); background: var(--color-tint); }
+.engine-card:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.engine-card label { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-1) var(--sp-2); align-items: baseline; cursor: pointer; }
+.engine-card input { margin: 0; accent-color: var(--color-accent); }
+.engine-card .name { font-weight: 600; }
+.engine-card .where, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
+.engine-card .state { font-size: var(--fs-small); color: var(--color-text-soft); }
+.engine-card[data-state="ready"] .state { color: var(--color-success); }
+.engine-card .default { font-size: var(--fs-caption); color: var(--color-accent); }
+.engine-card details { font-size: var(--fs-small); color: var(--color-text-soft); }
+.engine-card details summary { cursor: pointer; }
+.engine-card .detail { margin: var(--sp-1) 0 0; color: var(--color-text-soft); }
+
+/* The gallery (#/gallery): the components on the canvas, a section each, its titles in the titles' face. */
+.gallery { min-height: 100vh; padding: var(--sp-6); background: var(--color-canvas); color: var(--color-text); font: var(--fs-body) var(--font-text); }
+.gallery h1 { margin: 0 0 var(--sp-6); font: 700 var(--fs-title-lg) var(--font-display); }
+.gallery-part { display: grid; gap: var(--sp-4); margin-bottom: var(--sp-8); }
+.gallery-part > h2 { margin: 0; font: 600 var(--fs-title-sm) var(--font-display); }
+.gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
