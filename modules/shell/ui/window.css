@@ -524,7 +524,8 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 #first-choice .engine-card { align-content: start; }
 @media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice { padding: var(--sp-5); } }
 .first-steps { display: flex; gap: var(--sp-1); }
-.first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-sunken); }
+/* Its marks to come in the edge role, not v5's sunken: 3.7:1 on the card in both themes (WCAG 2.2 SC 1.4.11; lina, #1307). */
+.first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-edge); }
 .first-steps i.on { background: var(--color-accent); }
 .welcome-mode { padding: 14px 16px; border-radius: 12px; background: color-mix(in srgb, var(--ok) 12%, var(--surface)); display: flex; flex-direction: column; gap: 2px; }
 .welcome-mode.connected { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
