@@ -349,12 +349,26 @@ def check(what: str, held: bool, got: object = "") -> None:
         FAILED.append(what)
 
 
+# The machine's own folders, never in a window's words: its screenshots are published (#1297's first evidence showed a
+# HOME). The home this e2e started from, and any person's folder, as a path is written and as the window says one.
+STARTED_HOME = Path.home()
+PRIVATE = sorted({str(STARTED_HOME), "/ " + " / ".join(STARTED_HOME.parts[1:]), "/home/", "/ home /", "/Users/", "/ Users /"})
+
+
+def nothing_private(browser, name: str) -> None:
+    """Before a screenshot: the window's words hold no folder of the machine's."""
+    text = browser.execute_script("return document.body.innerText")
+    found = [private for private in PRIVATE if private in text]
+    check(f"{name}: no folder of the machine's in the window's words", not found, found)
+
+
 def shot(browser, name: str) -> None:
     """The page as it is, saved where KITOKEY_SCREENSHOTS says: for an eye against D11's boards. One
     whose name says its theme is measured: a light one light, a dark one dark (D89), its mean
-    lightness read by ImageMagick, 0 black to 1 white."""
+    lightness read by ImageMagick, 0 black to 1 white. Never one showing a folder of the machine's."""
     folder = os.environ.get("KITOKEY_SCREENSHOTS")
     if folder:
+        nothing_private(browser, name)
         Path(folder).mkdir(parents=True, exist_ok=True)
         browser.save_screenshot(str(Path(folder) / f"{name}.png"))
         theme = next((theme for theme in ("light", "dark") if theme in name.split("-")), None)
@@ -13880,6 +13894,7 @@ def store_shots(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#meeting .drawing .wave .col').length") > 0, 60)
                 browser.execute_script("document.activeElement.blur(); scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
                 time.sleep(0.6)
+                nothing_private(browser, f"{short}/{shot_name}")
                 browser.save_screenshot(str(store / short / f"{shot_name}.png"))
                 browser.execute_script("document.documentElement.style.overflow = ''")
                 seen(browser, f"{short}/{shot_name}.png")
@@ -13909,6 +13924,7 @@ def store_shots(now: dt.datetime) -> None:
                 "scrollTo(0, fits ?? aim);"
                 "document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.4)
+            nothing_private(browser, f"{short}/4-settings")
             browser.save_screenshot(str(store / short / "4-settings.png"))
             seen(browser, f"{short}/4-settings.png")
             browser.execute_script("document.documentElement.style.overflow = ''")
@@ -13939,6 +13955,7 @@ def store_shots(now: dt.datetime) -> None:
                 " meters: [...document.querySelectorAll('#meeting .page-level')].map(e => Number(e.getAttribute('aria-valuenow'))),"
                 " first: document.querySelector('#groups .session')?.getAttribute('href') ?? null, name: arguments[0]}",
                 f"#/meeting/{recording.name}")
+            nothing_private(browser, f"{short}/2-recording")
             browser.save_screenshot(str(store / short / "2-recording.png"))
             seen(browser, f"{short}/2-recording.png")
             browser.execute_script("document.documentElement.style.overflow = ''")
