@@ -52,6 +52,11 @@ main { padding: 28px 24px 56px; display: flex; flex-direction: column; gap: 26px
 .menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 5; min-width: 220px; padding: 4px; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 8px 24px rgb(0 0 0 / 0.16); }
 .menu-item { display: flex; align-items: center; min-height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 14px; text-align: left; white-space: nowrap; cursor: pointer; }
 .menu-item:hover, .menu-item:focus { background: var(--raised); }
+/* D121: a deletion last in its menu, after a line, in the destructive role's colour (PDR-0008). */
+.menu-item.destructive { color: var(--color-destructive); }
+.menu-separator { height: 1px; margin: var(--sp-1) 0; background: var(--color-divider); }
+/* D121: the meeting's bar of actions, each its words beside its icon; « Agenda »'s count after its words. */
+.bar-action .count { font-variant-numeric: tabular-nums; color: var(--color-text-soft); }
 .back { color: var(--soft); text-decoration: none; font-weight: 500; padding: 10px 4px; }
 /* The controls (D89): 32 px high on a 4 px grid, bordered with --edge. */
 .open, .search { min-height: 32px; border-radius: 8px; border: 1px solid; color: var(--ink); font: inherit; font-size: 14px; }

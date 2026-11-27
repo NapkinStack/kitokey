@@ -7599,7 +7599,7 @@ def meeting_actions_bar(now: dt.datetime) -> None:
     print("MA. a meeting's page: one bar of actions in words, « Plus » a menu, « Mettre à la corbeille » asked in a dialog (D121)")
     focused = "const a = document.activeElement; return !a || a === document.body ? 'body' : a.id || a.tagName.toLowerCase()"
     bar = ("const b = document.getElementById('meeting-actions'); if (!b) return null;"
-           " return [...b.querySelectorAll(':scope > button')].filter((e) => !e.hidden).map((e) => ({id: e.id,"
+           " return [...b.querySelectorAll(':scope > button, :scope > .more > button')].filter((e) => !e.hidden).map((e) => ({id: e.id,"
            " words: e.querySelector('.label')?.textContent.trim() ?? '', count: e.querySelector('.count')?.textContent.trim() ?? '',"
            " name: e.getAttribute('aria-label') ?? e.textContent.trim(), icon: !!e.querySelector('svg'), popup: e.getAttribute('aria-haspopup'),"
            " expanded: e.getAttribute('aria-expanded')}))")
@@ -9889,17 +9889,17 @@ def dates_mentioned(now: dt.datetime) -> None:
             browser.set_window_size(1100, 800)
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             shown = wait_for(browser, lambda b: b.execute_script(offered), 10)
-            # Among the summary's actions, as « Envoyer… » and « Copier » are (#1213, the decider): an icon, a calendar, its
-            # name and tooltip the words, before « Copier » — never a bar of its own under the summary.
+            # In the meeting's bar of actions (D121, after #1213 and #1239): « Agenda », a calendar and its count « 2 », before
+            # « Refaire »; its name begins with its words and says the count (WCAG 2.5.3), its tooltip the count.
             form = browser.execute_script(
-                "const b = document.getElementById('dates-open'), row = b?.closest('.minutes-actions'), copy = document.getElementById('copy-minutes');"
-                " return b ? {icon: b.classList.contains('icon-button'), row: !!row, before: !!copy && row === copy.parentElement"
-                " && !!(b.compareDocumentPosition(copy) & Node.DOCUMENT_POSITION_FOLLOWING), text: b.textContent.trim(),"
+                "const b = document.getElementById('dates-open'), bar = b?.closest('#meeting-actions'), redo = document.getElementById('redo-open');"
+                " return b ? {bar: !!bar, before: !!redo && !!(b.compareDocumentPosition(redo) & Node.DOCUMENT_POSITION_FOLLOWING),"
+                " words: b.querySelector('.label')?.textContent ?? '', count: b.querySelector('.count')?.textContent ?? '',"
                 " name: b.getAttribute('aria-label'), tip: b.title, calendar: !!b.querySelector('svg rect') && b.querySelectorAll('svg path').length === 3} : null")
-            # Its count beside the calendar (#1239): how many dates it offers, read at a glance; its name and tooltip say both.
             counted = {"Dates mentionnées": "2 dates mentionnées", "Dates mentioned": "2 dates mentioned"}[opens]
-            check(f"{language}: offered among the summary's actions, a calendar and its count « 2 », named « {counted} » and its tooltip the same, before « Copier » (#1213, #1239)",
-                  shown and form == {"icon": True, "row": True, "before": True, "text": "2", "name": counted, "tip": counted, "calendar": True}, form)
+            label = {"Dates mentionnées": "Agenda", "Dates mentioned": "Calendar"}[opens]
+            check(f"{language}: in the bar of actions, « {label} », a calendar and its count « 2 », before « Refaire », named « {label}, {counted} », its tooltip « {counted} » (D121, #1239)",
+                  shown and form == {"bar": True, "before": True, "words": label, "count": "2", "name": f"{label}, {counted}", "tip": counted, "calendar": True}, form)
             if language.startswith("fr"):
                 browser.execute_script("document.querySelector('#meeting .card.minutes').scrollIntoView({block: 'start'})")
                 shot(browser, "cm-dates-offered-light")
@@ -12894,25 +12894,25 @@ def nothing_silent(now: dt.datetime) -> None:
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('minutes_again', { name: 'gone' }).then(() => done(''), (why) => done(String(why)));")
             check(f"the raw text only in developer mode ({'on' if raw else 'off'})", ("gone is no session" in told) == raw, told)
             if raw:
-                # « More actions » with both items (D89): Enter opens it on the first, ↑ on the last, expanded while open.
-                wait_for(browser, lambda b: b.find_elements(By.ID, "more-actions"), 10)
+                # « More » with its items (D89, D121): Enter opens it on the first, ↑ on the last (the trash, D121), expanded while open.
+                wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
                 opened_on = []
                 for key in (Keys.ENTER, Keys.ARROW_UP):
-                    browser.execute_script("document.getElementById('more-actions').focus()")
+                    browser.execute_script("document.getElementById('more-open').focus()")
                     ActionChains(browser).send_keys(key).perform()
                     wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-actions').getAttribute('aria-expanded')]"))
+                    opened_on.append(browser.execute_script("return [document.activeElement.id, document.getElementById('more-open').getAttribute('aria-expanded')]"))
                     ActionChains(browser).send_keys(Keys.ESCAPE).perform()
                     wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                check("in developer mode, « More actions » opens on its first by Enter, on its last by ↑, expanded while open (D89)",
-                      opened_on == [["rename-item", "true"], ["copy-diagnostic", "true"]], opened_on)
-                browser.execute_script("document.getElementById('more-actions').focus()")
+                check("in developer mode, « More » opens on its first by Enter, on its last by ↑, expanded while open (D89, D121)",
+                      opened_on == [["rename-item", "true"], ["trash-meeting", "true"]], opened_on)
+                browser.execute_script("document.getElementById('more-open').focus()")
                 ActionChains(browser).send_keys(Keys.ENTER).perform()
                 wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
                 ActionChains(browser).send_keys(Keys.TAB).perform()
                 left_ = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-                check("Tab leaves « More actions » closed, not expanded (D89)",
-                      left_ and browser.execute_script("return document.getElementById('more-actions').getAttribute('aria-expanded')") == "false")
+                check("Tab leaves « More » closed, not expanded (D89)",
+                      left_ and browser.execute_script("return document.getElementById('more-open').getAttribute('aria-expanded')") == "false")
                 described = browser.execute_script("const b = document.getElementById('confidential-switch'); return document.getElementById(b.getAttribute('aria-describedby'))?.textContent")
                 check("in English, the switch's description: « Nothing leaves this computer » (D89)", described == "Nothing leaves this computer", described)
     # What the page reads and cannot: said where the eye is, in the user's language; asked by no gesture
@@ -14724,12 +14724,12 @@ def main() -> int:
             search.send_keys("voix")
             none = [p.text for p in browser.find_elements(By.CSS_SELECTOR, ".transcript .none") if p.is_displayed()]
             check("a search looks at what was said, not at who or when", none == ["Aucun résultat."], none)
-            check("the folder can be opened from the meeting", browser.find_element(By.ID, "open-folder").get_attribute("aria-label") == "Ouvrir le dossier")
+            check("the folder can be opened from the meeting, in « Plus » (D121)", browser.execute_script("return document.getElementById('open-folder')?.textContent") == "Ouvrir le dossier")
             # D89: the meeting's header — its title at 18 px, its actions on its right; each card's actions icons, each with its tooltip and its name.
             head = browser.execute_script(
-                "const h = document.querySelector('#meeting h1'), o = document.getElementById('open-folder');"
+                "const h = document.querySelector('#meeting h1'), o = document.getElementById('meeting-actions');"
                 " return [parseFloat(getComputedStyle(h).fontSize), Math.abs(h.getBoundingClientRect().top - o.getBoundingClientRect().top) < 24 && o.getBoundingClientRect().left > h.getBoundingClientRect().right]")
-            check("the meeting's title is 18 px, « Ouvrir le dossier » on the same line, at its right (D89)", head == [18, True], head)
+            check("the meeting's title is 18 px, its bar of actions on the same line, at its right (D89, D121)", head == [18, True], head)
             bar = browser.execute_script(
                 "const b = document.querySelector('#meeting .meeting-head'), h = document.querySelector('#meeting h1'), l = document.querySelector('#meeting .lasts'), s = getComputedStyle(b);"
                 " const t = document.createElement('i'); t.style.color = 'var(--line)'; document.body.append(t); const line = getComputedStyle(t).color; t.remove();"
@@ -14743,12 +14743,12 @@ def main() -> int:
                 " return [r.parentElement === f.parentElement, Math.abs((a.top + a.bottom) - (b.top + b.bottom)) < 4 && b.left >= a.right]")
             check("the transcript's Refaire… beside its search, at its right (D89, board 4)", beside == [True, True], beside)
             actions = browser.execute_script(
-                "return ['open-folder', 'copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
+                "return ['copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
                 " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
             searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
             check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
             check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
-                ["open-folder", "", "Ouvrir le dossier", "Ouvrir le dossier", True], ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
+                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
                 ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
             # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
             row = browser.execute_script(
@@ -14776,8 +14776,8 @@ def main() -> int:
             check("the context closed in its row, opened by it, the focus in its field (D89)",
                   closed and opened and toggle.get_attribute("aria-expanded") == "true" and browser.execute_script("return document.activeElement.id") == "context-text",
                   (closed, toggle.get_attribute("aria-expanded")))
-            # « Plus d’actions »: a menu button — Enter opens it on its first item, Escape closes it, the focus back on it.
-            more = browser.find_element(By.ID, "more-actions")
+            # « Plus »: a menu button, its words and its icon (D121) — Enter opens it on its first item, Escape closes it, the focus back on it.
+            more = browser.find_element(By.ID, "more-open")
             labelled = [more.get_attribute(a) for a in ("aria-label", "title", "aria-haspopup", "aria-expanded")]
             browser.execute_script("arguments[0].focus()", more)
             ActionChains(browser).send_keys(Keys.ENTER).perform()
@@ -14787,9 +14787,9 @@ def main() -> int:
             first = browser.execute_script("return [document.activeElement.getAttribute('role'), document.activeElement.textContent, document.getElementById('more-menu').getAttribute('role')]")
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             back = wait_for(browser, lambda b: not b.find_element(By.ID, "more-menu").is_displayed(), 2)
-            check("« Plus d’actions »: a menu of the rarer actions, opened by Enter on its first, Escape closes it, the focus back on its button (D89)",
-                  labelled == ["Plus d’actions", "Plus d’actions", "menu", "false"] and menu and items == ["Renommer cette réunion"]
-                  and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-actions"
+            check("« Plus »: a menu of the rarer actions, named « Plus d’actions », opened by Enter on its first, Escape closes it, the focus back on its button (D89, D121)",
+                  labelled == ["Plus d’actions", None, "menu", "false"] and menu and items == ["Renommer cette réunion", "Ouvrir le dossier", "Mettre à la corbeille"]
+                  and first == ["menuitem", "Renommer cette réunion", "menu"] and back and browser.execute_script("return document.activeElement.id") == "more-open"
                   and more.get_attribute("aria-expanded") == "false" and expanded == "true", (labelled, items, first, expanded))
             more.click()
             wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 2)
