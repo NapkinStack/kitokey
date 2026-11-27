@@ -197,7 +197,8 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
 // before its first, its last. The platform's `<dialog>` alone lets one Tab stop on the dialog itself (ines, after #1298).
 function roundTheDialog(dialog) {
   dialog.addEventListener("keydown", (event) => {
-    if (event.key !== "Tab") return;
+    // WebKitGTK says Shift+Tab « Unidentified » (GTK's ISO_Left_Tab): its code is still « Tab ».
+    if (event.key !== "Tab" && event.code !== "Tab") return;
     const stops = [...dialog.querySelectorAll(FOCUSABLE)].filter((stop) => stop.getClientRects().length);
     if (!stops.length) return;
     const [first, last] = [stops[0], stops[stops.length - 1]];

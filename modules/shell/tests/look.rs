@@ -819,8 +819,10 @@ const CONTROL_PARTS: [&str; 21] = [
 
 /// The heights a control keeps under 32 px, each with its reason: a box to tick, a switch's track
 /// inside its setting, a time in a line of text that is a link and no button.
-const SMALLER: [(&str, f64); 6] = [
+const SMALLER: [(&str, f64); 7] = [
     (".choice input, .row input[type=\"checkbox\"]", 20.0),
+    // A card's radio, drawn by the design system at the window's box size (#1310): the card is its target.
+    (".engine-card input, .option-card input", 20.0),
     // A switch's track, inside its 32 px setting.
     (".setting input[type=\"checkbox\"]", 20.0),
     (".remember input", 20.0),
