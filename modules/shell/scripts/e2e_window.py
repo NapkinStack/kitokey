@@ -7450,6 +7450,8 @@ def meeting_exported(now: dt.datetime) -> None:
                     found = axe_violations(browser)
                     check(f"{short}, {theme}: « Partager » open on a confidential meeting, its line in it, no violation of axe's WCAG 2.2 A and AA rules",
                           found == [], found)
+                # « Partager » open, for the eye against v5 (screens 4 and 9): an ordinary meeting's, a confidential one's.
+                shot_themed(browser, f"me-share-{short}-{'confidential' if confidential else 'ordinary'}-{theme}", theme)
                 ActionChains(browser).send_keys(Keys.ESCAPE).perform()
                 for kind, opener, head in (("pdf", "share-pdf", b"%PDF-"), ("md", "share-md", b"---")):
                     to = WORK / f"exported-{short}-{folder.name}.{kind}"
@@ -7472,7 +7474,32 @@ def meeting_exported(now: dt.datetime) -> None:
                           browser.execute_script(said) == words["done"].format(to.name)
                           and browser.execute_script("return [...document.querySelectorAll('[role=status], [aria-live]')].filter((e) => e.textContent.includes(arguments[0])).length", to.name) == 1,
                           browser.execute_script(said))
+                    if kind == "pdf" and not confidential:
+                        shot_themed(browser, f"me-said-{short}-{theme}", theme)
                     browser.execute_script("window.restore()")
+            # A long sentence said (the audit of #1320 against v5): on its own line under the bar, never pushing it; the
+            # whole bar in sight and the meeting's name there, at 1100 and 420 px.
+            long = WORK / ("exported-" + "un-nom-de-fichier-tres-long-pour-une-reunion-" * 2 + f"{short}.pdf")
+            browser.execute_script(stub, str(long))
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "share-pdf")
+            wait_for(browser, lambda b: long.name in (b.execute_script(said) or ""), 10)
+            browser.execute_script("window.restore()")
+            placed = ("const bar = document.getElementById('meeting-actions').getBoundingClientRect(), s = document.getElementById('share-said').getBoundingClientRect(),"
+                      " h = document.querySelector('#meeting h1').getBoundingClientRect(), buttons = [...document.querySelectorAll('#meeting-actions button')].filter((b) => b.getClientRects().length);"
+                      " return [innerWidth, buttons.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5 && r.width > 0; }),"
+                      " h.width > 40 && h.right <= innerWidth + 0.5, s.top >= bar.bottom - 0.5]")
+            for width, height in ((1100, 800), (420, 900)):
+                browser.set_window_size(width, height)
+                wait_for(browser, lambda b: abs(b.execute_script("return innerWidth") - width) < 40, 3)
+                time.sleep(0.3)
+                got = browser.execute_script(placed)
+                check(f"{short}, {width} px: a long « {words['done'].split(' ')[0]} » line under the bar, the whole bar in sight, the meeting's name there",
+                      got[1:] == [True, True, True], got)
+            if theme == "light":
+                shot(browser, f"me-said-long-{short}")
+            browser.set_window_size(1100, 800)
             # The dialog closed: nothing written, nothing said.
             browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
                                    " asked === 'export_file_chosen' ? Promise.resolve(null) : real.invoke(asked, ...rest)}; window.restore = () => { window.__TAURI__.core = real; };")
