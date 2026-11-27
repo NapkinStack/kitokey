@@ -2116,6 +2116,99 @@ def first_read_said(browser, ids, expected, got) -> None:
     later = [browser.find_element(By.ID, i).text for i in ids]
     print(f"  #965  first read {got}, a second later {later}; the page just after the first read: {now}")
 
+def first_run_ready(now: dt.datetime) -> None:
+    """CU. D126, the first run's third screen (mock-up 1c): once the assistant is answered, the window's empty
+    pane says « Prêt. Enregistrez votre premier appel. » and what Kitokey does in one sentence, beside the
+    shortcut, « Enregistrer » and « Essayer sur un exemple », the sidebar's record button the window's one primary
+    action — its sidebar there, so that nothing is a
+    dead end. Each gesture does what it says: the example opens its meeting, « Enregistrer » records. Started
+    again later, the empty pane says what it said before. In both languages and themes, axe clean. Its
+    illustration comes with the other two screens (D126, next pull request)."""
+    print("CU. the first run ends on « Prêt. Enregistrez votre premier appel. », record or try the example (D126)")
+    pane = ("return document.getElementById('empty').hidden ? null : [document.getElementById('none').textContent,"
+            " document.getElementById('none-do').textContent, document.getElementById('empty-record').textContent,"
+            " document.getElementById('empty-example').textContent,"
+            " [...document.querySelectorAll('#sidebar .primary, #empty .primary')].filter((b) => b.offsetParent).length]")
+    # No disk path in a published shot (the decider, 2026-11-27): the bench's folder shown by its name alone.
+    neutral = ("const f = document.getElementById('empty-folder');"
+               " if (f) f.textContent = f.textContent.replace(/(dans|in) .*$/, '$1 Kitokey.')")
+    for language, texts, example_opens in (
+        ("fr_FR.UTF-8", ["Prêt. Enregistrez votre premier appel.",
+                         "Kitokey écoute votre micro et le son de l’appel, puis écrit le compte rendu.",
+                         "Enregistrer", "Essayer sur un exemple", 1], True),
+        ("en_US.UTF-8", ["Ready. Record your first call.",
+                         "Kitokey listens to your microphone and the call’s sound, then writes the summary.",
+                         "Record", "Try it on an example", 1], False),
+    ):
+        short = language[:2]
+        meetings = WORK / f"ready-{short}"
+        meetings.mkdir()
+        window = Window(meetings, language, small=True, welcomed=False, args=())
+        window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+        with window as browser:
+            asked = wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+            check(f"{short}: not welcomed, the first run opens on its first question", asked)
+            press(browser, "welcome-skip")
+            shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
+            check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
+                  shown, browser.execute_script(pane))
+            check(f"{short}: the third screen keeps the sidebar: nothing is a dead end",
+                  browser.find_element(By.ID, "sidebar").is_displayed() and browser.find_element(By.ID, "settings-link").is_displayed())
+            # axe in each theme, its colours put on the page where the desktop shows the other one (as shot_themed does).
+            for theme in ("light", "dark"):
+                forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                    time.sleep(0.3)
+                violations = axe_violations(browser)
+                check(f"{short}, {theme}: the third screen has no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                browser.execute_script(neutral)
+                shot(browser, f"d126-ready-{short}-{theme}")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+            if example_opens:
+                press(browser, "empty-example")
+                opened = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/example-fr", 10)
+                check("« Essayer sur un exemple »: the example placed, its meeting's page opened",
+                      opened and (meetings / "example-fr" / "session.json").is_file(), browser.execute_script("return location.hash"))
+                # A meeting there, then gone again in the same session: the first run is over, the ordinary words come back.
+                wait_for(browser, lambda b: (meetings / "example-fr" / "minutes.md").is_file(), 20)
+                shutil.rmtree(meetings / "example-fr")
+                browser.execute_script("location.hash = '#/'; refresh()")
+                plain = wait_for(browser, lambda b: (b.execute_script(pane) or [None])[0] not in (None, texts[0]), 10)
+                check("a meeting there once, then gone in the same session: the empty window says its ordinary words, no longer ready",
+                      plain, browser.execute_script(pane))
+            else:
+                press(browser, "empty-record")
+                live = wait_for(browser, lambda b: b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+                check("« Record »: a recording starts", live)
+        if example_opens:
+            # Asking for less motion: the third screen the same, nothing of it moving (its shots, light and dark).
+            still = meetings.parent / f"ready-{short}-still"
+            still.mkdir()
+            window = asking_less_motion(Window(still, language, small=True, welcomed=False, args=()))
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}-still"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+            with window as browser:
+                wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+                press(browser, "welcome-skip")
+                shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
+                check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
+                      (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
+                for theme in ("light", "dark"):
+                    browser.execute_script(neutral)
+                    shot_themed(browser, f"d126-ready-{short}-still-{theme}", theme)
+        if not example_opens:
+            # Started again, welcomed, still no meeting: the empty pane says what it says outside a first run.
+            (meetings / "ready").mkdir()
+            window = Window(meetings / "ready", language)
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+            with window as browser:
+                drawn = wait_for(browser, lambda b: b.execute_script(pane) is not None, 10)
+                said = browser.execute_script(pane)
+                check(f"{short}: started again, welcomed: the empty pane is the ordinary one, « Record » not said ready",
+                      drawn and said[0] != texts[0] and said[2] != texts[2], said)
+
+
 def first_run(now: dt.datetime) -> None:
     """Y. The first start (D58): the full window opens on one question, then the setting said plainly."""
     print("Y. the first start: one question, the setting said plainly, private by default (D58)")
@@ -16069,6 +16162,7 @@ def main() -> int:
     transcription_guided(now)
     ollama_pulled(now)
     first_run(now)
+    first_run_ready(now)
     context_written(now)
     confidential_kept(now)
     meeting_language(now)
