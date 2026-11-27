@@ -9408,7 +9408,7 @@ def confidential_locked(now: dt.datetime) -> None:
 def keys_taught(now: dt.datetime) -> None:
     """CX. D128a, Kitokey by the keyboard: Ctrl+R records and stops, Ctrl+F reaches the page's search, Ctrl+, opens
     Settings, Ctrl+Maj+C copies the summary, Échap goes back, J and K the next and previous meeting, « ? » the sheet that
-    lists them all — a modal dialog, axe clean. Each said in its button's tooltip and to a screen reader
+    lists them all, Ctrl+B's fold of the sidebar with them — a modal dialog, axe clean. Each said in its button's tooltip and to a screen reader
     (aria-keyshortcuts). None taken while a field has the focus. J, K and « ? », a single key each, turned off by
     Settings' « Raccourcis à une touche » (WCAG 2.2 SC 2.1.4), on by default; the Ctrl ones then still act."""
     print("CX. Kitokey by the keyboard: Ctrl+R, Ctrl+F, Ctrl+,, Ctrl+Maj+C, Échap, J, K and « ? »'s sheet; said in the tooltips; "
@@ -9508,7 +9508,8 @@ def keys_taught(now: dt.datetime) -> None:
                  " kbd: d.querySelectorAll('kbd').length} : null")
         shown = wait_for(browser, lambda b: b.execute_script(sheet) is not None, 3)
         got = browser.execute_script(sheet) or {}
-        wanted = ("Ctrl+R", "Ctrl+K", "Ctrl+F", "Ctrl+,", "Ctrl+Maj+C", "Échap", "J", "K", "?")
+        # Ctrl+K, the palette, joins the sheet with the palette itself (D128b): a shortcut listed acts.
+        wanted = ("Ctrl+R", "Ctrl+F", "Ctrl+,", "Ctrl+Maj+C", "Ctrl+B", "Échap", "J", "K", "?")
         check("« ? »: the sheet, a modal dialog named « Raccourcis clavier », each shortcut a row with its keys",
               shown and got.get("modal") and got.get("title") == "Raccourcis clavier" and all(any(w in r for r in got["rows"]) for w in wanted) and got["kbd"] >= len(wanted), got)
         violations = axe_violations(browser)
