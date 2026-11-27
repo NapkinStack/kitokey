@@ -14183,7 +14183,15 @@ def engine_cards_drawn(now: dt.datetime) -> None:
               details: c.querySelector(':scope > details > summary') !== null,
               radio: radio ? [radio.name, radio.value, radio.checked, radio.disabled] : null };
           }) };"""
-    with Window(meetings, "fr_FR.UTF-8", 'reminder = false\n', ollama=base) as browser:
+    # A data folder of the scenario's own: the Whisper models here are what it puts there, never what an
+    # earlier scenario of the run left in the shared one (the attest of a09a184 found the default model
+    # there, fetched by another scenario).
+    data = WORK / "data-engine-cards"
+    models = data / "kitokey" / "models"
+    models.mkdir(parents=True)
+    window = Window(meetings, "fr_FR.UTF-8", 'reminder = false\n', ollama=base)
+    window.env.update(XDG_DATA_HOME=str(data))
+    with window as browser:
         wait_for(browser, lambda b: b.execute_script("return typeof words === 'object' && words !== null"), 10)
         auto = browser.execute_async_script(mount, service)
         check("the scopes drawn by engineCards(), from models_offered", isinstance(auto, list), auto)
@@ -14206,10 +14214,24 @@ def engine_cards_drawn(now: dt.datetime) -> None:
               [c["engine"] for c in write[1:]] == ["ollama", "ollama", "service"] and [c["at"] for c in write[1:]] == ["here", "here", "online"],
               write)
         hear = cards["settings-transcribe"]["cards"]
-        check("to transcribe, « Auto » the default Whisper model, to download at its size",
+        check("to transcribe, no Whisper model in the scenario's folder: « Auto » the default one, to download at its size",
               hear[0]["engine"] == "auto" and hear[0]["state"] == "download" and hear[0]["said"] == "À télécharger · 874 Mo".replace(" ", " ")
               and hear[0]["radio"][2] and isinstance(auto, list) and auto[1] == 874_188_075,
               hear)
+        (models / "ggml-large-v3-turbo-q8_0.bin").write_bytes(b"\0" * 16)
+        browser.execute_async_script("""
+            const done = arguments[arguments.length - 1];
+            window.__TAURI__.core.invoke('models_offered', { name: null }).then((offered) => {
+              const cards = engineCards({ words, job: 'transcribe', offered, scope: 'settings', services: [] });
+              cards.box.dataset.cs = 'settings-transcribe-here';
+              document.getElementById('cs-cards').append(cards.box);
+              done(true);
+            }, (why) => done(String(why)));""")
+        here = (browser.execute_script(read, "settings-transcribe-here") or {"cards": []})["cards"]
+        check("then the default Whisper model put in the scenario's folder: « Auto » ready, said « Prêt », the model named",
+              here and here[0]["engine"] == "auto" and here[0]["state"] == "ready" and here[0]["said"] == "Prêt"
+              and "Whisper large v3 turbo" in (here[0]["where"] or ""),
+              here[:1])
         own = cards["meeting-write"]["cards"]
         check("a meeting that chose none: « Par défaut » first, marked and chosen, then the engines",
               own[0]["marked"] and own[0]["radio"][1:3] == ["", True] and sum(c["marked"] for c in own) == 1 and any(c["at"] == "online" for c in own),
