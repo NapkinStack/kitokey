@@ -105,7 +105,11 @@ python3 - "$1" "$here/export-input" <<'END'
 import json, pathlib, sys
 to = pathlib.Path(json.loads(pathlib.Path(sys.argv[2]).read_text())["to"])
 written = to.with_name(to.name + ".part")
-written.write_text((pathlib.Path(sys.argv[1]) / "minutes.md").read_text())
+args = (pathlib.Path(sys.argv[2]).parent / "export-args").read_text().split()
+summary = (pathlib.Path(sys.argv[1]) / "minutes.md").read_text()
+# What exporting/v1 promises, no more: `md` is CommonMark under a YAML front matter (l. 39), its first bytes « --- »;
+# `pdf` a PDF (l. 40), whose first bytes are « %PDF- » (ISO 32000-2, 7.5.2). Written beside, then renamed (l. 95).
+written.write_bytes(b"%PDF-1.7\\n" + summary.encode() if args[args.index("--format") + 1] == "pdf" else summary.encode())
 written.replace(to)
 print(json.dumps({"event": "written", "file": str(to), "bytes": to.stat().st_size}))
 END
@@ -7389,6 +7393,105 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             redrawn = wait_for(browser, lambda b: [e["id"] for e in b.execute_script(bar) or []] == ["share-open", "redo-open", "more-open"], 10)
             check(f"{short}: no date found, no « {said['dates']} » in the bar (D121)", redrawn, browser.execute_script(bar))
 
+
+
+def meeting_exported(now: dt.datetime) -> None:
+    """ME. D121, criterion 2: « Partager » offers « Exporter en PDF » and « Exporter en Markdown », each the file
+    `exporting/v1` writes where the user chooses in the system's dialog: the summary alone (PDR-0007 sends never the
+    transcript), its first bytes the format's own; said once, in place; nothing when the dialog is closed; a file
+    refused said, nothing else. A confidential meeting is exported too, explicitly, its menu saying so in a line
+    (PDR-0007, amended 2026-11-24); an ordinary one has no such line. French light, English dark."""
+    print("ME. « Partager »: « Exporter en PDF » and « Exporter en Markdown », the summary alone, where the user chooses (D121)")
+    meetings = WORK / "exported"
+    plain, private = meetings / "2026-11-24_15-00", meetings / "2026-11-23_09-00"
+    for folder, started in ((plain, now - dt.timedelta(days=1)), (private, now - dt.timedelta(days=2))):
+        session(folder, started, 20, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"On valide le devis."}\n'
+            '{"type":"complete","duration":20.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v3\nmade: 2026-11-24T15:30:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe devis est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — jeudi\n\n## 3.\n\n- Rien\n")
+    (private / "confidential").write_bytes(b"")
+    menu = ("const m = document.getElementById('share-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
+            " return {items: [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim()]),"
+            " note: m.querySelector('.menu-note')?.textContent.trim() ?? null}")
+    said = "return document.getElementById('share-said')?.textContent.trim() ?? null"
+    stub = ("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+            " asked === 'export_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)};"
+            " window.restore = () => { window.__TAURI__.core = real; };")
+    for language, theme, words in (
+        ("fr_FR.UTF-8", "light", {"pdf": "Exporter en PDF", "md": "Exporter en Markdown", "done": "Exporté : « {} ».",
+                                  "failed": "Le fichier n’a pas pu être écrit", "note": "Confidentielle"}),
+        ("en_US.UTF-8", "dark", {"pdf": "Export to PDF", "md": "Export to Markdown", "done": "Exported: “{}”.",
+                                 "failed": "The file couldn’t be written", "note": "Confidential"}),
+    ):
+        short = language[:2]
+        window = Window(meetings, language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            for folder, confidential in ((plain, False), (private, True)):
+                browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "share-open"), 10)
+                time.sleep(0.4)
+                press(browser, "share-open")
+                got = wait_for(browser, lambda b: b.execute_script(menu), 3)
+                got = browser.execute_script(menu) or {}
+                items = [said_ for _, said_ in got.get("items", [])]
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: « Partager » offers « {words['pdf']} » and « {words['md']} » after its sends (D121)",
+                      items[-2:] == [words["pdf"], words["md"]], got)
+                note = got.get("note")
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: the menu's line on a confidential meeting {'said' if confidential else 'absent'} (PDR-0007)",
+                      (note is not None and note.startswith(words["note"])) if confidential else note is None, note)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                for kind, opener, head in (("pdf", "share-pdf", b"%PDF-"), ("md", "share-md", b"---")):
+                    to = WORK / f"exported-{short}-{folder.name}.{kind}"
+                    to.unlink(missing_ok=True)
+                    for kept in ("export-args", "export-input"):
+                        (WORK / kept).unlink(missing_ok=True)
+                    browser.execute_script(stub, str(to))
+                    press(browser, "share-open")
+                    wait_for(browser, lambda b: b.execute_script(menu), 3)
+                    press(browser, opener)
+                    written = wait_for(browser, lambda b: to.is_file() and (b.execute_script(said) or "") != "", 10)
+                    args = (WORK / "export-args").read_text().split() if (WORK / "export-args").is_file() else []
+                    given = json.loads((WORK / "export-input").read_text()) if (WORK / "export-input").is_file() else {}
+                    first = to.read_bytes()[:len(head)] if to.is_file() else b""
+                    # exporting/v1: `--format pdf|md --lang <lang>`, the summary alone; `to` the dialog's path, on the input.
+                    check(f"{short}, {folder.name}, {kind}: written where chosen, the summary alone, its first bytes the format's (exporting/v1 l. 39-40, 95)",
+                          written and args[1:] == ["--format", kind, "--lang", short, "--without-transcript"] and given.get("to") == str(to) and first == head,
+                          [written, args[1:], given.get("to"), first])
+                    check(f"{short}, {folder.name}, {kind}: said once, in place: « {words['done'].format(to.name)} » (#1252)",
+                          browser.execute_script(said) == words["done"].format(to.name)
+                          and browser.execute_script("return [...document.querySelectorAll('[role=status], [aria-live]')].filter((e) => e.textContent.includes(arguments[0])).length", to.name) == 1,
+                          browser.execute_script(said))
+                    browser.execute_script("window.restore()")
+            # The dialog closed: nothing written, nothing said.
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'export_file_chosen' ? Promise.resolve(null) : real.invoke(asked, ...rest)}; window.restore = () => { window.__TAURI__.core = real; };")
+            (WORK / "export-args").unlink(missing_ok=True)
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "share-pdf")
+            time.sleep(1)
+            check(f"{short}: the dialog closed, nothing written, nothing said", not (WORK / "export-args").exists() and browser.execute_script(said) == "", browser.execute_script(said))
+            browser.execute_script("window.restore()")
+            # Refused by the program: said, one action, the file not there.
+            to = WORK / f"refused-{short}.pdf"
+            (WORK / "export-refuse").write_bytes(b"")
+            try:
+                browser.execute_script(stub, str(to))
+                press(browser, "share-open")
+                wait_for(browser, lambda b: b.execute_script(menu), 3)
+                press(browser, "share-pdf")
+                refused = wait_for(browser, lambda b: (b.execute_script(said) or "").startswith(words["failed"]), 10)
+                check(f"{short}: a file refused is said, what to do with it, nothing written", refused and not to.exists(), browser.execute_script(said))
+                browser.execute_script("window.restore()")
+            finally:
+                (WORK / "export-refuse").unlink(missing_ok=True)
+            shot_themed(browser, f"me-exported-{short}-{theme}", theme)
 
 
 def meeting_trashed(now: dt.datetime) -> None:
@@ -15957,6 +16060,7 @@ def main() -> int:
     focus_kept(now)
     focus_swept(now)
     meeting_actions_bar(now)
+    meeting_exported(now)
     meeting_trashed(now)
     sound_checked(now)
     ends_on_sigterm(now)
