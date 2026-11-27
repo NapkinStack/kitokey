@@ -250,6 +250,20 @@ pub fn file() -> Option<PathBuf> {
     dirs::config_dir().map(|folder| folder.join("kitokey").join("settings.toml"))
 }
 
+/// What the bar kept beside the settings for the next recording until D125 took its engine and
+/// language out: no longer read, removed at start so that nothing is left behind.
+const LEFTOVERS: [&str; 2] = ["next-models.json", "next-language.txt"];
+
+/// The bar's next choices an earlier Kitokey left in `folder`, removed: the names of those that
+/// were there, none when they are gone already. Nothing else of the folder is touched; one that
+/// cannot be removed is left, and not named.
+pub fn leftovers_removed(folder: &Path) -> Vec<&'static str> {
+    LEFTOVERS
+        .into_iter()
+        .filter(|name| fs::remove_file(folder.join(name)).is_ok())
+        .collect()
+}
+
 /// The file as it is written: what it names, and where it names each path.
 #[derive(Deserialize)]
 struct Written {
