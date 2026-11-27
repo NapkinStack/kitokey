@@ -141,7 +141,10 @@ test("in the dark theme, the install block stands out of the canvas: its edge at
         return 0.2126 * r + 0.7152 * g + 0.0722 * b;
       };
       const code = getComputedStyle(document.querySelector(".get .code"));
-      const edge = code.outlineStyle !== "none" && parseFloat(code.outlineWidth) >= 1 ? code.outlineColor : code.borderTopColor;
+      // An edge that is drawn: an outline or a border at least 1 px wide. With neither, a border's colour is the text's
+      // (currentColor) and measures nothing: no edge, 1:1.
+      const edge = code.outlineStyle !== "none" && parseFloat(code.outlineWidth) >= 1 ? code.outlineColor
+        : code.borderTopStyle !== "none" && parseFloat(code.borderTopWidth) >= 1 ? code.borderTopColor : getComputedStyle(document.body).backgroundColor;
       const [a, b] = [lum(edge), lum(getComputedStyle(document.body).backgroundColor)].sort((x, y) => y - x);
       return (a + 0.05) / (b + 0.05);
     });
