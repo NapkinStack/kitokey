@@ -162,6 +162,19 @@ fn a_format_it_cannot_read_is_a_wrong_argument_nothing_leaves_nothing_is_written
             json!({"structure": "Notes", "sections": notes()["sections"]}).to_string(),
             "a name with capitals",
         ),
+        // 41 characters: one past minutes/v5's bound, for the name, an id and `actions` (sam's S6 on #1321).
+        (
+            json!({"structure": "n".repeat(41), "sections": notes()["sections"]}).to_string(),
+            "a name of 41 characters",
+        ),
+        (
+            json!({"structure": "notes", "sections": [{"id": "p".repeat(41), "about": "x"}]}).to_string(),
+            "an id of 41 characters",
+        ),
+        (
+            json!({"structure": "notes", "sections": [{"id": "points", "about": "x"}], "actions": "p".repeat(41)}).to_string(),
+            "actions of 41 characters",
+        ),
         (json!({"structure": "notes", "sections": []}).to_string(), "no section"),
         (json!({"structure": "notes", "sections": sections(7)}).to_string(), "seven sections"),
         (
