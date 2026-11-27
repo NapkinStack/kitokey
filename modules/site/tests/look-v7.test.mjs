@@ -131,3 +131,41 @@ test("the first step's track is seen against its tab, in both themes", async () 
     }
   });
 });
+
+test("in the dark theme, the install block stands out of the canvas: its edge at 3:1 at least", async () => {
+  await look(async (browser, origin) => {
+    const page = await open(browser, origin, "fr", "dark");
+    const ratio = await page.evaluate(() => {
+      const lum = (c) => {
+        const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const code = getComputedStyle(document.querySelector(".get .code"));
+      const edge = code.outlineStyle !== "none" && parseFloat(code.outlineWidth) >= 1 ? code.outlineColor : code.borderTopColor;
+      const [a, b] = [lum(edge), lum(getComputedStyle(document.body).backgroundColor)].sort((x, y) => y - x);
+      return (a + 0.05) / (b + 0.05);
+    });
+    assert.ok(ratio >= 3, `the install block's edge at ${ratio.toFixed(2)}:1 against the canvas`);
+    await page.close();
+  });
+});
+
+test("the formats' scene: its switches edged at 3:1 at least against their ground, in both themes", async () => {
+  await look(async (browser, origin) => {
+    for (const scheme of ["light", "dark"]) {
+      const page = await open(browser, origin, "fr", scheme);
+      const ratio = await page.evaluate(() => {
+        const lum = (c) => {
+          const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const sw = document.querySelector(".v-format .sw");
+        const ground = getComputedStyle(sw.closest("svg")).backgroundColor;
+        const [a, b] = [lum(getComputedStyle(sw).stroke), lum(ground)].sort((x, y) => y - x);
+        return (a + 0.05) / (b + 0.05);
+      });
+      assert.ok(ratio >= 3, `${scheme}: the switches' edge at ${ratio.toFixed(2)}:1`);
+      await page.close();
+    }
+  });
+});
