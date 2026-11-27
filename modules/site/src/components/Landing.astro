@@ -1,12 +1,10 @@
 ---
-// /<lang>/: the landing (D114, proposal D validated by the decider on 2026-11-25). Every word from
-// src/lib/landing.mjs. The hero's carousel: the drawn call, then five c18 clips, each slide's poster first.
+// /<lang>/: the landing (D114; site v7 validated by the decider on 2026-11-26, rebuilt section by section).
+// Every word from src/lib/landing.mjs. The hero: the promise, the price, and a drawn scene (the call, Kitokey's
+// bar, the minutes) over the two voices' spectrogram (public/hero.js); the real capture comes after D121.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
-import Call from "./Call.astro";
 import { channels, landing as w, repo } from "../lib/landing.mjs";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { ico } from "../lib/icons.mjs";
 // Each system by its owner's own mark, unaltered (BRANDS.md); Apple's white one on the dark theme.
 const MARKS = { linux: "tux.svg", windows: "windows-logo-2021.svg", apple: "apple-logo-black.svg" };
@@ -15,11 +13,9 @@ const { lang } = Astro.props;
 const t = (key) => w[key][lang];
 const [privacyId, usesId, systemsId, faqId, installId] = t("nav").map(([id]) => id);
 const [h1a, h1b, lead] = t("hero");
+const [buyLine, storeSoon, linuxFree, macSoon] = t("buy");
+const [sceneAlt, callTitle, you, when, confidential, mTitle, mMeta, mProv, mHigh, mText, mActs, acts] = t("scene");
 const [cta, follow] = t("cta");
-const [sLabel, sSlide, sRole, sOf] = t("slider");
-const [callTitle] = t("call");
-// A clip filmed in the app's dark theme too (c18), when its three files are here: the moon shows it.
-const dark = (key) => ["jpg", "mp4", "webm"].every((ext) => existsSync(join(process.cwd(), "public", "clips", `${key}-${lang}-dark.${ext}`)));
 const [chH, chP, chWith] = t("channels");
 const [pEyebrow, pH, pLead] = t("privacy");
 const [localTitle, localAlt] = t("local");
@@ -34,36 +30,51 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
   <script slot="head" src="/site.js" defer is:inline></script>
-  <script slot="head" src="/slider.js" defer is:inline></script>
-  <script slot="head" src="/waves.js" defer is:inline></script>
+  <script slot="head" src="/hero.js" defer is:inline></script>
   <Icons />
   <section class="hero" aria-labelledby="h1">
-    <div class="wrap hero-copy">
-      <h1 id="h1"><span>{h1a}</span> <span class="second">{h1b}</span></h1>
-      <p class="lead">{lead}</p>
-      <div class="hero-cta"><a class="btn btn-lg" href={`#${installId}`}>{cta}</a><a class="btn btn-lg btn-ghost" href={`${repo}/tags`}>{follow}</a></div>
-    </div>
+    <canvas class="voices" aria-hidden="true"></canvas>
     <div class="wrap">
-      <section class="slider" aria-roledescription={sRole} aria-label={sLabel}>
-        <div class="slides" tabindex="0">
-          {t("slides").map(([key, icon, kicker, h, p, alt], i, all) => (
-            <article class="slide" id={`slide-${i}`} data-clip={key === "record" ? undefined : `/clips/${key}-${lang}`} data-dark={key !== "record" && dark(key) ? "" : undefined} aria-roledescription={sSlide} aria-label={`${i + 1} ${sOf} ${all.length}, ${kicker}`}>
-              {key === "record" ? (
-                <div class="slide-media window">
-                  <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">{callTitle}</span></div>
-                  <Call lang={lang} />
-                </div>
-              ) : (
-                <div class="slide-media window">
-                  <div class="window-bar" aria-hidden="true"><span class="lights"><i></i><i></i><i></i></span><span class="wtitle">Kitokey</span></div>
-                  <img class="still" src={`/clips/${key}-${lang}-light.jpg`} width="1280" height="720" alt={alt} loading="lazy" decoding="async" />
-                </div>
-              )}
-              <div class="slide-card"><span class="tile" set:html={ico(icon)} /><p class="kicker">{kicker}</p><h2>{h}</h2>{p && <p>{p}</p>}</div>
-            </article>
-          ))}
+      <div class="pitch">
+        <h1 id="h1"><span class="l">{h1a}</span> <span class="l soft">{h1b}</span></h1>
+        <p class="lead">{lead}</p>
+        <div class="buy">
+          <p class="buy-line">{buyLine}</p>
+          <div class="cta">
+            <a class="store-soon" href={`#${systemsId}`}>{storeSoon}</a>
+            <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
+          </div>
         </div>
-      </section>
+        <p class="cta-note">{macSoon}</p>
+        <p class="assure">{t("assure").map((said) => <span><Fragment set:html={ico("check")} />{said}</span>)}</p>
+      </div>
+      <div class="scene" role="img" aria-label={sceneAlt}>
+        <div class="cbar" aria-hidden="true">
+          <span class="rec"></span><span class="tm num">00:31:08</span>
+          <span class="mtr"><Fragment set:html={ico("mic")} /><span class="tr" data-meter="me" data-n="30"></span></span>
+          <span class="mtr"><Fragment set:html={ico("speaker")} /><span class="tr" data-meter="ot" data-n="30"></span></span>
+          <span class="lockt on" set:html={ico("lock")} />
+          <span class="sep"></span><span class="stop"><i></i></span>
+        </div>
+        <div class="callwin" aria-hidden="true">
+          <div class="cb">{callTitle}</div>
+          <div class="cg">
+            {[["camille", "Camille"], ["hugo", "Hugo"], ["lea", "Léa"], ["vous", you]].map(([img, name], i) => (
+              <div class={i === 0 ? "ct sp" : "ct"}><img src={`/img/call-${img}.webp`} alt="" width="960" height="540" /><span>{name}</span></div>
+            ))}
+          </div>
+        </div>
+        <article class="mcard" aria-hidden="true">
+          <div class="mc-top"><span class="num">{when}</span><span class="chip chip-private"><Fragment set:html={ico("lock")} />{confidential}</span></div>
+          <div class="mc-title">{mTitle}</div>
+          <div class="mc-meta">{mMeta}</div>
+          <div class="prov">{mProv}</div>
+          <p class="mh">{mHigh}</p>
+          <p>{mText}</p>
+          <p class="mh">{mActs}</p>
+          {acts.map(([who, what, day]) => <div class="act-row"><span class="who">{who}</span><span>{what}</span><span class="chip"><Fragment set:html={ico("calendar")} />{day}</span></div>)}
+        </article>
+      </div>
     </div>
   </section>
 
