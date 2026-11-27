@@ -3931,7 +3931,7 @@ def announced(now: dt.datetime) -> None:
             before = browser.execute_script(place)
             gone = wait_for(browser, lambda b: not b.execute_script(line)[0], 20)
             check("after fifteen seconds it is gone", gone, browser.execute_script(line))
-            check("gone, the bar is its row alone again: 440 × 44", wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 44], 3), browser.execute_script("return [innerWidth, innerHeight]"))
+            check("gone, the bar is its row alone again: 440 × 48", wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 48], 3), browser.execute_script("return [innerWidth, innerHeight]"))
             check("Arrêter has not moved", browser.execute_script(place) == before, [before, browser.execute_script(place)])
             stop_from_small(browser)
             check("stopped, the tray's icon is blue again", wait_for(None, lambda b: tray_colour() == "blue", 20), tray_colour())
@@ -4016,7 +4016,7 @@ def heard_checked(now: dt.datetime) -> None:
                 got = browser.execute_script(meters)
                 check("a thin meter per side in the row: its icon, a 14 px trace (#1179), named by its side", got == [[True, 14, me], [True, 14, others]], got)
                 check("at silence, nothing said, the bar its row alone", browser.execute_script(said) == ["", ""]
-                      and wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3), [browser.execute_script(said), browser.execute_script("return innerHeight")])
+                      and wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3), [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 before = browser.execute_script(place)
                 fit(browser, "listening")
                 (taping / "hush").unlink()
@@ -4144,13 +4144,13 @@ def microphone_chosen(now: dt.datetime) -> None:
                 window.env.update(GTK_THEME="Adwaita:dark")
             with window as browser:
                 wait_for(browser, lambda b: b.find_element(By.ID, "small-more").is_displayed(), 8)
-                # Read once the bar settled, bounded: « Plus d’options » shows before bar_fit has made it 44 high (#755).
-                wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
+                # Read once the bar settled, bounded: « Plus d’options » shows before bar_fit has made it 48 high (#755).
+                wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3)
                 closed = browser.execute_script("return [innerWidth, innerHeight, document.getElementById('small-more').getAttribute('aria-label')]")
                 options(browser)
-                opened = wait_for(browser, lambda b: b.execute_script("return innerHeight") > 44, 3)
+                opened = wait_for(browser, lambda b: b.execute_script("return innerHeight") > 48, 3)
                 got = browser.execute_script(state)
-                check(f"{short} {theme}: closed, 440 × 44; « {closed[2]} » opens the options under the row, the bar growing", closed[:2] == [440, 44] and opened
+                check(f"{short} {theme}: closed, 440 × 48; « {closed[2]} » opens the options under the row, the bar growing", closed[:2] == [440, 48] and opened
                       and browser.find_element(By.ID, "small-more").get_attribute("aria-expanded") == "true", [closed, browser.execute_script("return innerHeight")])
                 check(f"{short} {theme}: at rest the name says Auto, closed", auto in got["name"] and not got["panel"], got)
                 to_the_name(browser)
@@ -4220,8 +4220,8 @@ def microphone_chosen(now: dt.datetime) -> None:
                 # Escape in the options, the list closed: they close, the bar back to its row, the focus on its chevron.
                 to_the_name(browser)
                 keys(browser, Keys.ESCAPE)
-                folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
-                check(f"{short} {theme}: Escape closes the options, 44 high again, the focus on « Plus d’options »",
+                folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3)
+                check(f"{short} {theme}: Escape closes the options, 48 high again, the focus on « Plus d’options »",
                       folded and browser.execute_script("return [document.activeElement.id, document.activeElement.getAttribute('aria-expanded')]") == ["small-more", "false"],
                       browser.execute_script("return [innerHeight, document.activeElement.id]"))
                 # The next recording takes it; capture says it gone: said, inside the window, the context open.
@@ -5927,8 +5927,8 @@ def bar_after_stop(now: dt.datetime) -> None:
     focused = "return document.activeElement ? document.activeElement.id : ''"
     said = "const s = document.getElementById('small-last-said'); return s && s.getClientRects().length ? s.textContent : ''"
     shown = "const b = document.getElementById('small-last-open'); return !!b && b.getClientRects().length > 0"
-    # Nothing to say: no line at all under the row, the bar its 44 px — never an empty band.
-    bare = "const l = document.getElementById('small-last'); return !!l && l.getClientRects().length === 0 && innerHeight === 44"
+    # Nothing to say: no line at all under the row, the bar its 48 px — never an empty band.
+    bare = "const l = document.getElementById('small-last'); return !!l && l.getClientRects().length === 0 && innerHeight === 48"
     model = WORK / "after-stop-model.bin"
     model.write_bytes(b"\0" * 16)
     settings = (f'after = "minutes"\nreminder = false\nmodel = "{model}"\n'
@@ -5970,7 +5970,7 @@ def bar_after_stop(now: dt.datetime) -> None:
         gates = [WORK / "gate-hearing", WORK / "gate-minutes"]
         with window as browser:
             wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
-            check(f"{short}: at rest before any recording, the bar says no meeting: no line under its row, 44 px high (D92)",
+            check(f"{short}: at rest before any recording, the bar says no meeting: no line under its row, 48 px high (D92)",
                   browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
                   [browser.execute_script(said), browser.execute_script("return innerHeight")])
             for gate in gates:
@@ -6023,7 +6023,7 @@ def bar_after_stop(now: dt.datetime) -> None:
                 wait_for(browser, lambda b: len(b.window_handles) == 2, 10)
                 browser.switch_to.window([h for h in browser.window_handles if h != main][0])
                 back = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 10)
-                check(f"{short}: back in the bar, it says no meeting: no line under its row, 44 px high (D92)",
+                check(f"{short}: back in the bar, it says no meeting: no line under its row, 48 px high (D92)",
                       back and browser.execute_script(said) == "" and not browser.execute_script(shown) and wait_for(browser, lambda b: b.execute_script(bare), 3),
                       [browser.execute_script(said), browser.execute_script("return innerHeight")])
                 # Another meeting stopped, its transcript held — its page never opened —, and a recording started while it
@@ -8005,10 +8005,10 @@ def focus_swept(now: dt.datetime) -> None:
 
 
 def bar_opened(now: dt.datetime) -> None:
-    """BA. The bar opened (D90, board 6): at rest, the microphone, « Vérifier le son » — D88's panel in
-    the bar — and « Avancé » closed; recording, the context, the microphone recorded, « Confidentielle »
-    and « Avancé », « Vérifier le son » not offered: the meters are in the row."""
-    print("BA. the bar opened: at rest the microphone, « Vérifier le son » opening its panel in the bar, « Avancé » closed; recording the context, the microphone recorded, « Confidentielle » — keyboard alone, both themes, French and English, nothing overflowing (D90)")
+    """BA. The bar opened (D90, board 6): at rest, the microphone and « Vérifier le son » — D88's panel in
+    the bar; recording, the context and the microphone recorded, « Vérifier le son » not offered: the meters
+    and the lock are in the row (D125)."""
+    print("BA. the bar opened: at rest the microphone, « Vérifier le son » opening its panel in the bar, recording the context and the microphone recorded — keyboard alone, both themes, French and English, nothing overflowing (D90)")
     listed = WORK / "microphones"
     listed.write_text(json.dumps({"event": "microphone", "name": "alsa_laptop", "description": "Digital Microphone"}) + "\n")
     mic = subprocess.run(["pactl", "load-module", "module-null-sink", "sink_name=kitokey_e2e_check_mic", "media.class=Audio/Source/Virtual"],
@@ -8083,7 +8083,7 @@ def bar_opened(now: dt.datetime) -> None:
                     # At rest, by the keyboard alone: « Plus d’options », Enter.
                     reached = to_more(browser)
                     keys(browser, Keys.ENTER)
-                    opened = wait_for(browser, lambda b: b.execute_script("return innerHeight") > 44 and any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
+                    opened = wait_for(browser, lambda b: b.execute_script("return innerHeight") > 48 and any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
                     check(f"{name}: at rest, « Plus d’options » reached by Tab opens the options under the row by Enter", reached and opened, browser.execute_script("return innerHeight"))
                     if not opened:
                         continue
@@ -8124,8 +8124,8 @@ def bar_opened(now: dt.datetime) -> None:
                           back and wait_for(None, lambda b: ended.is_file(), 3), [browser.execute_script(focused), ended.is_file()])
                     fit(browser, f"{name}: closed by ×, the bar back to its options")
                     keys(browser, Keys.ESCAPE)
-                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
-                    check(f"{name}: Escape closes the options, 44 high, the focus on « Plus d’options »", folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48 and b.execute_script(focused) == "small-more", 3)
+                    check(f"{name}: Escape closes the options, 48 high, the focus on « Plus d’options »", folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
                     # A recording started from the panel by the keyboard: the panel goes, the focus follows to ■.
                     keys(browser, Keys.ENTER)
                     wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
@@ -8144,9 +8144,9 @@ def bar_opened(now: dt.datetime) -> None:
                     keys(browser, Keys.ENTER)
                     opened = wait_for(browser, lambda b: b.find_element(By.ID, "small-context").is_displayed(), 3)
                     check(f"{name}: recording, « Plus d’options » opened by Enter", reached and opened, browser.execute_script(focused))
-                    order = tabbed(browser, 5)
-                    check(f"{name}: recording, Tab goes to the context, the microphone, then « Confidentielle », the options' last (D125: no « Avancé »)",
-                          order == ["small-full", "small-hide", "small-context", "small-microphone", "small-confidential"], order)
+                    order = tabbed(browser, 4)
+                    check(f"{name}: recording, Tab goes to the context, then the microphone, the options' last (D125: no « Avancé », the lock in the row)",
+                          order == ["small-full", "small-hide", "small-context", "small-microphone"], order)
                     got = browser.execute_script("return [document.getElementById('small-check').getClientRects().length, document.getElementById('small-microphone-next').textContent]")
                     check(f"{name}: recording, « {said['check']} » is not offered; the microphone says the one recorded, and that a change is for the next",
                           got == [0, said["recorded"]], got)
@@ -8160,7 +8160,7 @@ def bar_opened(now: dt.datetime) -> None:
                     keys(browser, Keys.ENTER)
                     wait_for(browser, lambda b: any(e.is_displayed() for e in b.find_elements(By.ID, "small-check")), 3)
                     keys(browser, Keys.ESCAPE)
-                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44 and b.execute_script(focused) == "small-more", 3)
+                    folded = wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48 and b.execute_script(focused) == "small-more", 3)
                     check(f"{name}: Escape on « Plus d’options », opened, folds the options, the focus kept on it",
                           reached and folded, [browser.execute_script("return innerHeight"), browser.execute_script(focused)])
                     unfolded = unfold(browser)
@@ -8169,7 +8169,7 @@ def bar_opened(now: dt.datetime) -> None:
                     # Whether the bar took the Escape, read on the document once its own listener has run.
                     browser.execute_script("window.__escaped = []; document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__escaped.push(e.defaultPrevented); })")
                     keys(browser, Keys.ESCAPE)
-                    # Folded to the row and the line saying the context kept: no longer 44 high.
+                    # Folded to the row and the line saying the context kept: no longer 48 high.
                     folded = wait_for(browser, lambda b: b.execute_script("return document.getElementById('small-options').hidden"), 3)
                     got = browser.execute_script("const f = document.getElementById('small-next-context'); return [f.value, document.activeElement === f, window.__escaped]")
                     check(f"{name}: Escape in the row's context folds the options, taken by the bar, its text and the focus kept", unfolded and folded and got == ["Point", True, [True]],
@@ -8209,7 +8209,7 @@ def bar_opened(now: dt.datetime) -> None:
                     # it follows to ●.
                     tray = {"fr": ("Démarrer", "Arrêter"), "en": ("Start", "Stop")}[short]
                     offered = lambda words: wait_for(None, lambda b: any(label.startswith(words) for label in tray_labels()), 5) and tray_click(words)
-                    for where in ("small-confidential", "small-context"):
+                    for where in ("small-lock", "small-context"):
                         time.sleep(0.6)
                         started = offered(tray[0]) and wait_for(browser, lambda b: b.find_element(By.ID, "small-stop").is_displayed(), 8)
                         browser.execute_script("document.getElementById('small-more').click()")
@@ -8288,12 +8288,12 @@ def context_before_start(now: dt.datetime) -> None:
     meeting = meetings / "2026-10-18_12-00"
     with Window(meetings, "fr_FR.UTF-8", settings, small=True) as browser:
         wait_for(browser, lambda b: b.execute_script(focused) == "small-record", 10)
-        wait_for(browser, lambda b: b.execute_script("return innerHeight") == 44, 3)
+        wait_for(browser, lambda b: b.execute_script("return innerHeight") == 48, 3)
         got = browser.execute_script(field)
-        check("fr light: at rest, the context's field is in the row, empty, named, open; no ✕, no sentence, the bar 44 high",
+        check("fr light: at rest, the context's field is in the row, empty, named, open; no ✕, no sentence, the bar 48 high",
               got["in_row"] and got["shown"] and got["value"] == "" and got["placeholder"] == "Sujet, participants…"
               and got["name"] == "De quoi parle la réunion ? Qui y participe ?" and not got["closed"]
-              and not got["clear"] and not got["kept_shown"] and got["height"] == 44, got)
+              and not got["clear"] and not got["kept_shown"] and got["height"] == 48, got)
         if not got["shown"]:
             return
         fit(browser, "fr light: at rest, the field empty")
@@ -8312,7 +8312,7 @@ def context_before_start(now: dt.datetime) -> None:
         check("fr light: typed at rest, the shell keeps it for the next recording; nothing is written anywhere yet",
               held and not any(meetings.iterdir()), [kept(browser), sorted(p.name for p in meetings.iterdir())])
         fit(browser, "fr light: at rest, a context kept, its sentence under the row")
-        check("fr light: kept, the bar grows by its line", browser.execute_script("return innerHeight") > 44, browser.execute_script("return innerHeight"))
+        check("fr light: kept, the bar grows by its line", browser.execute_script("return innerHeight") > 48, browser.execute_script("return innerHeight"))
         time.sleep(0.3)
         shot_themed(browser, "d91-context-rest-fr-light", "light")
         order = tab_round(browser, 2)
@@ -8384,7 +8384,7 @@ def context_before_start(now: dt.datetime) -> None:
         stop_from_small(browser)
         wait_for(browser, lambda b: b.find_element(By.ID, "small-record").is_displayed(), 10)
         wait_for(None, lambda b: (meeting / "transcript.jsonl").is_file(), 15)
-        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar its row of 44 and nothing under it
+        # Cleared by its ✕: nothing is kept for the next, the sentence gone, the bar its row of 48 and nothing under it
         # but the meeting just stopped (D92's line), the focus in the field.
         browser.find_element(By.ID, "small-next-context").click()
         keys(browser, "Pour la suite")
@@ -8392,11 +8392,11 @@ def context_before_start(now: dt.datetime) -> None:
         press(browser, "small-context-clear")
         row_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
                      " const p = document.getElementById('small'), l = document.getElementById('small-last');"
-                     " return lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                     " return lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 48"
                      " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
         cleared = wait_for(browser, lambda b: kept(b) == "" and b.execute_script(row_alone), 3)
         got = browser.execute_script(field)
-        check("fr light: cleared by its ✕, nothing is kept, nothing said of it, the row 44 high and D92's one line alone under it, the focus in the field",
+        check("fr light: cleared by its ✕, nothing is kept, nothing said of it, the row 48 high and D92's one line alone under it, the focus in the field",
               cleared and got["value"] == "" and not got["kept_shown"] and not got["clear"] and browser.execute_script(focused) == "small-next-context", [kept(browser), got])
         # Emptied by the keyboard too.
         keys(browser, "Encore")
@@ -12114,19 +12114,16 @@ def confidential_kept(now: dt.datetime) -> None:
         ActionChains(browser).send_keys(Keys.ENTER).perform()
         started = wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
         press(browser, "small-more")
-        # The options drawn before they are read: the bar grows to hold them after the press.
-        wait_for(browser, lambda b: b.find_element(By.CSS_SELECTOR, "#small .confidential").is_displayed(), 5)
-        row = browser.find_element(By.CSS_SELECTOR, "#small .confidential")
-        check("recording, the bar's options offer « Réunion confidentielle — rien ne quitte cet ordinateur », off",
-              started and "Réunion confidentielle" in row.text and "Rien ne quitte cet ordinateur" in row.text
-              and switch(browser, "small-confidential").get_attribute("role") == "switch"
-              and not switch(browser, "small-confidential").is_selected(), row.text)
-        check("the lock before its words is drawn, never read aloud",
-              browser.execute_script("return document.querySelector('#small .confidential svg.lock')?.getAttribute('aria-hidden')") == "true")
+        # One lock in the row (D125): a toggle button, named, not pressed.
+        lock = ("const l = document.getElementById('small-lock');"
+                " return l && [l.getClientRects().length > 0, l.getAttribute('aria-label'), l.getAttribute('aria-pressed'), l.querySelector('svg')?.getAttribute('aria-hidden')]")
+        check("recording, the bar's row offers its lock « Réunion confidentielle », not pressed, its drawing never read aloud",
+              started and browser.execute_script(lock) == [True, "Réunion confidentielle", "false", "true"], browser.execute_script(lock))
         time.sleep(0.4)
         seen(browser, "d60-1-small-off-light")
         wait_for(browser, lambda b: (meeting / "session.json").exists(), 3)
-        switch(browser, "small-confidential").send_keys(Keys.SPACE)
+        browser.execute_script("document.getElementById('small-lock').focus()")
+        ActionChains(browser).send_keys(Keys.SPACE).perform()
         marked = wait_for(browser, lambda b: (meeting / "confidential").exists(), 3)
         check("turned on by the keyboard, the meeting's file confidential is written, empty, nothing beside it",
               marked and (meeting / "confidential").read_bytes() == b"" and names(meeting) == ["confidential", "session.json"], names(meeting))
@@ -12266,13 +12263,13 @@ def confidential_kept(now: dt.datetime) -> None:
         wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
         wait_for(browser, lambda b: (english / "2026-10-18_12-00" / "session.json").exists(), 3)
         press(browser, "small-more")
-        press(browser, "small-confidential")
+        press(browser, "small-lock")
         marked = wait_for(browser, lambda b: (english / "2026-10-18_12-00" / "confidential").exists(), 3)
-        row = browser.find_element(By.CSS_SELECTOR, "#small .confidential").text
+        row = browser.execute_script("const l = document.getElementById('small-lock'); return [l.getAttribute('aria-label'), l.getAttribute('aria-pressed')]")
         held = wait_for(browser, whole, 5)
-        # Which part failed said with it (#850): the mark written, the row's words, the window's height.
-        check("in English, « Confidential meeting — nothing leaves this computer », on, the window whole",
-              marked and "Confidential meeting" in row and "Nothing leaves this computer" in row and held,
+        # Which part failed said with it (#850): the mark written, the lock's name and state, the window's height.
+        check("in English, the lock « Confidential meeting » pressed, the window whole",
+              marked and row == ["Confidential meeting", "true"] and held,
               {"marked": marked, "row": row, "fits": fits(browser)})
         seen(browser, "d60-2-small-on-dark")
         stop_from_small(browser)
@@ -12404,20 +12401,19 @@ def nothing_silent(now: dt.datetime) -> None:
     with Window(recorded, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True) as browser:
         press(browser, "small-record")
         wait_for(browser, lambda b: shown(b, "small-stop"), 10)
-        press(browser, "small-more")
-        made = wait_for(browser, lambda b: list(recorded.glob("*/session.json")) and shown(b, "small-confidential"), 15)
+        made = wait_for(browser, lambda b: list(recorded.glob("*/session.json")) and shown(b, "small-lock"), 15)
         folder = next(recorded.glob("*/session.json")).parent if made else recorded
         folder.chmod(0o555)
-        click = "document.getElementById('small-confidential').click()"
+        click = "document.getElementById('small-lock').click()"
         top = "return document.getElementById('small-stop').getBoundingClientRect().top"
         try:
             before = browser.execute_script(top)
             browser.execute_script(click)
             said = wait_for(browser, lambda b: shown(b, "small-said"), 8)
             check("said, Arrêter stays where it is", browser.execute_script(top) == before)
-            check("confidential refused in the small window: said, its lock off, never promising what is not so",
+            check("confidential refused in the small window: said, its lock not pressed, never promising what is not so",
                   said and "Impossible de marquer la réunion comme confidentielle" in text(browser, "small-said")
-                  and "on" not in browser.execute_script("return document.getElementById('small-confidential').closest('.confidential').className").split(),
+                  and browser.execute_script("return document.getElementById('small-lock').getAttribute('aria-pressed')") == "false",
                   text(browser, "small-said"))
         finally:
             folder.chmod(0o755)
@@ -15442,7 +15438,7 @@ def main() -> int:
             listed = wait_for(browser, lambda b: len(b.find_elements(By.CSS_SELECTOR, "#groups .session")) == 2, 5)
             check("a meeting whose audio was freed is still listed; the whole one is not", listed)
 
-    with section("Q. the recording bar (D35, D90): opened first, at rest, 440 × 44; recording in it; back to rest at the stop; one window at a time"):
+    with section("Q. the recording bar (D35, D90): opened first, at rest, 440 × 48; recording in it; back to rest at the stop; one window at a time"):
         taping = WORK / "taping"
         taping.mkdir()
         with (window := Window(taping, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', small=True)) as browser:
@@ -15456,9 +15452,9 @@ def main() -> int:
                    "return {size: [innerWidth, innerHeight], row: document.querySelector('#small .bar-row').getBoundingClientRect().height,"
                    " mark: shown('#small .handle svg.mark').length, buttons: shown('#small .bar-row button').map(b => [b.id, b.getBoundingClientRect().height, b.getBoundingClientRect().width, b.textContent.trim(), b.getAttribute('aria-label'), b.title]),"
                    " gone: shown('#small .last, #small-keys, #small .none').length, scroll: [document.scrollingElement.scrollHeight, document.scrollingElement.clientHeight]}")
-            rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 44], 5)
+            rest = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 48], 5)
             got = browser.execute_script(row)
-            check("at rest the bar is 440 × 44: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 44 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
+            check("at rest the bar is 440 × 48: one row, the mark as its handle, nothing to scroll", rest and got["row"] == 48 and got["mark"] == 1 and got["scroll"][0] <= got["scroll"][1], got)
             check("●, « Plus d’options », the whole window and « Masquer la barre », each 28 px, an icon alone named by its words, its tooltip the same",
                   [b[0] for b in got["buttons"]] == ["small-record", "small-more", "small-full", "small-hide"] and all(b[1] == b[2] == 28 and b[3] == "" and b[4] and b[5].startswith(b[4]) for b in got["buttons"])
                   and got["buttons"][2][4] == "Ouvrir la fenêtre complète", got["buttons"])
@@ -15483,7 +15479,7 @@ def main() -> int:
             got = browser.execute_script(live)
             check("recording: ■ in the row, 28 px, an icon named « Arrêter l’enregistrement »; ● gone", got["stop"] == [28, 28, "", "Arrêter l’enregistrement", True] and got["record"] == 0, got)
             check("the handle's dot red and larger; the time in the row, in tabular figures", got["dot"] == [True, "2.2"] and got["time"] == [1, "tabular-nums"], got)
-            check("as at rest, 440 × 44: the row alone, its meters in it (D90)", wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 44], 3), browser.execute_script("return [innerWidth, innerHeight]"))
+            check("as at rest, 440 × 48: the row alone, its meters in it (D90)", wait_for(browser, lambda b: b.execute_script("return [innerWidth, innerHeight]") == [440, 48], 3), browser.execute_script("return [innerWidth, innerHeight]"))
             shot(browser, "6-small")
             fits = browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight];")
             check("it holds in its window, nothing to scroll", fits[0] <= fits[1], fits)
@@ -15518,8 +15514,8 @@ def main() -> int:
             rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
             stopped = '"stopped"' in (taping / "2026-10-18_12-00" / "session.json").read_text()
             check("■ stops the recording, and the bar comes back to rest — it does not close", rest and stopped and browser.window_handles == [small], browser.window_handles)
-            back = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 44], 5)
-            check("at rest again, 440 × 44, the handle's dot back", back and browser.execute_script("return document.querySelector('#small .handle .dot').getAttribute('r')") == "1.6", browser.execute_script(row))
+            back = wait_for(browser, lambda b: b.execute_script(row)["size"] == [440, 48], 5)
+            check("at rest again, 440 × 48, the handle's dot back", back and browser.execute_script("return document.querySelector('#small .handle .dot').getAttribute('r')") == "1.6", browser.execute_script(row))
             shot(browser, "6-small-after")
             try:
                 browser.find_element(By.ID, "small-full").click()
@@ -15564,14 +15560,14 @@ def main() -> int:
             browser.find_element(By.ID, "small-stop").click()
             rest = wait_for(browser, lambda b: b.find_elements(By.ID, "small-record") and b.find_element(By.ID, "small-record").is_displayed(), 5)
             check("opened from the full window during a recording, it too comes back to rest, in English", rest and browser.find_element(By.ID, "small-record").get_attribute("aria-label") == "Start recording")
-            # Its transcript follows the stop: the bar at rest is its row of 44 and D92's one line alone under it, saying
+            # Its transcript follows the stop: the bar at rest is its row of 48 and D92's one line alone under it, saying
             # that meeting (#939), as context_before_start reads it.
             rest_alone = ("const lines = [...document.querySelectorAll('#small .bar-lines > *')].filter(e => e.id !== 'small-last' && e.getClientRects().length);"
                           " const p = document.getElementById('small'), l = document.getElementById('small-last');"
-                          " return innerWidth === 440 && lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 44"
+                          " return innerWidth === 440 && lines.length === 0 && Math.round(document.querySelector('#small .bar-row').getBoundingClientRect().height) === 48"
                           " && Math.abs(innerHeight - Math.ceil(p.getBoundingClientRect().height)) <= 1 && (l.hidden || l.getBoundingClientRect().height <= 20)")
             back = wait_for(browser, lambda b: b.execute_script(rest_alone), 5)
-            check("at rest, in English, 440 wide again: its row of 44, and D92's one line alone under it (#939)", back,
+            check("at rest, in English, 440 wide again: its row of 48, and D92's one line alone under it (#939)", back,
                   browser.execute_script("return [innerWidth, innerHeight, document.getElementById('small-last')?.textContent]"))
 
     with section("I. the window, in English; and a folder with no session"):
