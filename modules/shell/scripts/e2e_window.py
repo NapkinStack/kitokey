@@ -9370,6 +9370,7 @@ def confidential_locked(now: dt.datetime) -> None:
                 window.env.update(GTK_THEME="Adwaita:dark")
             with window as browser:
                 check(f"{short}, {theme}: at rest, no lock", not (browser.execute_script(lock) or {}).get("shown"), browser.execute_script(lock))
+                shot_themed(browser, f"cp-rest-{short}-{theme}", theme)
                 browser.find_element(By.ID, "small-record").click()
                 wait_for(browser, lambda b: b.find_elements(By.ID, "small-stop") and b.find_element(By.ID, "small-stop").is_displayed(), 10)
                 # Half a second after the start: a press within it is the same one (D68), and ■ below would be lost.
@@ -9380,6 +9381,7 @@ def confidential_locked(now: dt.datetime) -> None:
                 check(f"{short}, {theme}: recording, one lock in the row, a button not pressed, named « {named} » for a screen reader and in its tooltip; no switch, no second lock",
                       got.get("shown") and got["tag"] == "BUTTON" and got["type"] == "button" and got["pressed"] == "false" and got["label"] == named
                       and got["title"] == named and got["drawn"] and got["inside"] and got["row"] and got["others"] == [], got)
+                shot_themed(browser, f"cp-unpressed-{short}-{theme}", theme)
                 browser.execute_script("document.getElementById('small-lock').click()")
                 pressed = wait_for(browser, lambda b: b.execute_script(lock)["pressed"] == "true" and (folder / "confidential").exists(), 3)
                 got = browser.execute_script(lock)
@@ -9417,7 +9419,8 @@ def bar_stop_neutral(now: dt.datetime) -> None:
              " square: getComputedStyle(square).backgroundColor, text: probe('backgroundColor', 'var(--color-text)'), time: getComputedStyle(time).color, text_colour: probe('color', 'var(--color-text)'),"
              " live: getComputedStyle(live).fill, record: probe('color', 'var(--color-record)'), reds,"
              " out: [...row.children].filter((x) => x.getClientRects().length && (x.getBoundingClientRect().left < -0.5 || x.getBoundingClientRect().right > innerWidth + 0.5)).map((x) => x.id || x.className),"
-             " scroll: [row.scrollWidth, row.clientWidth],"
+             " scroll: [row.scrollWidth, row.clientWidth], gap: getComputedStyle(row).columnGap, wanted_gap: probe('columnGap', 'var(--sp-2)'),"
+             " meters: Math.round(document.querySelector('#small .meters').getBoundingClientRect().width),"
              " separated: !!before && before.classList.contains('bar-separator') && before.getAttribute('aria-hidden') === 'true' && before.getClientRects().length > 0}")
     ring = "const a = document.activeElement; const s = getComputedStyle(a); return [a.id, s.outlineStyle, s.outlineWidth]"
     hover = "return [getComputedStyle(document.getElementById('small-stop')).backgroundColor, (() => { const p = document.createElement('i'); p.style.backgroundColor = 'var(--color-hover)'; document.body.append(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; })()]"
@@ -9437,7 +9440,8 @@ def bar_stop_neutral(now: dt.datetime) -> None:
             got = browser.execute_script(looks)
             check(f"{theme}: recording, the row and the bar 48 high", got["row"] == 48 and got["height"] == 48, got)
             check(f"{theme}: a separator, unseen by a screen reader, then ■", got["separated"], got)
-            check(f"{theme}: recording, the whole row inside the bar, nothing to scroll", got["out"] == [] and got["scroll"][0] <= got["scroll"][1], got)
+            check(f"{theme}: recording, the row's items 8 px apart (Round 4), the whole row inside the bar, nothing to scroll",
+                  got["gap"] == got["wanted_gap"] and got["out"] == [] and got["scroll"][0] <= got["scroll"][1], got)
             check(f"{theme}: ■ neutral — 32 × 32, the small radius, the sunken ground edged 1 px by the divider, its square in the text's colour",
                   got["size"] == [32, 32] and got["radius"] == got["wanted_radius"] and got["ground"] == got["sunken"]
                   and got["edge"] == ["1px", got["divider"]] and got["square"] == got["text"], got)

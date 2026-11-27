@@ -354,7 +354,7 @@ body.small-window { background: var(--surface); }
 body.small-window .frame { display: none; }
 #small { max-width: none; padding: 0; gap: 0; }
 /* 48 high, its controls 32 (D125, the decider's Round 4 of 2026-11-26). */
-#small .bar-row { display: flex; align-items: center; gap: var(--sp-1); height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4); }
+#small .bar-row { display: flex; align-items: center; gap: var(--sp-2); height: 48px; padding: 0 var(--sp-2) 0 var(--sp-4); }
 #small .bar-space { flex: 1 1 auto; }
 /* Said confidential while it records (#1204, D125): one lock, a toggle; pressed, in the meeting's green, as
    « Confidentielle »'s chip (3:1 on the surface at least, tests/look.rs). */
