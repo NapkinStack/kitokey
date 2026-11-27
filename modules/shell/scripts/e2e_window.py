@@ -2117,19 +2117,20 @@ def first_read_said(browser, ids, expected, got) -> None:
     print(f"  #965  first read {got}, a second later {later}; the page just after the first read: {now}")
 
 def first_run_screens(now: dt.datetime) -> None:
-    """CV. D126, the first run's screens (1) and (2) (criterion 1 as #1280 amended it, mock-up v6). (1) Three cards by
-    kind of engine, no list of models: « Auto », marked « Par défaut » and checked, « Sur cet ordinateur », « Service en
-    ligne »; the download of what « Auto » needs starts at once, before any click, but only what downloads without an
+    """CV. D126, the first run's screens (1) and (2) (criterion 1 as #1280 amended it, mock-up v5's screens 1 and 1b), in
+    French and in English, each screen shot in both themes. (1) Three cards by kind of engine, no list of models: « Auto »,
+    marked « Par défaut », checked and saying what it resolves to, « Sur cet ordinateur », « Service en ligne », each with
+    its facts; the download of what « Auto » needs starts at once, before any click, but only what downloads without an
     install — Whisper's model; Ollama absent, « Auto » to write says it is to install and nothing is pulled;
-    « Je choisirai plus tard » keeps « Auto » — nothing written for who writes. (2) The sound checked inline, its two meters, a progress of what is
-    prepared with its size; « Ça marche » ends on screen (3), the empty window said ready (CU)."""
+    « Je choisirai plus tard » keeps « Auto » — nothing written for who writes. (2) The sound checked inline, its two meters moving, a progress of what is
+    prepared with its size and the time left; « Ça marche » ends on screen (3), the empty window said ready (CU)."""
     print("CV. the first run: three engine cards, Auto's download at once, the sound checked while it comes (D126)")
-    served, model = WORK / "served-first", os.urandom(300_000)
+    served, model = WORK / "served-first", os.urandom(900_000)
     served.mkdir()
     (served / "model.bin").write_bytes(model)
     asked = []
 
-    # Served slowly, as T serves it: its coming is seen on screen (2).
+    # Served slowly, as T serves it: about 9 s, so that its coming, its size and the time left are still seen on screen (2).
     class Slow(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(served), **kwargs)
@@ -2145,50 +2146,73 @@ def first_run_screens(now: dt.datetime) -> None:
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Slow)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    meetings = WORK / "first-screens"
-    meetings.mkdir()
-    window = Window(meetings, "fr_FR.UTF-8", small=True, welcomed=False, args=())
-    window.env.update(XDG_DATA_HOME=str(WORK / "data-first-screens"), KITOKEY_SPEECH=str(WORK / "nowhere"),
-                      KITOKEY_MODEL_PUBLISHED=f"http://127.0.0.1:{server.server_address[1]}/model.bin {len(model)} {hashlib.sha256(model).hexdigest()}")
     cards = ("const f = document.querySelector('#welcome fieldset.engine-cards[data-job=write]'); return f ? "
              "[...f.querySelectorAll('.engine-card')].map((c) => [c.dataset.engine, c.querySelector('input').checked,"
-             " c.querySelector('.default')?.textContent ?? null]) : null")
+             " c.querySelector('.default')?.textContent ?? null, c.querySelectorAll('.facts > *').length,"
+             " c.querySelector('.details')?.textContent.trim() ?? '']) : null")
+    title = "const h = document.querySelector(arguments[0] + ' h1'); return h && h.offsetParent ? h.textContent.trim() : null"
     logs = WORK / "state" / "kitokey" / "logs"
     pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
-    pulled_before = pulls()
+    size, left = r"\d[\d,.]*\s?(Ko|Mo|Go|kB|MB|GB)", r"\d+\s?(s|min)\b"
     try:
-        with window as browser:
-            drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
-            got = browser.execute_script(cards)
-            check("(1) three cards by kind of engine, « Auto » first, marked « Par défaut » and checked, no list of models",
-                  drawn and [c[0] for c in got] == ["auto", "local", "online"] and got[0][1] and got[0][2] == "Par défaut"
-                  and not any(c[1] for c in got[1:]) and not browser.find_elements(By.CSS_SELECTOR, "#welcome select"), got)
-            fetching = wait_for(browser, lambda b: "/model.bin" in asked, 5)
-            check("(1) the download of what « Auto » needs starts at once, before any click", fetching, asked)
-            # Ollama silent (the scenario's address answers nothing): « Auto » to write cannot be downloaded, only installed.
-            auto = browser.execute_script("return document.querySelector('#welcome .engine-card[data-engine=auto]')?.dataset.state ?? null")
-            time.sleep(2)
-            check("(1) Ollama absent: « Auto » says it is to install, and nothing impossible is started — no model pulled",
-                  auto == "install" and pulls() == pulled_before, (auto, pulls() - pulled_before))
-            press(browser, "first-later")
-            sound = wait_for(browser, lambda b: b.find_elements(By.ID, "first-sound") and b.find_element(By.ID, "first-sound").is_displayed(), 10)
-            text = window.file.read_text()
-            check("(1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (2)",
-                  sound and "minutes_provider" not in text and "minutes_model" not in text, text)
-            meters = browser.execute_script("return [...document.querySelectorAll('#first-sound .first-meter')].map((m) => m.dataset.side)")
-            check("(2) the sound checked inline: two meters, the microphone and the call", meters == ["local", "remote"], meters)
-            progress = browser.execute_script("const p = document.getElementById('first-progress');"
-                                              " return p ? [p.getAttribute('role'), p.textContent] : null")
-            check("(2) a progress of what is prepared, with its size, while it comes",
-                  progress is not None and progress[0] == "progressbar" and "Ko" in progress[1].replace("\xa0", " "), progress)
-            violations = axe_violations(browser)
-            check("(2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
-            for theme in ("light", "dark"):
-                shot_themed(browser, f"d126-sound-fr-{theme}", theme)
-            press(browser, "first-works")
-            ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
-                             and b.find_element(By.ID, "none").text == "Prêt. Enregistrez votre premier appel.", 10)
-            check("« Ça marche »: screen (3), the empty window said ready (CU)", ready, browser.find_element(By.ID, "none").text)
+        # The words of mock-up v5, screens 1 and 1b, in French; the English ones are the same keys' (words.rs).
+        for locale, lang, words in (("fr_FR.UTF-8", "fr", ("Deux questions, et c’est prêt.", "On vérifie le son pendant que tout se prépare.")),
+                                    ("en_US.UTF-8", "en", None)):
+            asked.clear()
+            meetings = WORK / f"first-screens-{lang}"
+            meetings.mkdir()
+            window = Window(meetings, locale, small=True, welcomed=False, args=())
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-first-screens-{lang}"), KITOKEY_SPEECH=str(WORK / "nowhere"),
+                          KITOKEY_MODEL_PUBLISHED=f"http://127.0.0.1:{server.server_address[1]}/model.bin {len(model)} {hashlib.sha256(model).hexdigest()}")
+            pulled_before = pulls()
+            with window as browser:
+                drawn = wait_for(browser, lambda b: b.execute_script(cards) is not None, 10)
+                got = browser.execute_script(cards)
+                check(f"{lang}: (1) three cards by kind of engine, « Auto » first, marked as the default and checked, no list of models",
+                      drawn and [c[0] for c in got] == ["auto", "local", "online"] and got[0][1] and got[0][2]
+                      and (lang != "fr" or got[0][2] == "Par défaut")
+                      and not any(c[1] for c in got[1:]) and not browser.find_elements(By.CSS_SELECTOR, "#welcome select"), got)
+                check(f"{lang}: (1) each card with its facts, « Auto » saying what it resolves to",
+                      drawn and all(c[3] > 0 for c in got) and got[0][4] != "", got)
+                shown = browser.execute_script(title, "#welcome")
+                check(f"{lang}: (1) its title, mock-up v5's", shown and (words is None or shown == words[0]), shown)
+                fetching = wait_for(browser, lambda b: "/model.bin" in asked, 5)
+                check(f"{lang}: (1) the download of what « Auto » needs starts at once, before any click", fetching, asked)
+                if lang == "fr":
+                    # Ollama silent (the scenario's address answers nothing): « Auto » to write cannot be downloaded, only installed.
+                    auto = browser.execute_script("return document.querySelector('#welcome .engine-card[data-engine=auto]')?.dataset.state ?? null")
+                    time.sleep(2)
+                    check("(1) Ollama absent: « Auto » says it is to install, and nothing impossible is started — no model pulled",
+                          auto == "install" and pulls() == pulled_before, (auto, pulls() - pulled_before))
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-choice-{lang}-{theme}", theme)
+                press(browser, "first-later")
+                sound = wait_for(browser, lambda b: b.find_elements(By.ID, "first-sound") and b.find_element(By.ID, "first-sound").is_displayed(), 10)
+                if lang == "fr":
+                    text = window.file.read_text()
+                    check("(1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (2)",
+                          sound and "minutes_provider" not in text and "minutes_model" not in text, text)
+                shown = browser.execute_script(title, "#first-sound")
+                check(f"{lang}: (2) its title, mock-up v5's", sound and shown and (words is None or shown == words[1]), shown)
+                meters = "return [...document.querySelectorAll('#first-sound .first-meter')].map((m) => [m.dataset.side, m.lastElementChild?.style.height ?? ''])"
+                # The capture stand-in hears 40 % on the microphone, 5 % on the call (scenario AZ's levels).
+                moving = wait_for(browser, lambda b: b.execute_script(meters) == [["local", "40%"], ["remote", "5%"]], 5)
+                check(f"{lang}: (2) the sound checked inline: two meters, the microphone and the call, each moving with its level",
+                      moving, browser.execute_script(meters))
+                progress = "const p = document.getElementById('first-progress'); return p ? [p.getAttribute('role'), p.textContent.replace(/\\s/g, ' ')] : null"
+                said = wait_for(browser, lambda b: (p := b.execute_script(progress)) and len(re.findall(size, p[1])) >= 2 and re.search(left, p[1]), 5)
+                got = browser.execute_script(progress)
+                check(f"{lang}: (2) a progress of what is prepared, its size come and in all, and the time left, while it comes",
+                      said and got[0] == "progressbar", got)
+                violations = axe_violations(browser)
+                check(f"{lang}: (2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-sound-{lang}-{theme}", theme)
+                if lang == "fr":
+                    press(browser, "first-works")
+                    ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
+                                     and b.find_element(By.ID, "none").text == "Prêt. Enregistrez votre premier appel.", 10)
+                    check("« Ça marche »: screen (3), the empty window said ready (CU)", ready, browser.find_element(By.ID, "none").text)
     finally:
         server.shutdown()
 
