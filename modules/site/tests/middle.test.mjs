@@ -5,10 +5,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dist } from "./helpers.mjs";
+import { dist, unwrapped } from "./helpers.mjs";
 import { landing } from "../src/lib/landing.mjs";
 
-const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
+const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8").then(unwrapped);
 const sections = async (lang) => [...(await page(lang)).matchAll(/<section class="mid[^"]*"[\s\S]*?<\/section>/g)].map((m) => m[0]);
 const text = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 

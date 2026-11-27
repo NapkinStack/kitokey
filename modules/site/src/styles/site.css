@@ -55,6 +55,8 @@ p { text-wrap: pretty; }
 .skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
 .skip:focus { top: 10px; color: var(--on-accent); }
 .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+/* A compound word kept whole (src/lib/nb.mjs): it never breaks at its hyphen. */
+.nb { white-space: nowrap; }
 @media (min-width: 700px) { .wrap { padding: 0 32px; } }
 
 /* ---- A page of text: the privacy policy ---- */
