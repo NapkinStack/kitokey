@@ -1563,3 +1563,25 @@ fn a_dialog_and_a_toast_pop_and_not_for_who_asked_for_less_motion() {
     );
     assert!(!STYLE.contains("--ease-spring"), "a spring overshoots");
 }
+
+/// #1310: a card's radio is drawn by the design system, not by the platform, whose unchecked ring WebKitGTK draws at
+/// 1.57:1 in light and 1.84:1 in dark. Its ring is the edge role, which ROLE_PAIRS holds at 3:1 on the surface
+/// (WCAG 2.2 SC 1.4.11); checked, the accent's ring and dot.
+#[test]
+fn a_cards_radio_is_ringed_in_the_edge_role() {
+    for one in [".engine-card input", ".option-card input"] {
+        assert_eq!(given(COMPONENTS, one, "appearance").as_deref(), Some("none"), "{one}");
+        assert_eq!(given(COMPONENTS, one, "-webkit-appearance").as_deref(), Some("none"), "{one}");
+        let border = given(COMPONENTS, one, "border").unwrap_or_default();
+        assert!(border.ends_with("solid var(--color-edge)"), "{one}: {border}");
+        let checked = format!("{one}:checked");
+        assert_eq!(
+            given(COMPONENTS, &checked, "border-color").as_deref(),
+            Some("var(--color-accent)"),
+            "{checked}"
+        );
+        let dot = given(COMPONENTS, &checked, "background").unwrap_or_default();
+        assert!(dot.contains("var(--color-accent)"), "{checked}: {dot}");
+    }
+    assert!(ROLE_PAIRS.contains(&("--color-edge", "--color-surface", 3.0)));
+}
