@@ -13060,6 +13060,8 @@ def nothing_silent(now: dt.datetime) -> None:
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: shown(b, "none"), 5)
         check("no meeting: what to do first, never only a path", said and text(browser, "none-do").startswith("Pour commencer, cliquez sur Démarrer un enregistrement") and shown(browser, "empty-record"))
+        check("no meeting: its folder said from the home, in French (#1304)",
+              text(browser, "empty-folder") == "Les réunions sont enregistrées dans Dossier personnel / silence-none.", text(browser, "empty-folder"))
         browser.execute_script("document.getElementById('empty').scrollIntoView()")
         for theme in ("light", "dark"):
             shot_themed(browser, f"d67-none-{theme}", theme)
@@ -15003,8 +15005,10 @@ def main() -> int:
             said = not_saved()
             check("a folder that is not a whole path is said, and nothing changes", said.startswith("Non enregistré") and window.file.read_text() == text, said)
             browser.execute_script("location.hash = '#/'")
-            listed = wait_for(browser, lambda b: str(elsewhere) in b.find_element(By.ID, "empty-folder").text, 5)
-            check("the list reads the folder chosen", listed, browser.find_element(By.ID, "empty-folder").text)
+            # Said from the home, as Settings says it (#1304): never the machine's path.
+            listed = wait_for(browser, lambda b: b.find_element(By.ID, "empty-folder").text
+                              == "Les réunions sont enregistrées dans Dossier personnel / elsewhere / Kitokey.", 5)
+            check("the list reads the folder chosen, said from the home", listed, browser.find_element(By.ID, "empty-folder").text)
             browser.find_element(By.ID, "settings-link").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"))
             # This computer's Ollama saved, and not answering (here, nothing listens on its port): said
@@ -15992,7 +15996,18 @@ def main() -> int:
         empty.mkdir()
         with Window(empty, "en_GB.UTF-8") as browser:
             said = [browser.find_element(By.ID, i).text for i in ("none", "empty-folder")]
-            check("an empty folder is said, with its path on a line of its own (#775)", said == ["No meeting yet.", f"Meetings are saved in {empty}."], said)
+            check("an empty folder is said, from the home, on a line of its own (#775, #1304)", said == ["No meeting yet.", "Meetings are saved in Home folder / empty."], said)
+            # Unreadable, said in English from the home too (#1304), then read again once given back.
+            empty.chmod(0)
+            try:
+                browser.execute_script("window.dispatchEvent(new Event('focus'))")
+                none = lambda b: b.find_element(By.ID, "none").text  # noqa: E731
+                unread = wait_for(browser, lambda b: none(b) == "Can’t read the meetings in Home folder / empty.", 10)
+                check("an unreadable folder is said, in English, from the home (#1304)", unread, none(browser))
+            finally:
+                empty.chmod(0o755)
+            browser.execute_script("window.dispatchEvent(new Event('focus'))")
+            wait_for(browser, lambda b: b.find_element(By.ID, "none").text == "No meeting yet.", 10)
             check("the sidebar is named in English", browser.find_element(By.ID, "sidebar").get_attribute("aria-label") == "Meetings")
             lang = browser.execute_script("return document.documentElement.lang")
             check("the page says it is in English", lang == "en", lang)
