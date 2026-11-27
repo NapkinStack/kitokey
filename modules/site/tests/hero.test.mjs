@@ -65,3 +65,21 @@ test("nothing of the old hero is built: no carousel, no clips, no waves", async 
   const files = await readdir(dist);
   for (const gone of ["slider.js", "waves.js", "clips"]) assert.ok(!files.includes(gone), `${gone} is still built`);
 });
+
+// #1290 at 419b131: the hero's text column was class « copy », which site.css styles as the install's dark, round
+// copy button, so a dark disc sat behind the whole headline in the light theme. The hero shares no class with the
+// old page's rules but those named here, each overridden by hero.css under .hero.
+const SHARED = { wrap: "the page's container, the same width everywhere", ico: "a pictogram's box, sized under .hero", lead: "the lead's size, margin and width, set again by .hero .lead" };
+
+test("the hero takes no style of the old page by a class they share, but the ones named", async () => {
+  const source = await readFile(new URL("../src/components/Landing.astro", import.meta.url), "utf8");
+  const hero = source.slice(source.indexOf('<section class="hero"'), source.indexOf("</section>", source.indexOf('<section class="hero"')));
+  const classes = new Set([...hero.matchAll(/class=\{?["`]([^"`]+)["`]/g)].flatMap((m) => m[1].replace(/\$\{[^}]*\}/g, "").split(/\s+/)).filter(Boolean));
+  for (const name of hero.match(/ico\("[a-z]+"\)/g) ? ["ico"] : []) classes.add(name);
+  const css = (await readFile(new URL("../src/styles/site.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const styled = new Set([...css.matchAll(/([^{}]+)\{/g)].flatMap((m) => [...m[1].matchAll(/\.([a-zA-Z][\w-]*)/g)].map((c) => c[1])));
+  const shared = [...classes].filter((c) => styled.has(c));
+  assert.deepEqual(shared.filter((c) => !(c in SHARED)), [], "the hero takes the old page's style by these classes");
+  const css2 = await readFile(new URL("../src/styles/hero.css", import.meta.url), "utf8");
+  for (const c of shared) assert.match(css2, new RegExp(`\\.hero \\.${c}\\b|^\\.${c}\\b`, "m"), `.${c}: ${SHARED[c]}, but hero.css does not set it`);
+});

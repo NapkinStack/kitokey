@@ -41,7 +41,7 @@ html[data-site="dark"] .halo::after { mix-blend-mode: screen; opacity: .04; }
 /* ---- The hero ---- */
 .hero { position: relative; padding: 40px 0 112px; }
 .hero .wrap { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
-.hero .copy { position: relative; }
+.hero .pitch { position: relative; }
 .hero h1 { font-family: var(--display); font-weight: 780; font-size: clamp(38px, 4vw, 54px); line-height: 1.02; letter-spacing: -.035em; text-wrap: balance; }
 .hero h1 .l { display: block; }
 .hero h1 .soft { color: var(--accent); }
@@ -60,7 +60,7 @@ html[data-site="dark"] .halo::after { mix-blend-mode: screen; opacity: .04; }
 .assure { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: var(--sp-6) 0 0; padding-top: var(--sp-5); border-top: 1px solid var(--border-subtle); font-size: 15px; color: var(--text-secondary); max-width: 540px; }
 .assure span { display: inline-flex; align-items: center; gap: 6px; }
 .assure .ico { color: var(--accent); }
-/* The two voices' spectrogram, decorative, behind the copy and into the minutes card (public/hero.js). */
+/* The two voices' spectrogram, decorative, behind the pitch and into the minutes card (public/hero.js). */
 .voices { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
 @media (prefers-reduced-motion: no-preference) {
   .hero h1 .l { animation: glide .8s var(--ease-out) both; }

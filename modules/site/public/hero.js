@@ -28,8 +28,8 @@
   const hero = document.querySelector(".hero");
   const cv = hero?.querySelector(".voices");
   const card = hero?.querySelector(".scene .mcard");
-  const copy = hero?.querySelector(".copy");
-  if (!cv?.getContext || !card || !copy) return;
+  const pitch = hero?.querySelector(".pitch");
+  if (!cv?.getContext || !card || !pitch) return;
   const ctx = cv.getContext("2d");
   const cols = {};
   let w = 0, h = 0, t = 4, last = 0, raf = 0, onScreen = true;
@@ -43,12 +43,12 @@
   // A quiet grid of dots over the hero; two bands of light run through it, « Vous » above, « Les autres » below. Time
   // runs left to right, so speech flows towards the minutes card; the voices take turns, and past the middle both
   // bands bend into the card's left edge: two voices becoming a page. Dots under the headline are dimmed, so the
-  // copy keeps its contrast.
+  // words keep their contrast.
   const ease = (v) => { v = Math.max(0, Math.min(1, v)); return v < 0.5 ? 2 * v * v : 1 - (-2 * v + 2) ** 2 / 2; };
   const draw = () => {
     if (!w) return;
     const narrow = w < 1040, g = narrow ? 12 : 14, night = dark();
-    const hb = hero.getBoundingClientRect(), cb = card.getBoundingClientRect(), pb = copy.getBoundingClientRect();
+    const hb = hero.getBoundingClientRect(), cb = card.getBoundingClientRect(), pb = pitch.getBoundingClientRect();
     const x1 = narrow ? w : cb.left - hb.left + cb.width * 0.35, y0 = narrow ? 10 : 18;
     const y1 = narrow ? pb.top - hb.top + 150 : cb.top - hb.top + cb.height * 0.5;
     const px0 = pb.left - hb.left - 16, px1 = pb.right - hb.left + 16, py0 = pb.top - hb.top - 8, py1 = pb.bottom - hb.top + 8;
