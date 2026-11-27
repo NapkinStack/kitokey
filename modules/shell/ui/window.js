@@ -297,9 +297,11 @@ function actionButton(glyph, label, id, name) {
 // on its first item, ↑ on its last; ↑ ↓ Home End move in it; Escape closes it, the focus back on its button; Tab or
 // a click elsewhere closes it; an item chosen closes it, the focus back on the button before the item acts. An item
 // marked destructive comes last, after a separator, as the platforms' menus put a deletion.
-function moreActions(items, words, { id = "more-open", menuId = "more-menu", glyph = "ellipsis", label = words.meeting_more, name = words.more_actions } = {}) {
+function moreActions(items, words, { id = "more-open", menuId = "more-menu", glyph = "ellipsis", label = words.meeting_more, name = words.more_actions, chevron = false } = {}) {
   const more = element("div", "more");
   const button = actionButton(glyph, label, id, name);
+  // A button that opens a menu says it with a chevron after its words (v5, « Partager ▾ »), as the platforms' menu buttons do.
+  if (chevron) button.append(icon("chevron-down"));
   button.setAttribute("aria-haspopup", "menu");
   button.setAttribute("aria-controls", menuId);
   button.setAttribute("aria-expanded", "false");
@@ -3364,7 +3366,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   meetingBar = actions;
   const press = (id) => () => document.getElementById(id)?.click();
   const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")]], words,
-    { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share });
+    { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
   const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
   redo.addEventListener("click", press("redo-minutes"));
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.

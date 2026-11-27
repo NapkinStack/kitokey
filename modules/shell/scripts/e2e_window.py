@@ -7751,6 +7751,13 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             # Each accessible name begins with its visible words, the count in it too (WCAG 2.5.3).
             check(f"{short}: each name begins with its visible words, the count in it (WCAG 2.5.3)",
                   bool(got) and all(b["name"].startswith(b["words"]) and b["count"] in b["name"] for b in got), [b["name"] for b in got])
+            # A button that opens a menu of choices says so (v5): « Partager » a chevron after its words; « Refaire » opens
+            # none yet, « Plus » is its own icon: neither has one (the coordinator's audit of #1301).
+            chevrons = browser.execute_script(
+                "return ['share-open', 'redo-open', 'more-open'].map((id) => { const b = document.getElementById(id);"
+                " const last = b?.lastElementChild; return !!last && last.matches('svg.glyph') && last.previousElementSibling?.matches('.label'); })")
+            check(f"{short}: « {said['share']} » a chevron after its words, « {said['redo']} » and « {said['more']} » none (v5)",
+                  chevrons == [True, False, False], chevrons)
             # Before the cards in the focus order, and no positive tabindex anywhere.
             order = browser.execute_script(
                 "const b = document.getElementById('meeting-actions'), c = document.querySelector('#meeting .card');"
