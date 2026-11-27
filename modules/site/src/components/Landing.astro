@@ -230,10 +230,10 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
     </div>
   </section>
 
-  <section class="section" id={installId} aria-labelledby="get-h">
+  <section class="end" id={installId} aria-labelledby="get-h">
     <div class="wrap get">
-      <div class="section-head reveal"><p class="eyebrow">{gEyebrow}</p><h2 id="get-h">{gH}</h2><p class="lead">{gLead}</p></div>
-      <div class="code reveal" data-copied={copied} data-failed={failed}>
+      <div class="sh"><p class="kicker">{gEyebrow}</p><h2 id="get-h">{gH}</h2><p class="sub">{gLead}</p></div>
+      <div class="code" data-copied={copied} data-failed={failed}>
         <div class="code-bar">
           <div class="os-tabs" role="group" aria-label={osLabel}>
             {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}><span>{name}</span></button>)}

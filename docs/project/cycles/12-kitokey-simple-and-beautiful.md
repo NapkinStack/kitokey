@@ -5,6 +5,14 @@ appetite_weeks: 1         # the decider, 2026-11-26, relayed by the coordinator:
 start: 2026-11-26         # cycle 11's early closure (#1257), on the decider's word of 2026-11-26
 end: 2026-12-03           # start + appetite: the first day the cycle is over — the circuit breaker
 deliverables:
+  - id: D108
+    title: "A meeting's summary and transcript become a file to edit, a PDF or subtitles, from one model of the summary"
+    module: export
+    state: ready          # entered cycle 12 on the decider's word of 2026-11-26, carried over from cycle 11 (deferred at its closure)
+    acceptance:
+      - "Spike first: given typst as a library (`typst`, `typst-pdf`), when a release build of the program that writes the PDF is measured, then its added size is recorded against D102's package size and a threshold of 15 MB on Linux, and the scripts it renders with the font bundled — Latin with U+00A0 and U+202F, Cyrillic, CJK if the font covers it, emoji — and whether its PDF/UA-1 output exists in that version; under the threshold, typst writes the PDF; over it, the PDF goes to *Later* with the number, recorded in the module's log issue"
+      - "Given a meeting's folder with its `minutes` and its transcript, when `export` writes it, then its model reads the summary's sections as an ordered list — `minutes/v4`'s three mapped to it, `minutes/v5`'s named ones as they come (D111) — and writes Markdown — CommonMark with a GFM table and a YAML front matter: title, date, duration, models —, HTML with `lang` set and real headings, DOCX with Word's heading styles, SRT and VTT from the transcript, and a tagged PDF when the spike allows it; what is included — summary, transcript, speakers, times — is the caller's choice; held by the module's tests, each format opened back by a reader (pulldown-cmark, docx-rs, a PDF text extractor, a subtitle parser), the PDF's on a transcript holding each script the spike recorded, and on a v5 summary once v5 is merged"
+      - "Given the module, when it becomes `active`, then its manifest, its `AGENTS.md` and its contract with the shell are written, the contract consumed by the shell alone"
   - id: D120
     title: "Kitokey's design system lives in its code — one source of tokens, its components, a gallery — and a test refuses any value outside it; an export carries it to Claude Design, the code staying the source"
     module: shell
@@ -183,6 +191,13 @@ never batched at the end.
 below; P2 and P3 are in *Later*, D127 and D128 aside.
 
 ## Deliverables
+
+### D108
+
+Carried over from cycle 11, where its closure deferred it (2026-11-26). It entered this cycle on the decider's
+word of 2026-11-26, because D121 offers « Exporter en PDF » and needs the program that writes it; it fits what is
+left of the appetite, the end date unchanged. Its criteria are cycle 11's, as they were. Finished in #1212 (the
+library), #1279 (the program), #1283 (the module active) and #1284 (the site no longer consumes `exporting/v1`).
 
 ### D120
 
