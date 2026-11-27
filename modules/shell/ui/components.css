@@ -70,7 +70,7 @@
 .engine-card:has(input:checked) { border-color: var(--color-accent); background: var(--color-tint); }
 .engine-card:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .engine-card label { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-1) var(--sp-2); align-items: baseline; cursor: pointer; }
-.engine-card input { margin: 0; accent-color: var(--color-accent); }
+.engine-card input { margin: 0; align-self: center; accent-color: var(--color-accent); }
 .engine-card .name { font-weight: 600; }
 .engine-card .where, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
 /* Its state a chip under its name; « Par défaut » a chip at the name's end. */
@@ -92,7 +92,9 @@
 .chip.success { background: var(--color-success-ground); color: var(--color-success); }
 .chip.private { background: var(--color-private-ground); color: var(--color-private); }
 .chip.warning { background: var(--color-warning-ground); color: var(--color-warning); }
-:is(.chip.neutral, .chip.accent, .chip.success, .chip.private, .chip.warning) > svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+/* A neutral chip on a chosen card: the tint is its ground's shade, so it is edged (3:1 on the tint, #1312). */
+.engine-card:has(input:checked) .chip.neutral { outline: 1px solid var(--color-edge); outline-offset: -1px; }
+:is(.chip.neutral, .chip.accent, .chip.success, .chip.private, .chip.warning) > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
 /* An option card: one choice among a few, a native radio in its label — its icon on a tile, its title, a sentence;
    chosen, edged in the accent on the tint. The radios give the group and the arrow keys (WAI-ARIA APG). */
@@ -120,15 +122,15 @@
 }
 .option-card .tile > svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .option-card .title { display: block; font-weight: 600; }
-.option-card .says { display: block; color: var(--color-text-soft); font-size: var(--fs-small); }
+.option-card .says { display: block; margin: 0; color: var(--color-text-soft); font-size: var(--fs-small); }
 
 /* A progress: what is being made, how long is left, its cancel; a bar per step, each a progress bar named and at
    its value. */
 .progress { display: grid; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-md); background: var(--color-surface); box-shadow: var(--e1); color: var(--color-text); font: var(--fs-body) var(--font-text); }
-.progress .label { display: flex; align-items: center; gap: var(--sp-3); }
-.progress .label > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--color-accent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-.progress .label .left { color: var(--color-text-soft); }
-.progress .label .button { margin-left: auto; }
+.progress .task { display: flex; align-items: center; gap: var(--sp-3); }
+.progress .task > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--color-accent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.progress .task .left { color: var(--color-text-soft); }
+.progress .task .button { margin-left: auto; }
 .progress .bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--sp-1); }
 .progress .bar { height: var(--sp-2); border-radius: var(--r-pill); background: var(--color-sunken); overflow: hidden; }
 .progress .bar > i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--color-accent); }
@@ -136,7 +138,7 @@
 /* A toast: an action's outcome, said once at the window's foot and gone after 5 s (`role=status`); in the text's
    colour on the surface's, so that it stands out in both themes. It pops in, unless the system asks for less motion. */
 .toast {
-  position: fixed; left: 0; right: 0; bottom: var(--sp-8); z-index: 50; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto;
+  position: fixed; left: 0; right: 0; bottom: calc(var(--sp-8) * 2 + var(--sp-2)); z-index: 50; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto;
   display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-radius: var(--r-md);
   background: var(--color-text); color: var(--color-surface); box-shadow: var(--e2); font: var(--fs-body) var(--font-text);
   animation: pop var(--d-base) var(--ease-out);

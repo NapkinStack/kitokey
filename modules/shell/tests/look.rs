@@ -1667,6 +1667,16 @@ fn a_component_takes_no_global_class_and_sits_as_v5_sets_it() {
         Some("calc(var(--sp-8) * 2 + var(--sp-2))")
     );
     assert_eq!(given(COMPONENTS, ".engine-card input", "align-self").as_deref(), Some("center"));
-    let edged = given(COMPONENTS, ".engine-card:has(input:checked) .chip.neutral", "outline").unwrap_or_default();
+    // Read by its selector as written: `bodies_of` unfolds `:is()`, which would cut `:has()`.
+    let edged = rules(COMPONENTS)
+        .into_iter()
+        .find(|(selector, _)| selector == ".engine-card:has(input:checked) .chip.neutral")
+        .and_then(|(_, body)| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .find(|(key, _)| key.trim() == "outline")
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .unwrap_or_default();
     assert!(edged.ends_with("solid var(--color-edge)"), "{edged}");
 }

@@ -334,7 +334,7 @@ function galleryProgress(words) {
   const made = element("div", "progress");
   made.dataset.component = "progress";
   made.dataset.state = "running";
-  const label = element("div", "label");
+  const label = element("div", "task");
   const cancel = element("button", "button ghost", words.making_cancel);
   cancel.type = "button";
   label.append(icon("file-text"), element("b", "", words.minutes_making), element("span", "left", fill(words.making_left, 3)), cancel);
