@@ -619,6 +619,12 @@ pub struct Window {
     /// meeting is being recorded or made, or the system's trash refused it. At most: no limit.
     /// Placeholders: {} the reason.
     pub trash_refused: &'static str,
+    /// Shows: the design system's gallery (D120, `#/gallery`, linked from nowhere): its title. When: the
+    /// gallery shown. At most: one line. Placeholders: none.
+    pub gallery_title: &'static str,
+    /// Shows: the gallery's sections: its buttons, its banners, its dialogs, its engine cards (D120). When: the gallery shown.
+    /// At most: one line each. Placeholders: none.
+    pub gallery_parts: [&'static str; 4],
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
@@ -1658,6 +1664,16 @@ pub struct Window {
     /// Shows: the empty window, as a button beside the one that records. When: no meeting yet, no
     /// recording runs. At most: about 28 characters. Placeholders: none.
     pub example_try: &'static str,
+    /// The first run's third screen (D126, mock-up 1c): the empty window, once the assistant is answered.
+    /// Shows: the empty window, as its title. When: a first run just ended, no meeting yet. At most: one
+    /// line. Placeholders: none.
+    pub ready_title: &'static str,
+    /// Shows: the empty window, under `ready_title`. When: as `ready_title`. At most: two lines.
+    /// Placeholders: none.
+    pub ready_says: &'static str,
+    /// Shows: the empty window, as its primary button, which records. When: as `ready_title`. At most:
+    /// about 16 characters. Placeholders: none.
+    pub ready_record: &'static str,
     /// Shows: the sidebar, as a button. When: stop recording. At most: about 24 characters.
     /// Placeholders: none.
     pub record_stop: &'static str,
@@ -2119,6 +2135,8 @@ pub fn window(language: Language) -> Window {
             trash_cancel: "Cancel",
             trash_confirm: "Move to trash",
             trash_refused: "Not moved to the trash: {}",
+            gallery_title: "Components",
+            gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
             more_actions: "More actions",
             labelled: "{}:",
             minutes_title: "Summary",
@@ -2459,6 +2477,9 @@ pub fn window(language: Language) -> Window {
             minutes_stopped: "Minutes stopped. You can start them again, with another model if you like.",
             record_start: "Start recording",
             example_try: "Try it on an example",
+            ready_title: "Ready. Record your first call.",
+            ready_says: "Kitokey listens to your microphone and the call’s sound, then writes the summary.",
+            ready_record: "Record",
             record_stop: "Stop recording",
             agree_eyebrow: "First online summary",
             agree_title: "The text of “{}” is about to leave your computer",
@@ -2655,6 +2676,8 @@ pub fn window(language: Language) -> Window {
             trash_cancel: "Annuler",
             trash_confirm: "Mettre à la corbeille",
             trash_refused: "Pas mise à la corbeille\u{a0}: {}",
+            gallery_title: "Composants",
+            gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
             more_actions: "Plus d’actions",
             labelled: "{}\u{a0}:",
             minutes_title: "Compte rendu",
@@ -3004,6 +3027,9 @@ pub fn window(language: Language) -> Window {
             minutes_stopped: "Compte rendu arrêté. Vous pouvez le relancer, avec un autre modèle si besoin.",
             record_start: "Démarrer un enregistrement",
             example_try: "Essayer sur un exemple",
+            ready_title: "Prêt. Enregistrez votre premier appel.",
+            ready_says: "Kitokey écoute votre micro et le son de l’appel, puis écrit le compte rendu.",
+            ready_record: "Enregistrer",
             record_stop: "Arrêter l’enregistrement",
             agree_eyebrow: "Premier compte rendu en ligne",
             agree_title: "Le texte de «\u{a0}{}\u{a0}» va quitter votre ordinateur",

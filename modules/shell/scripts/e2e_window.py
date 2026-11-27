@@ -483,12 +483,13 @@ def redo_offered(browser, panel: str, step: str) -> list[str]:
 
 
 def tokens(theme: str) -> str:
-    """A theme's roles as `ui/tokens.css` sets them: the light ones on `:root`, the dark ones under
-    Settings' dark (the same list as the system's, held by tests/look.rs)."""
+    """A theme's roles as `ui/tokens.css` sets them: the light ones in its `:root` blocks — the design
+    system's and the window's older names (#1298) —, the dark ones under Settings' dark (the same list
+    as the system's, held by tests/look.rs). Without the blocks' color-scheme: `shot_themed` says it."""
     css = re.sub(r"/\*.*?\*/", "", (Path(__file__).parent.parent / "ui" / "tokens.css").read_text(), flags=re.S)
-    start = css.index("--color-ground") if theme == "light" else css.index(':root[data-theme="dark"] {') + len(':root[data-theme="dark"] {')
-    block = css[start:css.index("}", start)].replace("color-scheme: dark;", "")
-    return " ".join(block.split())
+    opening = ":root {" if theme == "light" else ':root[data-theme="dark"] {'
+    blocks = [part.split("}", 1)[0] for part in css.split(opening)[1:]]
+    return " ".join(re.sub(r"color-scheme:[^;]*;", "", " ".join(blocks)).split())
 
 
 def shot_themed(browser, name: str, theme: str) -> None:
@@ -2215,6 +2216,99 @@ def first_run_screens(now: dt.datetime) -> None:
                     check("« Ça marche »: screen (3), the empty window said ready (CU)", ready, browser.find_element(By.ID, "none").text)
     finally:
         server.shutdown()
+
+
+def first_run_ready(now: dt.datetime) -> None:
+    """CU. D126, the first run's third screen (mock-up 1c): once the assistant is answered, the window's empty
+    pane says « Prêt. Enregistrez votre premier appel. » and what Kitokey does in one sentence, beside the
+    shortcut, « Enregistrer » and « Essayer sur un exemple », the sidebar's record button the window's one primary
+    action — its sidebar there, so that nothing is a
+    dead end. Each gesture does what it says: the example opens its meeting, « Enregistrer » records. Started
+    again later, the empty pane says what it said before. In both languages and themes, axe clean. Its
+    illustration comes with the other two screens (D126, next pull request)."""
+    print("CU. the first run ends on « Prêt. Enregistrez votre premier appel. », record or try the example (D126)")
+    pane = ("return document.getElementById('empty').hidden ? null : [document.getElementById('none').textContent,"
+            " document.getElementById('none-do').textContent, document.getElementById('empty-record').textContent,"
+            " document.getElementById('empty-example').textContent,"
+            " [...document.querySelectorAll('#sidebar .primary, #empty .primary')].filter((b) => b.offsetParent).length]")
+    # No disk path in a published shot (the decider, 2026-11-27): the bench's folder shown by its name alone.
+    neutral = ("const f = document.getElementById('empty-folder');"
+               " if (f) f.textContent = f.textContent.replace(/(dans|in) .*$/, '$1 Kitokey.')")
+    for language, texts, example_opens in (
+        ("fr_FR.UTF-8", ["Prêt. Enregistrez votre premier appel.",
+                         "Kitokey écoute votre micro et le son de l’appel, puis écrit le compte rendu.",
+                         "Enregistrer", "Essayer sur un exemple", 1], True),
+        ("en_US.UTF-8", ["Ready. Record your first call.",
+                         "Kitokey listens to your microphone and the call’s sound, then writes the summary.",
+                         "Record", "Try it on an example", 1], False),
+    ):
+        short = language[:2]
+        meetings = WORK / f"ready-{short}"
+        meetings.mkdir()
+        window = Window(meetings, language, small=True, welcomed=False, args=())
+        window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+        with window as browser:
+            asked = wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+            check(f"{short}: not welcomed, the first run opens on its first question", asked)
+            press(browser, "welcome-skip")
+            shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
+            check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
+                  shown, browser.execute_script(pane))
+            check(f"{short}: the third screen keeps the sidebar: nothing is a dead end",
+                  browser.find_element(By.ID, "sidebar").is_displayed() and browser.find_element(By.ID, "settings-link").is_displayed())
+            # axe in each theme, its colours put on the page where the desktop shows the other one (as shot_themed does).
+            for theme in ("light", "dark"):
+                forced = (theme == "dark") != browser.execute_script("return matchMedia('(prefers-color-scheme: dark)').matches")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                    time.sleep(0.3)
+                violations = axe_violations(browser)
+                check(f"{short}, {theme}: the third screen has no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                browser.execute_script(neutral)
+                shot(browser, f"d126-ready-{short}-{theme}")
+                if forced:
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+            if example_opens:
+                press(browser, "empty-example")
+                opened = wait_for(browser, lambda b: b.execute_script("return location.hash") == "#/meeting/example-fr", 10)
+                check("« Essayer sur un exemple »: the example placed, its meeting's page opened",
+                      opened and (meetings / "example-fr" / "session.json").is_file(), browser.execute_script("return location.hash"))
+                # A meeting there, then gone again in the same session: the first run is over, the ordinary words come back.
+                wait_for(browser, lambda b: (meetings / "example-fr" / "minutes.md").is_file(), 20)
+                shutil.rmtree(meetings / "example-fr")
+                browser.execute_script("location.hash = '#/'; refresh()")
+                plain = wait_for(browser, lambda b: (b.execute_script(pane) or [None])[0] not in (None, texts[0]), 10)
+                check("a meeting there once, then gone in the same session: the empty window says its ordinary words, no longer ready",
+                      plain, browser.execute_script(pane))
+            else:
+                press(browser, "empty-record")
+                live = wait_for(browser, lambda b: b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+                check("« Record »: a recording starts", live)
+        if example_opens:
+            # Asking for less motion: the third screen the same, nothing of it moving (its shots, light and dark).
+            still = meetings.parent / f"ready-{short}-still"
+            still.mkdir()
+            window = asking_less_motion(Window(still, language, small=True, welcomed=False, args=()))
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}-still"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+            with window as browser:
+                wait_for(browser, lambda b: b.find_elements(By.ID, "welcome-skip") and b.find_element(By.ID, "welcome-skip").is_displayed(), 10)
+                press(browser, "welcome-skip")
+                shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
+                check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
+                      (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
+                for theme in ("light", "dark"):
+                    browser.execute_script(neutral)
+                    shot_themed(browser, f"d126-ready-{short}-still-{theme}", theme)
+        if not example_opens:
+            # Started again, welcomed, still no meeting: the empty pane says what it says outside a first run.
+            (meetings / "ready").mkdir()
+            window = Window(meetings / "ready", language)
+            window.env.update(XDG_DATA_HOME=str(WORK / f"data-ready-{short}"), KITOKEY_SPEECH=str(WORK / "nowhere"))
+            with window as browser:
+                drawn = wait_for(browser, lambda b: b.execute_script(pane) is not None, 10)
+                said = browser.execute_script(pane)
+                check(f"{short}: started again, welcomed: the empty pane is the ordinary one, « Record » not said ready",
+                      drawn and said[0] != texts[0] and said[2] != texts[2], said)
 
 
 def first_run(now: dt.datetime) -> None:
@@ -6650,6 +6744,96 @@ def axe_first_surfaces(now: dt.datetime) -> None:
                     found = axe_violations(browser)
                     check(f"{short}, {theme}: {what}, no violation of axe's WCAG 2.2 A and AA rules (D106)",
                           shown and themed(browser) and found == [], (theme, browser.execute_script(dark), found))
+
+# D120's gallery: each component and the states it is shown in (criterion 3).
+GALLERY = {
+    "button": ("primary", "secondary", "ghost", "icon", "destructive", "hover", "pressed", "focus", "disabled"),
+    "banner": ("info", "private", "warning"),
+    "dialog": ("confirm", "destructive"),
+}
+
+
+def gallery_shown(now: dt.datetime) -> None:
+    """CT. D120, criterion 3: the gallery (`#/gallery`, linked from nowhere) shows each component of
+    `ui/components.css` in each of its states, in French and English, light and dark, at 420 and 1100 px;
+    axe-core finds no violation of its WCAG 2.2 A and AA rules there. Its titles in Bricolage Grotesque, its
+    words in the system's face; its dialog the platform's own, « Annuler » focused, Escape closing it."""
+    print("CT. the design system's gallery: each component in each state, both languages and themes, no axe violation (D120)")
+    dark = "return matchMedia('(prefers-color-scheme: dark)').matches"
+    shown_in = ("return [...document.querySelectorAll('#gallery [data-component]')].filter((e) => e.getClientRects().length)"
+                ".map((e) => e.dataset.component + ':' + e.dataset.state)")
+    for (language, short), theme in itertools.product((("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")), ("light", "dark")):
+        window = Window(WORK / f"gallery-{short}-{theme}", language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script("location.hash = '#/gallery'")
+            drawn = wait_for(browser, lambda b: b.find_element(By.ID, "gallery").is_displayed(), 10)
+            check(f"{short}, {theme}: the gallery alone in the window", drawn and not browser.find_element(By.ID, "frame").is_displayed()
+                  and browser.execute_script(dark) == (theme == "dark"), (drawn, browser.execute_script(dark)))
+            shown = browser.execute_script(shown_in)
+            wanted = [f"{component}:{state}" for component, states in GALLERY.items() for state in states]
+            check(f"{short}, {theme}: each component in each of its states", all(one in shown for one in wanted),
+                  sorted(set(wanted) - set(shown)))
+            # A banner of the components is its own: window.css's `.banner` (#770's strip) gives it no margin.
+            insets = browser.execute_script("return [...document.querySelectorAll('#gallery .banner')].map((b) =>"
+                                            " Math.round(b.getBoundingClientRect().left - b.closest('.gallery-part').querySelector('h2').getBoundingClientRect().left))")
+            check(f"{short}, {theme}: each banner aligned on its section's title", insets and set(insets) == {0}, insets)
+            heights = browser.execute_script("return [...document.querySelectorAll('#gallery .button')].filter((e) => e.getClientRects().length)"
+                                             ".map((e) => Math.round(e.getBoundingClientRect().height))")
+            check(f"{short}, {theme}: each button 32 px high (D89)", heights and set(heights) == {32}, heights)
+            faces = browser.execute_async_script(
+                "const done = arguments[0]; document.fonts.ready.then(() => done(["
+                "document.fonts.check('700 20px \"Bricolage Grotesque\"'),"
+                "getComputedStyle(document.querySelector('#gallery h1')).fontFamily,"
+                "getComputedStyle(document.querySelector('#gallery p')).fontFamily]))")
+            # WebKit says a family without its quotes: the first one named, unquoted, is the face asked for.
+            first = lambda family: family.split(",")[0].strip().strip('"')
+            check(f"{short}, {theme}: the titles in Bricolage Grotesque, loaded; the words in the system's face",
+                  faces[0] and first(faces[1]) == "Bricolage Grotesque" and "Bricolage" not in faces[2], faces)
+            # D122's engine card (`engineCards()`): its four states, and its groups side by side, each its own.
+            states = browser.execute_script("return [...document.querySelectorAll('#gallery .engine-card')]"
+                                            ".filter((e) => e.getClientRects().length).map((e) => e.dataset.state)")
+            check(f"{short}, {theme}: the engine card ready, to download, to install, its key missing (D122)",
+                  {"ready", "download", "install", "key"} <= set(states), states)
+            # Each card's words in one column, the radio alone in its own: its state under its name, never beside the radio.
+            off = browser.execute_script("return [...document.querySelectorAll('#gallery .engine-card')].map((c) =>"
+                                         " Math.round(c.querySelector('.state').getBoundingClientRect().left - c.querySelector('.name').getBoundingClientRect().left))")
+            check(f"{short}, {theme}: each engine card's state under its name", off and set(off) == {0}, off)
+            chosen = ("return [...document.querySelectorAll('#gallery .engine-cards')]"
+                      ".map((g) => g.querySelector('input:checked')?.closest('.engine-card').dataset.engine ?? null)")
+            before = browser.execute_script(chosen)
+            for group in (0, 1):
+                browser.execute_script("const r = document.querySelectorAll('#gallery .engine-cards')[arguments[0]]"
+                                       ".querySelectorAll('input[type=radio]'); r[r.length - 1].click()", group)
+            after = browser.execute_script(chosen)
+            check(f"{short}, {theme}: a card chosen in one group leaves the other groups' choice", len(before) >= 3
+                  and after[0] != before[0] and after[1] != before[1] and after[0] is not None and after[2:] == before[2:], (before, after))
+            # The dialog the platform draws (`<dialog>`, modal): « Annuler » focused, Escape closes it, the focus back.
+            opener = browser.find_element(By.ID, "gallery-dialog-open")
+            opener.click()
+            opened = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('dialog[open]')"), 5)
+            focused = browser.execute_script("const e = document.activeElement; return [e.dataset.role, e.closest('dialog') !== null]")
+            check(f"{short}, {theme}: the dialog opened modal, its cancel focused (PDR-0008)", opened and focused == ["cancel", True], (opened, focused))
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: b.execute_script("return !document.querySelector('dialog[open]')"), 5)
+            check(f"{short}, {theme}: Escape closes it, the focus back on what opened it",
+                  closed and browser.execute_script("return document.activeElement.id") == "gallery-dialog-open",
+                  (closed, browser.execute_script("return document.activeElement.id")))
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
+            for width in (420, 1100):
+                browser.set_window_size(width, 800)
+                time.sleep(0.3)
+                wide = browser.execute_script("return document.documentElement.scrollWidth <= innerWidth")
+                check(f"{short}, {theme}: at {width} px nothing overflows", wide, browser.execute_script("return [document.documentElement.scrollWidth, innerWidth]"))
+                # Each section brought to the top, one screenshot each: the window shows a part of the gallery at once.
+                parts = browser.execute_script("return document.querySelectorAll('#gallery .gallery-part').length")
+                for part in range(parts):
+                    browser.execute_script("document.querySelectorAll('#gallery .gallery-part')[arguments[0]].scrollIntoView({block: 'start'})", part)
+                    time.sleep(0.2)
+                    shot(browser, f"ct-gallery-{part + 1}-{width}-{short}-{theme}")
+
 
 # What acts, by a tag or a role: what CE reaches, marks and measures (WCAG 2.1.1, 2.5.8).
 KEY_ACTING = ("a[href], button, input:not([type=hidden]), select, textarea, summary, [role=button], [role=link],"
@@ -16170,6 +16354,7 @@ def main() -> int:
     transcription_guided(now)
     ollama_pulled(now)
     first_run(now)
+    first_run_ready(now)
     first_run_screens(now)
     context_written(now)
     confidential_kept(now)
@@ -16224,6 +16409,7 @@ def main() -> int:
     bar_after_stop(now)
     summaries_to_a_folder(now)
     axe_first_surfaces(now)
+    gallery_shown(now)
     keys_first_surfaces(now)
     redo_says_what_is_wrong(now)
     redo_says_what_follows(now)
