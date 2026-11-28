@@ -97,7 +97,9 @@ dependencies:
 # No stack is imposed. check and test are required once the module holds more than its
 # description (fitness M7): declare them before its first file of code.
 commands:
-  check: npm ci --no-audit --no-fund && npm run build
+  # The check builds with the tests' legal values (LEGAL_TEST=1, as `npm test` does): a build with no publisher's
+  # details fails on purpose (src/lib/legal.mjs), and those values are refused on Cloudflare Pages (CF_PAGES=1).
+  check: npm ci --no-audit --no-fund && LEGAL_TEST=1 npm run build
   test: npm test
 #  check:                        # under 2 min: format, lint, types
 #  test:                         # NEVER starts another module
