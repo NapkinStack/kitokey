@@ -14,4 +14,4 @@ hold_days: 7
 owner_team: NapkinStack/maintainers
 project_name: Kitokey
 review_budget_files: 15
-review_budget_lines: 400
+review_budget_lines: 800

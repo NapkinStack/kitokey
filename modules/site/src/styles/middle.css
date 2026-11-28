@@ -4,7 +4,8 @@
 .mid { padding: 104px 0; }
 .mid-band { background: color-mix(in srgb, var(--bg-surface) 62%, transparent); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
 .mid .sh { max-width: 720px; margin-bottom: 48px; }
-.mid .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
+/* The kicker, v7's (l. 177): above its title's lead (.sh p), never taking its size or colour. */
+.mid .sh .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
 .mid h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.1vw, 42px); line-height: 1.1; letter-spacing: -.02em; }
 .mid .sh p { font-size: 18px; color: var(--text-secondary); margin: var(--sp-4) 0 0; }
 .mid h3 { font-family: var(--display); font-weight: 700; font-size: 21px; line-height: 1.25; letter-spacing: -.01em; margin: 0; }
@@ -37,12 +38,41 @@
 .mid .pf .tile, .mid .ft .tile, .mid .case .tile { width: 40px; height: 40px; margin-bottom: 6px; background: var(--bg-tint); box-shadow: none; }
 .mid .pf .tile.priv { background: var(--private-bg); }
 .mid .pf h3, .mid .ft h3 { font-size: 18px; }
-.mid .ft h3 .chip { position: absolute; top: 22px; right: 22px; height: 22px; font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
+/* The « Fonctions » cards' scenes (planche v4, validated by the decider on 2026-11-27): the final call's line (end.css,
+   .illus), the site's tokens, in both themes. */
+.mid .ft .v { display: block; width: 100%; height: auto; aspect-ratio: 240 / 112; margin-bottom: 10px; background: var(--bg-sunken); border-radius: var(--r-md); }
+.mid .v .doc { fill: var(--bg-surface); stroke: var(--border-subtle); stroke-width: 1.5; filter: drop-shadow(0 6px 14px rgb(30 50 100/.14)); }
+html[data-site="dark"] .mid .v .doc { stroke: var(--border-control); filter: none; }
+.mid .v .faded { opacity: .7; }
+.mid .v .ln { stroke: var(--text-tertiary); stroke-width: 4; stroke-linecap: round; opacity: .55; fill: none; }
+.mid .v .me { stroke: var(--track-me); stroke-width: 4; stroke-linecap: round; fill: none; }
+.mid .v .dots { stroke: var(--border-control); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 0 8; fill: none; }
+.mid .v .ok, .mid .v .accf { fill: var(--accent); }
+.mid .v .check { fill: none; stroke: var(--on-accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.mid .v .acc { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; fill: none; }
+.mid .v .handle { stroke-width: 6; }
+.mid .v .lens { fill: none; stroke: var(--accent); stroke-width: 4; }
+.mid .v .onacc, .mid .v .onaccf { fill: var(--on-accent); }
+.mid .v .tint { fill: var(--bg-tint); }
+/* A switch's edge in the control's ink, 3:1 at least against the scene's ground. */
+.mid .v .sw { stroke: var(--border-control); stroke-width: 1.5; }
+.mid .v .mark { fill: var(--mark); opacity: .9; }
+.mid .v .ink { fill: var(--text-tertiary); }
+.mid .v .soft { stroke: var(--border-control); stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.mid .v .w-me { fill: var(--track-me); }
+.mid .v .w-ot { fill: var(--track-others); }
+.mid .v .off { opacity: .35; }
+.mid .v .w-mid { stroke: var(--border-control); stroke-width: 1; opacity: .6; }
+.mid .v text { font: 700 11px system-ui, sans-serif; fill: var(--accent); }
+.mid .v text.onacc { fill: var(--on-accent); }
+/* « Bientôt » as planche v4 draws it (.soon): right after the title, on its line, the accent on its tint. */
+.mid .ft h3 .chip { display: inline-flex; margin-left: 6px; height: 20px; padding: 0 8px; vertical-align: 2px; border-radius: var(--r-pill); background: var(--bg-tint); color: var(--accent); font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
 .mid .pf p, .mid .ft p { color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
-.mid .io-link { margin-top: 18px; font-size: 15px; }
-/* The real capture of a meeting's page, once D121 is filmed: a labelled place until then. */
-.mid .shot-ph { margin-top: 20px; border: 1.5px dashed var(--border-control); border-radius: var(--r-xl); min-height: 140px; display: grid; place-items: center; text-align: center; padding: 24px; color: var(--text-tertiary); font-size: 14px; background: color-mix(in srgb, var(--bg-surface) 50%, transparent); }
-.mid .shot-ph b { display: block; color: var(--text-secondary); font-size: 15px; margin-bottom: 4px; }
+/* A meeting's page as the app draws it, in the page's language: the Store's own screenshot (D103's store_shots), light
+   in both themes, framed and lifted on the dark ground. To be filmed again after D121's layout. */
+.mid .shot-f { margin: 20px 0 0; }
+.mid .shot { display: block; width: 100%; height: auto; border-radius: var(--r-xl); box-shadow: var(--e2); outline: 1px solid var(--border-subtle); }
+html[data-site="dark"] .mid .shot { outline: 1px solid var(--border-control); box-shadow: 0 24px 60px -24px rgb(0 0 0 / .7); }
 
 /* Who it is for. */
 .mid .cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
