@@ -6902,10 +6902,13 @@ window.addEventListener("focus", () => {
   inMenu = false;
   if (!choosing && !menu) refresh();
 });
-window.addEventListener("hashchange", () => {
+window.addEventListener("hashchange", (event) => {
   // « Réglages » asked while Settings are drawn at one of their tabs: the same page — its tab's address kept,
-  // nothing drawn, what is typed stays (D123), as when Settings were one address.
-  if (location.hash === "#/settings" && drawnAddress?.startsWith("#/settings/") && !document.getElementById("settings").hidden) {
+  // nothing drawn, what is typed stays (D123), as when Settings were one address. Only from that tab itself: from
+  // another address asked meanwhile (a meeting still opening), Settings are drawn anew, and that meeting's late
+  // answer is for an address left (AP).
+  if (location.hash === "#/settings" && drawnAddress?.startsWith("#/settings/") && new URL(event.oldURL).hash === drawnAddress
+    && !document.getElementById("settings").hidden) {
     history.replaceState(null, "", drawnAddress);
     return;
   }
