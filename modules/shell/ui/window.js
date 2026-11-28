@@ -5816,13 +5816,15 @@ function showSmall(words) {
   paintLast = () => {
     const last = recording === false ? lastStopped : null;
     const stage = last && lastStage(last);
-    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
+    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open, failed: stage.why !== undefined };
     else if (!last || lastShown?.name !== last.name) lastShown = null;
     const text = lastShown?.text ?? "";
     if (lastLive.textContent !== text) lastLive.textContent = text;
     lastSaid.textContent = text;
     lastSaid.title = text;
     lastOpen.hidden = !lastShown?.open;
+    // A failure in two lines (D125): the meeting and its cause read, never cut in their first words.
+    lastLine.classList.toggle("failed", !!lastShown?.failed);
     lastOpen.dataset.name = lastShown?.name ?? "";
     lastLine.hidden = text === "";
   };
