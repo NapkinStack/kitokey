@@ -15100,8 +15100,9 @@ def main() -> int:
                 " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
             searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
             check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
-            check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
-                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
+            # Its tooltip also says its shortcut (D128a, as CX checks); its name stays the action alone.
+            check("each secondary action of the meeting: an icon button, its tooltip and its name (D89, D128a)", actions == [
+                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu (Ctrl+Maj+C)", True],
                 ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
             # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
             row = browser.execute_script(
