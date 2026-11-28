@@ -7,7 +7,7 @@ import { say } from "../lib/words.mjs";
 const { lang } = Astro.props;
 const [pub, name, form, capital, registration, vat, seat, contact, head, hosted, address, phone] = say("legalFields", lang);
 const rows = [[name, publisher.LEGAL_NAME], [form, publisher.LEGAL_FORM], [capital, publisher.LEGAL_CAPITAL], [registration, publisher.LEGAL_REGISTRATION],
-  [vat, publisher.LEGAL_VAT], [seat, publisher.LEGAL_SEAT], [contact, publisher.LEGAL_CONTACT], [head, director(lang)]];
+  [vat, publisher.LEGAL_VAT], [seat, publisher.LEGAL_SEAT], [contact, publisher.LEGAL_CONTACT], [phone, publisher.LEGAL_PHONE], [head, director(lang)]];
 ---
 <Page lang={lang} title={`${say("legal", lang)} · Kitokey`} description={say("local", lang)} path="legal/" kind="wrap prose">
   <h1>{say("legal", lang)}</h1>

@@ -9,7 +9,8 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import { dist, root, pages, route } from "./helpers.mjs";
 
-const FIELDS = ["LEGAL_NAME", "LEGAL_FORM", "LEGAL_CAPITAL", "LEGAL_REGISTRATION", "LEGAL_VAT", "LEGAL_SEAT", "LEGAL_CONTACT"];
+// The publisher's phone, which the LCEN asks (art. 6 III-1; the decider, 2026-11-28), among them.
+const FIELDS = ["LEGAL_NAME", "LEGAL_FORM", "LEGAL_CAPITAL", "LEGAL_REGISTRATION", "LEGAL_VAT", "LEGAL_SEAT", "LEGAL_CONTACT", "LEGAL_PHONE"];
 const text = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
 // Imports src/lib/legal.mjs in a fresh process with `env` alone: what a build on that machine would get.
@@ -42,6 +43,9 @@ test("a build without the publisher's details fails, naming what is missing", ()
   const one = loads({ ...real, LEGAL_VAT: "" });
   assert.notEqual(one.status, 0);
   assert.match(one.stderr, /LEGAL_VAT/);
+  const phone = loads({ ...real, LEGAL_PHONE: "" });
+  assert.notEqual(phone.status, 0);
+  assert.match(phone.stderr, /LEGAL_PHONE/);
 });
 
 test("the tests' values are refused on Cloudflare Pages, a real build's values accepted there", () => {

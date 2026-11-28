@@ -229,15 +229,25 @@ fn the_index_its_book_and_its_components() {
     assert_eq!(index["v"], 3);
     assert_eq!(index["editing"], "code", "the page is the code's, read only");
     assert_eq!(index["docs"]["readme"], "project/README.md");
+    // Made by CI, it says the run and who started it (`GITHUB_ACTOR`); made on a workstation, the commit alone and
+    // nobody: a published file names no person (D120 2b).
     let via = index["lastChange"]["via"].as_str().unwrap_or_default();
-    let commit = via
-        .strip_prefix("CI · NapkinStack/kitokey@")
-        .unwrap_or_else(|| panic!("lastChange.via: {via}"));
+    let by = &index["lastChange"]["by"];
+    let commit = match via.strip_prefix("CI · NapkinStack/kitokey@") {
+        Some(commit) => {
+            assert!(by.as_str().is_some_and(|by| !by.is_empty()), "lastChange.by: {by}");
+            commit
+        }
+        None => {
+            let commit = via.strip_prefix("local · ").unwrap_or_else(|| panic!("lastChange.via: {via}"));
+            assert!(by.is_null(), "made on a workstation, lastChange names {by}");
+            commit
+        }
+    };
     assert!(
         commit.len() == 40 && commit.chars().all(|c| c.is_ascii_hexdigit()),
         "lastChange.via's commit: {commit}"
     );
-    assert_eq!(index["lastChange"]["by"], "kitokey-lina[bot]");
     let book = read("design-system/project/README.md");
     assert!(book.contains(commit), "project/README.md names the commit the export was made from");
     let project = json("design-system/project/tokens.json");
@@ -245,7 +255,17 @@ fn the_index_its_book_and_its_components() {
         let file = font["file"].as_str().unwrap_or_default();
         assert!(here().join("design-system/project").join(file).is_file(), "type.fonts: {file}");
     }
-    for component in ["Button", "Banner", "Dialog", "EngineCard", "Cover"] {
+    for component in [
+        "Button",
+        "Banner",
+        "Dialog",
+        "EngineCard",
+        "Chip",
+        "OptionCard",
+        "Progress",
+        "Toast",
+        "Cover",
+    ] {
         let folder = Path::new("design-system/project/components").join(component);
         let preview = read(folder.join("preview.html").to_str().unwrap());
         let first = preview.lines().next().unwrap_or_default();
@@ -254,6 +274,10 @@ fn the_index_its_book_and_its_components() {
             "{component}: {first}"
         );
         assert!(!preview.contains("http"), "{component}'s preview reaches the network");
+        // A banner carries its icon, as the gallery draws it.
+        if component == "Banner" {
+            assert_eq!(preview.matches("<svg").count(), 3, "each banner's icon");
+        }
         if component != "Cover" {
             let about = read(folder.join("README.md").to_str().unwrap());
             assert!(

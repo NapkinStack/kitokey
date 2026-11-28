@@ -3,7 +3,8 @@
 // naming it. `npm test` builds with LEGAL_TEST=1, each field then « TEST <its name> »; on Cloudflare Pages
 // (CF_PAGES=1, set by Pages on every build) the tests' values are refused, given by LEGAL_TEST or by hand.
 // No person's name: the publication's director is named by office unless PUBLICATION_DIRECTOR says otherwise.
-export const FIELDS = ["LEGAL_NAME", "LEGAL_FORM", "LEGAL_CAPITAL", "LEGAL_REGISTRATION", "LEGAL_VAT", "LEGAL_SEAT", "LEGAL_CONTACT"];
+// The publisher's phone among them, which the LCEN asks (art. 6 III-1; the decider, 2026-11-28).
+export const FIELDS = ["LEGAL_NAME", "LEGAL_FORM", "LEGAL_CAPITAL", "LEGAL_REGISTRATION", "LEGAL_VAT", "LEGAL_SEAT", "LEGAL_CONTACT", "LEGAL_PHONE"];
 
 const env = process.env;
 const testing = env.LEGAL_TEST === "1";

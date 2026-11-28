@@ -140,8 +140,11 @@ def test_the_comparator_refuses_a_schemas_breaks_wherever_they_are(path, tmp_pat
 # a capture that knows it (#361); a `device`'s `headset`, said by a capture that listens (D88); a
 # `complete`'s `made`, in a transcript written before it was (D93); its `made_in`, `cost` and
 # `currency`, said only when the producer knows them (D97); a `failed`'s `retry_after`, said when the
-# destination said it (posting/v1); a segment's `given`, when a person gave its voice (#1244).
+# destination said it (posting/v1); a segment's `given`, when a person gave its voice (#1244); a format's
+# `actions`, absent when it has none (summarising/v1, D129) — posting's payload's `actions` stays required by
+# its own refused example.
 OPTIONAL = {
+    "actions",
     "stopped",
     "track",
     "voice",
@@ -922,6 +925,44 @@ EXAMPLES["posting/v1/payload.schema.json"][1].extend(
         {"title": "t", "summary": "", "actions": [], "dates": [{"date": "2026-11-27", "what": "", "who": None}]},
         {"title": "t", "summary": "", "actions": [], "dates": [{"date": "1 déc.", "what": "x", "who": None}]},
     ]
+)
+
+# summarising/v1's `--format` (D129): a format a person made, read from a file — the bounds of minutes/v5's
+# front matter; never one of the six structures' names, which keep their own sections.
+_SECTIONS = [
+    {"id": "contexte", "about": "Le contexte du client, en deux phrases."},
+    {"id": "suites", "about": "Ce que chacun fera, qui et pour quand."},
+]
+EXAMPLES["summarising/v1/format.schema.json"] = (
+    [
+        {"structure": "client_weekly", "sections": _SECTIONS, "actions": "suites"},
+        {"structure": "notes", "sections": [{"id": "points", "about": "Every point raised."}]},
+        {"structure": "six", "sections": [{"id": f"s{n}", "about": "x"} for n in range(6)]},
+    ],
+    [
+        "a format that is no object",
+        {"sections": _SECTIONS},
+        {"structure": "client_weekly"},
+        {"structure": "general", "sections": _SECTIONS},
+        {"structure": "interview", "sections": _SECTIONS},
+        {"structure": "Client Weekly", "sections": _SECTIONS},
+        {"structure": "ClientWeekly", "sections": _SECTIONS},
+        {"structure": "one_to_one", "sections": _SECTIONS},
+        {"structure": "stand_up", "sections": _SECTIONS},
+        {"structure": "client_call", "sections": _SECTIONS},
+        {"structure": "project_review", "sections": _SECTIONS},
+        {"structure": "a" * 41, "sections": _SECTIONS},
+        {"structure": "notes", "sections": []},
+        {"structure": "notes", "sections": [{"id": f"s{n}", "about": "x"} for n in range(7)]},
+        {"structure": "notes", "sections": [{"id": "Points", "about": "x"}]},
+        {"structure": "notes", "sections": [{"about": "x"}]},
+        {"structure": "notes", "sections": [{"id": "points"}]},
+        {"structure": "notes", "sections": [{"id": "points", "about": ""}]},
+        {"structure": "notes", "sections": [{"id": "points", "about": "two\nlines"}]},
+        {"structure": "notes", "sections": [{"id": "points", "about": "x" * 201}]},
+        {"structure": "notes", "sections": _SECTIONS, "actions": "Suites"},
+        {"structure": "notes", "sections": _SECTIONS, "actions": ""},
+    ],
 )
 
 
