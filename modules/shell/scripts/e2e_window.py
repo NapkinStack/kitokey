@@ -504,23 +504,56 @@ def context_opened(browser):
     return browser.find_element(By.ID, "context-text")
 
 
-def redo_pick(browser, panel: str, step: str, index: int) -> None:
-    """A model chosen in a Refaire… panel's « Avancé » (D91): opened if it is closed, then its list —
-    the first entry Settings' own."""
-    toggle = f"{panel}-advanced"
-    wait_for(browser, lambda b: b.find_elements(By.ID, toggle))
-    if browser.find_element(By.ID, toggle).get_attribute("aria-expanded") != "true":
-        press(browser, toggle)
-    Select(browser.find_element(By.ID, f"{panel}-{step}-model")).select_by_index(index)
+REDO_DIALOG = ("const d = document.querySelector('dialog.redo-dialog[open]'); if (!d) return null; const cards = d.querySelector('fieldset.engine-cards');"
+               " const card = (c) => c.querySelector('.name').textContent;"
+               " return {title: d.querySelector('h2')?.textContent ?? '', job: cards?.dataset.job ?? null,"
+               " names: cards ? [...cards.querySelectorAll('.engine-card')].map(card) : [],"
+               " checked: cards ? [...cards.querySelectorAll('.engine-card')].filter((c) => c.querySelector('input:checked')).map(card)[0] ?? null : null,"
+               " value: cards?.querySelector('input[type=radio]:checked')?.value ?? null,"
+               " marked: cards ? [...cards.querySelectorAll('.engine-card')].filter((c) => c.querySelector('.default')).map(card) : [],"
+               " online: cards ? [...cards.querySelectorAll('.engine-card[data-where=online]')].map(card) : [],"
+               " said: document.getElementById('redo-dialog-models-said')?.textContent ?? null,"
+               " says: [...d.querySelectorAll(':scope > .says, :scope > .note')].filter((n) => !n.hidden).map((n) => n.textContent),"
+               " go: [...d.querySelectorAll('.actions button')].map((b) => b.textContent.trim())}")
 
 
-def redo_offered(browser, panel: str, step: str) -> list[str]:
-    """What a Refaire… panel's « Avancé » offers for a step, opened if it is closed."""
-    toggle = f"{panel}-advanced"
-    wait_for(browser, lambda b: b.find_elements(By.ID, toggle))
-    if browser.find_element(By.ID, toggle).get_attribute("aria-expanded") != "true":
-        press(browser, toggle)
-    return browser.execute_script("return [...document.getElementById(arguments[0]).options].map(o => o.textContent)", f"{panel}-{step}-model")
+def redo_open(browser, step: str):
+    """The bar's « Refaire ▾ » (D121, criterion 3), its item for a step — "minutes" or "transcription" —, its dialog
+    awaited: what it shows (REDO_DIALOG), or None when it does not open."""
+    if browser.execute_script(REDO_DIALOG) is not None:
+        return browser.execute_script(REDO_DIALOG)
+    item = "redo-minutes-item" if step == "minutes" else "redo-transcript-item"
+    wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"), 10)
+    press(browser, "redo-open")
+    if not wait_for(browser, lambda b: b.find_elements(By.ID, item) and b.find_element(By.ID, item).is_displayed(), 3):
+        return None
+    press(browser, item)
+    if not wait_for(browser, lambda b: b.execute_script(REDO_DIALOG), 5):
+        return None
+    return browser.execute_script(REDO_DIALOG)
+
+
+def redo_choose(browser, name: str) -> None:
+    """The card of that name checked in Refaire's dialog, as a click on it."""
+    browser.execute_script("const d = document.querySelector('dialog.redo-dialog[open]');"
+                           " [...d.querySelectorAll('.engine-card')].find((c) => c.querySelector('.name').textContent === arguments[0]).querySelector('input').click()", name)
+
+
+def redo_pick(browser, step: str, index: int) -> None:
+    """The card at that place checked in Refaire's dialog for a step, opened if it is not: the first « Par défaut »,
+    Settings' own (D122)."""
+    redo_open(browser, step)
+    browser.execute_script("document.querySelectorAll('dialog.redo-dialog[open] .engine-card input')[arguments[0]].click()", index)
+
+
+def redo_offered(browser, step: str) -> list[str]:
+    """The cards Refaire's dialog offers for a step, opened if it is not: their names."""
+    return (redo_open(browser, step) or {}).get("names", [])
+
+
+def redo_closed(browser) -> bool:
+    """Refaire's dialog gone."""
+    return bool(wait_for(browser, lambda b: b.execute_script(REDO_DIALOG) is None, 5))
 
 
 def tokens(theme: str) -> str:
@@ -3740,38 +3773,13 @@ LONG = "hf.co/unsloth/Mistral-Small-3.2-24B-Instruct-2506-GGUF:UD-Q4_K_XL-very-l
 LONG_SAID = "Mistral Small 3.2 24B Instruct 2506 GGUF UD Q4 K XL Very Long Name"
 # A list's chosen entry: whether it fits the list as drawn, and what is said whole under it, if anything —
 # inside the window's width.
-def long_resized(browser, where: str, chosen: str) -> None:
-    """A long name chosen in Refaire… at 830 px, where it fits; then the window narrowed to 420 px and
-    widened back, never crossing 840 (the page's own break): said whole under its list once the list is
-    too narrow for it, at 12 px, and no longer once it fits again — whatever the window does after."""
-    pick = "redo-panel-minutes-model"
-    Select(browser.find_element(By.ID, pick)).select_by_visible_text(chosen)
-    time.sleep(0.5)
-    got = browser.execute_script(LONG_SHOWN, pick)
-    check(f"{where}: chosen at 830 px, the long name fits its list, nothing said under it", got["fit"] and got["said"] is None, got)
-    browser.set_window_size(420, 700)
-    narrowed = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is not None, 5)
-    got = browser.execute_script(LONG_SHOWN, pick)
-    check(f"{where}: the window narrowed to 420 px after the choice — the name said whole under its list, 12 px, inside the window",
-          narrowed and not got["fit"] and got["said"] == got["text"] and got["size"] == "12px" and got["inside"], got)
-    browser.set_window_size(830, 800)
-    widened = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, pick)["said"] is None, 5)
-    got = browser.execute_script(LONG_SHOWN, pick)
-    check(f"{where}: widened back to 830 px — it fits again, nothing said under it", widened and got["fit"], got)
-
-
-LONG_SHOWN = ("const s = document.getElementById(arguments[0]); const f = getComputedStyle(s); const c = document.createElement('canvas').getContext('2d');"
-              "c.font = `${f.fontSize} ${f.fontFamily}`; const text = s.options[s.selectedIndex].textContent;"
-              "const u = document.getElementById(arguments[0] + '-whole'); const shown = u && u.getClientRects().length > 0;"
-              "return {text, fit: Math.ceil(c.measureText(text).width) + 36 <= s.clientWidth, said: shown ? u.textContent : null, size: u ? getComputedStyle(u).fontSize : null,"
-              " inside: !shown || (u.getBoundingClientRect().right <= innerWidth && u.scrollWidth <= u.clientWidth + 1)}")
-
-
 def models_advanced(now: dt.datetime) -> None:
-    """BD. « Avancé » (D91, board 6) in Refaire…: closed by default, the meeting's own models chosen there —
-    Settings' first —, kept with the meeting, Settings unchanged; a model gone said on the page; a
-    confidential meeting offered no service. The bar offers none since D125 (CV)."""
-    print("BD. « Avancé » in Refaire…: closed, Settings' first, the meeting's own models kept, Settings unchanged, a model gone said, no service when confidential (D91)")
+    """BD. A meeting's own engines (D91), chosen in « Refaire ▾ »'s dialog since D121 (criterion 3) with D122's engine card:
+    Settings' first, « Par défaut », the meeting's own checked, kept with the meeting once Refaire is pressed, never on
+    Annuler, Settings unchanged; a model gone, Settings unreadable, a service unused while confidential said in the
+    dialog; a confidential meeting offered no service; a long name kept inside the dialog. The bar offers none since
+    D125 (CV)."""
+    print("BD. Refaire's dialog: Settings' first, the meeting's own engine checked and kept, Settings unchanged, a model gone said, no service when confidential (D91, D121)")
 
     class Tags(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
@@ -3804,15 +3812,9 @@ def models_advanced(now: dt.datetime) -> None:
     hearing, writing = WORK / "hearing-args", WORK / "summary-args"
     read = lambda path: path.read_text() if path.exists() else ""
     own = lambda: json.loads((meeting / "models.json").read_text()) if (meeting / "models.json").exists() else None
-    shown = ("const t = document.getElementById(arguments[0] + '-advanced'); const p = document.getElementById(arguments[0] + '-advanced-panel');"
-             "const o = (id) => { const s = document.getElementById(arguments[0] + id); return s ? [...s.options].map(x => x.textContent) : null; };"
-             "const v = (id) => { const s = document.getElementById(arguments[0] + id); return s ? s.options[s.selectedIndex]?.textContent : null; };"
-             "return {expanded: t?.getAttribute('aria-expanded'), hidden: p?.hidden, hear: o('-transcription-model'), write: o('-minutes-model'),"
-             " heard: v('-transcription-model'), written: v('-minutes-model'), note: p?.querySelector('.says')?.textContent, said: p?.querySelector('.note')?.textContent}")
     idle = "return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null && m.transcripts_waiting.length === 0 && m.minutes_waiting.length === 0)"
-    # The meeting Refaire… opens, as a recording leaves it: its transcript heard by the model it chose,
-    # tiny, Settings' for the minutes. That choice was made in the bar's « Avancé » until D125 took it out;
-    # a meeting's engine is chosen in Refaire… now (D122).
+    # The meeting Refaire opens, as a recording leaves it: its transcript heard by the model it chose,
+    # tiny, Settings' for the minutes. A meeting's engine is chosen in Refaire's dialog (D121, D122).
     session(meeting, now - dt.timedelta(hours=2), 1, {"local.wav": 1000})
     (meeting / "models.json").write_text(json.dumps({"transcription": {"engine": "whisper", "model": tiny.name}}))
     (meeting / "transcript.jsonl").write_text(
@@ -3820,66 +3822,61 @@ def models_advanced(now: dt.datetime) -> None:
         '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n'
     )
     try:
-        # Refaire…: its « Avancé » closed, the meeting's own models in it; chosen there, kept once Refaire is pressed.
         full = Window(meetings, "fr_FR.UTF-8", named, ollama=base)
         full.env.update(XDG_DATA_HOME=str(data))
         with full as browser:
             before = full.file.read_text()
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"), 10)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            got = browser.execute_script(shown, "redo-transcript-panel")
-            check("Refaire… of the transcript: « Avancé » closed by default, the meeting's own model chosen in it",
-                  got["expanded"] == "false" and got["hidden"] is True and got["heard"] == "Whisper tiny adv"
-                  and got["written"] == "Celui des Réglages\u00a0: Qwen3 14b", got)
+            got = redo_open(browser, "transcription") or {}
+            check("« Refaire la transcription »: Settings' first, « Par défaut », the meeting's own engine checked (D91, D122)",
+                  got.get("marked") == ["Whisper adv settings"] and (got.get("names") or [None])[0] == "Whisper adv settings"
+                  and got.get("checked") == "Whisper tiny adv", got)
             # Annuler: nothing changed.
-            press(browser, "redo-transcript-panel-advanced")
-            Select(browser.find_element(By.ID, "redo-transcript-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
-            press(browser, "redo-transcript-panel-cancel")
-            time.sleep(0.5)
-            check("Annuler: the meeting's models as they were", own() == {"transcription": {"engine": "whisper", "model": tiny.name}}, own())
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            press(browser, "redo-transcript-panel-advanced")
-            Select(browser.find_element(By.ID, "redo-transcript-panel-transcription-model")).select_by_index(0)
-            Select(browser.find_element(By.ID, "redo-transcript-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
+            redo_choose(browser, "Whisper adv settings")
+            press(browser, "redo-dialog-cancel")
+            closed = redo_closed(browser)
+            check("Annuler: the dialog closed, the meeting's engines as they were",
+                  closed and own() == {"transcription": {"engine": "whisper", "model": tiny.name}}, own())
+            redo_pick(browser, "transcription", 0)
             hearing.unlink(missing_ok=True)
-            press(browser, "redo-transcript-do")
+            press(browser, "redo-dialog-do")
             redone = wait_for(None, lambda b: str(model) in read(hearing), 15)
-            check("Refaire with Settings' model chosen in « Avancé »: made again by it, the choice kept for the meeting",
-                  redone and own() == {"minutes": {"provider": here, "model": "mistral:7b"}}, (read(hearing), own()))
+            check("Refaire with « Par défaut » checked: made again by Settings' model, the meeting's own choice dropped",
+                  redone and own() is None, (read(hearing), own()))
             wait_for(browser, lambda b: b.execute_script(idle), 15)
-            # Its minutes first, by its own model: then Refaire… on them.
+            # Its minutes first, by Settings' model: then Refaire on them.
             browser.execute_script("window.__TAURI__.core.invoke('minutes_asked', {name: arguments[0]})", meeting.name)
             wait_for(None, lambda b: (meeting / "minutes.md").exists(), 15)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             browser.execute_script("location.hash = '#/'")
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            writing.unlink(missing_ok=True)
-            # Below the page's break at 840 px from here, so that a resize never draws the page anew.
-            browser.set_window_size(830, 800)
-            time.sleep(1.5)
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
-            got = browser.execute_script(shown, "redo-panel")
-            check("Refaire… of the minutes: « Avancé » closed, the meeting's own minutes model in it",
-                  got["expanded"] == "false" and got["written"] == "Mistral 7b — sur cet ordinateur", got)
-            press(browser, "redo-panel-advanced")
-            long_resized(browser, "fr, Refaire…", LONG_SAID + " — sur cet ordinateur")
-            Select(browser.find_element(By.ID, "redo-panel-minutes-model")).select_by_visible_text("Mistral 7b — sur cet ordinateur")
-            gone_ = wait_for(browser, lambda b: b.execute_script(LONG_SHOWN, "redo-panel-minutes-model")["said"] is None, 3)
-            check("a name that fits: nothing said under the list", gone_, browser.execute_script(LONG_SHOWN, "redo-panel-minutes-model"))
-            press(browser, "redo-do")
-            wrote = wait_for(None, lambda b: "mistral:7b" in read(writing), 15)
-            check("Refaire with « Avancé » left closed: made again by the meeting's own model", wrote and "qwen3:14b" not in read(writing), read(writing))
-            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            got = redo_open(browser, "minutes") or {}
+            check("« Refaire le compte rendu »: Settings' first, « Par défaut » and checked, Ollama's models after it, Settings' never twice",
+                  got.get("marked") == ["Qwen3 14b"] and got.get("checked") == "Qwen3 14b"
+                  and got.get("names", [])[1:3] == ["Mistral 7b", LONG_SAID] and got.get("names", []).count("Qwen3 14b") == 1, got)
+            # A long name: wrapped inside its card, nothing out of the dialog, at 420 px as at 1100 (D91's UX pass).
+            browser.set_window_size(420, 700)
+            time.sleep(1)
+            inside = browser.execute_script("const d = document.querySelector('dialog.redo-dialog[open]');"
+                                            " const c = [...d.querySelectorAll('.engine-card')].find((c) => c.querySelector('.name').textContent === arguments[0]);"
+                                            " return [d.scrollWidth <= d.clientWidth + 1, c.getBoundingClientRect().right <= d.getBoundingClientRect().right + 0.5, d.getBoundingClientRect().right <= innerWidth]",
+                                            LONG_SAID)
             browser.set_window_size(1100, 800)
-            time.sleep(1.5)
-            # Its own model fails: the page names it, and where to choose another — Refaire… › Avancé, not Settings.
+            check("a long name at 420 px: its card inside the dialog, the dialog inside the window, no scroll across", inside == [True, True, True], inside)
+            redo_choose(browser, "Mistral 7b")
+            writing.unlink(missing_ok=True)
+            press(browser, "redo-dialog-do")
+            wrote = wait_for(None, lambda b: "mistral:7b" in read(writing), 15)
+            check("Refaire with Mistral checked: made again by it, kept for the meeting",
+                  wrote and "qwen3:14b" not in read(writing) and own() == {"minutes": {"provider": here, "model": "mistral:7b"}}, (read(writing), own()))
+            wait_for(browser, lambda b: b.execute_script(idle), 15)
+            got = redo_open(browser, "minutes") or {}
+            check("opened again: the meeting's own engine checked, Settings' still first", got.get("checked") == "Mistral 7b" and got.get("marked") == ["Qwen3 14b"], got)
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
+            # Its own model fails: the page names it, and where to choose another — « Refaire › Refaire le compte rendu », not Settings.
             failure = "const w = document.querySelector('#minutes-state .what'); return w ? w.textContent : ''"
             # The notification, read before the page: the same sentence.
             notified = WORK / "notified-own-minutes"
@@ -3888,77 +3885,65 @@ def models_advanced(now: dt.datetime) -> None:
             time.sleep(0.5)
             (WORK / "fail-minutes").touch()
             try:
-                press(browser, "redo-minutes")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+                redo_open(browser, "minutes")
                 # Its end awaited with another application in front: told only then (D92).
-                away(browser, lambda: (press(browser, "redo-do"), wait_for(None, lambda b: "pas pu être refait" in notified.read_text(), 15)))
+                away(browser, lambda: (press(browser, "redo-dialog-do"), wait_for(None, lambda b: "pas pu être refait" in notified.read_text(), 15)))
                 failed = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
-                check("the meeting's own minutes model fails: the page names it, and Refaire… › Avancé to choose another",
-                      failed and "Mistral 7b" in told and "Refaire…\u00a0› Avancé" in told and "réglages" not in told, told)
+                check("the meeting's own minutes model fails: the page names it, and « Refaire › Refaire le compte rendu » to choose another",
+                      failed and "Mistral 7b" in told and "Refaire\u00a0› Refaire le compte rendu" in told and "réglages" not in told and "Avancé" not in told, told)
                 heard_own = wait_for(None, lambda b: "pas pu être refait" in notified.read_text(), 10)
                 since = len(notified.read_text())
                 said_own = notified.read_text()
-                check("and its notification says the same: the model named, Refaire… › Avancé, never Settings",
-                      heard_own and "Mistral 7b, choisi pour cette réunion" in said_own and "Refaire…\u00a0› Avancé" in said_own
+                check("and its notification says the same: the model named, « Refaire › Refaire le compte rendu », never Settings",
+                      heard_own and "Mistral 7b, choisi pour cette réunion" in said_own and "Refaire\u00a0› Refaire le compte rendu" in said_own
                       and "réglages" not in said_own, said_own[-500:])
                 # Settings' model fails: Settings' wording, as before.
                 (meeting / "models.json").unlink()
                 wait_for(browser, lambda b: b.execute_script(idle), 15)
                 browser.execute_script("location.hash = '#/'")
                 browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-                press(browser, "redo-minutes")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
+                redo_open(browser, "minutes")
                 writing.unlink(missing_ok=True)
-                away(browser, lambda: (press(browser, "redo-do"),
+                away(browser, lambda: (press(browser, "redo-dialog-do"),
                                        wait_for(None, lambda b: "pas pu être refait" in notified.read_text()[since:], 15)))
                 failed = wait_for(browser, lambda b: "qwen3:14b" in read(writing) and "Le dernier Refaire a échoué" in b.execute_script(failure), 15)
                 told = browser.execute_script(failure)
-                check("Settings' minutes model fails: Settings' wording, no « Avancé »",
-                      failed and "dans les Réglages" in told and "Avancé" not in told, told)
+                check("Settings' minutes model fails: Settings' wording, no « Refaire › »",
+                      failed and "dans les Réglages" in told and "Refaire\u00a0›" not in told, told)
                 heard_settings = wait_for(None, lambda b: "pas pu être refait" in notified.read_text()[since:], 10)
                 said_settings = notified.read_text()[since:]
                 check("and its notification keeps Settings' wording",
-                      heard_settings and "dans les Réglages" in said_settings and "Avancé" not in said_settings, said_settings[-500:])
+                      heard_settings and "dans les Réglages" in said_settings and "Refaire\u00a0›" not in said_settings, said_settings[-500:])
             finally:
                 monitor.terminate()
                 (WORK / "fail-minutes").unlink()
                 (meeting / "models.json").write_text(json.dumps({"minutes": {"provider": here, "model": "mistral:7b"}}))
             wait_for(browser, lambda b: b.execute_script(idle), 15)
-            check("Settings unchanged by Refaire…", full.file.read_text() == before, full.file.read_text())
-            # Refaire… of the transcript: the transcript alone, by the meeting's models — its minutes untouched.
+            check("Settings unchanged by Refaire", full.file.read_text() == before, full.file.read_text())
+            # Refaire la transcription: the transcript alone, by the meeting's engines — its minutes untouched.
             minutes_before = (meeting / "minutes.md").read_text()
             hearing.unlink(missing_ok=True)
             writing.unlink(missing_ok=True)
             browser.execute_script("location.hash = '#/'")
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
-            press(browser, "redo-transcript-do")
+            redo_open(browser, "transcription")
+            press(browser, "redo-dialog-do")
             heard = wait_for(None, lambda b: str(model) in read(hearing), 15)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
             time.sleep(2)
-            check("Refaire… of the transcript makes the transcript alone, its minutes untouched",
+            check("Refaire la transcription makes the transcript alone, its minutes untouched",
                   heard and not writing.exists() and (meeting / "minutes.md").read_text() == minutes_before, (read(hearing), read(writing)))
-            # Settings unreadable: Refaire… still opens, from those last read, and says why.
+            # Settings unreadable: the dialog still opens, from those last read, and says why.
             kept_settings = full.file.read_text()
             full.file.write_text("this is [not toml")
-            press(browser, "redo-transcript")
-            opened = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            if opened:
-                press(browser, "redo-transcript-panel-advanced")
-            got = browser.execute_script(shown, "redo-transcript-panel")
+            got = redo_open(browser, "transcription")
             full.file.write_text(kept_settings)
-            check("Settings unreadable: Refaire… opens all the same, offering what was last read, and says it",
-                  opened and got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings" and bool(got["said"]), got)
-            if opened:
-                press(browser, "redo-transcript-panel-cancel")
-            else:
-                browser.execute_script("location.hash = '#/'")
-                browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
+            check("Settings unreadable: Refaire's dialog opens all the same, offering what was last read, and says it",
+                  bool(got) and got["marked"] == ["Whisper adv settings"] and bool(got["said"]), got)
+            if got:
+                press(browser, "redo-dialog-cancel")
+                redo_closed(browser)
             # A model gone: said on the page, Settings' standing in.
             (meeting / "models.json").write_text(json.dumps({"transcription": {"engine": "whisper", "model": tiny.name}}))
             tiny.unlink()
@@ -3968,61 +3953,48 @@ def models_advanced(now: dt.datetime) -> None:
             gone_said = browser.execute_script("return document.getElementById('models-gone')?.textContent")
             check("a model chosen for the meeting and gone: said on its page, Settings' standing in",
                   said and gone_said == "Le modèle de transcription choisi pour cette réunion n’est plus installé\u00a0: celui des Réglages sera utilisé.", gone_said)
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            press(browser, "redo-transcript-panel-advanced")
-            got = browser.execute_script(shown, "redo-transcript-panel")
-            check("and in « Avancé »: Settings' shown, the model gone said", got["heard"] == "Celui des Réglages\u00a0: Whisper adv settings"
-                  and "n’est plus installé" in (got["said"] or ""), got)
-            press(browser, "redo-transcript-panel-cancel")
-            # Confidential, Settings hearing and writing by services: « Avancé » names no service at all —
-            # Settings' entry says who makes it here —; a service chosen is said unused, and refused.
+            got = redo_open(browser, "transcription") or {}
+            check("and in Refaire's dialog: « Par défaut » checked, the model gone said, never silently another",
+                  got.get("checked") == "Whisper adv settings" and "n’est plus installé" in (got.get("said") or ""), got)
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
+            # Confidential, Settings hearing and writing by services: no card is online — Settings' says who makes it
+            # here —; a service chosen is said unused, and refused.
             serviced = kept_settings + ('engine = "service"\ntranscription_agreed = "hears.example"\n'
                                         'minutes_agreed = "writes.example"\n')
             serviced = serviced.replace(f'minutes_provider = "{here}"', 'minutes_provider = "https://writes.example/v1"').replace('minutes_model = "qwen3:14b"', 'minutes_model = "gpt-4.1-mini"')
             full.file.write_text(serviced)
             (meeting / "confidential").write_bytes(b"")
             (meeting / "models.json").write_text(json.dumps({"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}))
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            press(browser, "redo-transcript-panel-advanced")
-            got = browser.execute_script(shown, "redo-transcript-panel")
-            check("confidential, Settings naming services: no entry names one — Settings' says Whisper and Ollama here",
-                  got["hear"] and got["write"] and not any("via" in one for one in got["hear"] + got["write"])
-                  and got["hear"][0] == "Celui des Réglages\u00a0: Whisper adv settings" and got["write"][0].startswith("Celui des Réglages\u00a0: "), got)
-            check("a service the confidential meeting chose: not shown chosen, said unused while confidential",
-                  got["heard"] == got["hear"][0] and "le service en ligne choisi n’est pas utilisé" in (got["said"] or ""), got)
-            press(browser, "redo-transcript-panel-cancel")
+            got = redo_open(browser, "transcription") or {}
+            check("confidential, Settings naming a service: no card online, « Par défaut » made here",
+                  bool(got.get("names")) and got.get("online") == [] and got.get("marked") == ["Whisper adv settings"], got)
+            check("a service the confidential meeting chose: not checked, « Par défaut » is, said unused while confidential",
+                  got.get("checked") == "Whisper adv settings" and "le service en ligne choisi n’est pas utilisé" in (got.get("said") or ""), got)
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
+            got = redo_open(browser, "minutes") or {}
+            check("its minutes' dialog: no card online either", bool(got.get("names")) and got.get("online") == [], got)
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
             refused = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('meeting_models_chosen', {name: arguments[0], chosen: arguments[1]}).then(() => done('kept'), () => done('refused'))",
                 meeting.name, {"minutes": {"provider": "https://writes.example/v1", "model": "gpt-4.1-mini"}})
             check("a service chosen for a confidential meeting is refused, nothing written",
                   refused == "refused" and own() == {"transcription": {"engine": "service", "provider": "https://hears.example/v1", "model": "whisper-1"}}, [refused, own()])
             (meeting / "confidential").unlink()
-            # Settings naming no one to write the minutes: their entry says so in words.
-            full.file.write_text("\n".join(line for line in kept_settings.splitlines() if not line.startswith(("minutes_provider", "minutes_model"))) + "\n")
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-            press(browser, "redo-transcript-panel-advanced")
-            got = browser.execute_script(shown, "redo-transcript-panel")
-            check("Settings naming no minutes model: their entry reads « Réglages : aucun modèle choisi »",
-                  (got["write"] or [None])[0] == "Celui des Réglages\u00a0: aucun modèle choisi", got)
-            press(browser, "redo-transcript-panel-cancel")
             full.file.write_text(kept_settings)
-        # In English, Refaire…: the long name said whole as well.
+        # In English: the same dialog, its words.
         english_full = Window(meetings, "en_US.UTF-8", named, ollama=base)
         english_full.env.update(XDG_DATA_HOME=str(data))
         with english_full as browser:
-            browser.set_window_size(830, 800)
-            time.sleep(1.5)
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
             wait_for(browser, lambda b: b.execute_script(idle), 15)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel-advanced"), 5)
-            press(browser, "redo-panel-advanced")
-            long_resized(browser, "en, Redo…", LONG_SAID + " — on this computer")
-            press(browser, "redo-panel-cancel")
+            got = redo_open(browser, "minutes") or {}
+            check("in English: « Write the summary again », Settings' first, its button naming the making",
+                  got.get("title") == "Write the summary again" and got.get("marked") == ["Qwen3 14b"]
+                  and got.get("go") == ["Cancel", "Write the summary again"], got)
+            press(browser, "redo-dialog-cancel")
     finally:
         tags.shutdown()
 
@@ -4061,11 +4033,12 @@ def minutes_copied(now: dt.datetime) -> None:
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\n") as browser:
         browser.execute_script(f"location.hash = '#/meeting/{written.name}'")
         offered = wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes"), 10)
+        # D121, criterion 3 (part 3b): Refaire is the bar's alone — the card keeps no « Refaire… » beside its copy.
         beside = browser.execute_script(
-            "const c = document.getElementById('copy-minutes'), r = document.getElementById('redo-minutes');"
-            "return c && r && c.parentElement === r.parentElement && c.nextElementSibling === r")
-        check("a meeting with minutes offers « Copier le compte rendu », beside Refaire…",
-              offered and beside and browser.find_element(By.ID, "copy-minutes").get_attribute("aria-label") == "Copier le compte rendu", beside)
+            "const c = document.getElementById('copy-minutes'); return c && [c.nextElementSibling?.id ?? null, !!document.querySelector('.minutes [id^=redo-]')]")
+        check("a meeting with minutes offers « Copier le compte rendu », and no « Refaire… » on its card (D121)",
+              offered and beside == [beside[0], False] and beside[0] != "redo-minutes"
+              and browser.find_element(By.ID, "copy-minutes").get_attribute("aria-label") == "Copier le compte rendu", beside)
         browser.execute_script(stand_in, False)
         press(browser, "copy-minutes")
         said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
@@ -6788,16 +6761,16 @@ def keys_first_surfaces(now: dt.datetime) -> None:
 
 
 def redo_says_what_is_wrong(now: dt.datetime) -> None:
-    """CI. D113, criterion 3: Refaire… with Settings' model missing, or the meeting's folder not writable —
-    its button stays and the panel says which is wrong and what to do, never a setting the user did not
-    touch (#771); the panel open, the window crossing 840 px either way — the panel, its choice and the
-    focus stay (#777). In French."""
-    print("CI. Refaire…: what is wrong said in its panel, its button kept; open across the 840 px break, it stays as it was (D113)")
+    """CI. D113, criterion 3, in « Refaire ▾ »'s dialog since D121 (criterion 3): « Refaire la transcription » with
+    Settings' model missing, or the meeting's folder not writable — the dialog stays, its button back, and it says
+    which is wrong and what to do, never a setting the user did not touch (#771); the dialog open, the window
+    crossing 840 px either way — the dialog, its choice and the focus stay (#777). In French."""
+    print("CI. Refaire's dialog: what is wrong said in it, its button back; open across the 840 px break, it stays as it was (D113, D121)")
     idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
             " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
-    # The notes shown: « Avancé » closed holds its own status line, empty and hidden (s113cok).
-    note = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
-            " const go = document.getElementById('redo-transcript-do');"
+    # The warnings shown in the dialog: the models' line, empty, is hidden (s113cok).
+    note = ("const p = document.querySelector('dialog.redo-dialog[open]'); if (!p) return null;"
+            " const go = document.getElementById('redo-dialog-do');"
             " return [!!go && !go.disabled, [...p.querySelectorAll('.note.warn')].filter((n) => n.getClientRects().length).map((n) => n.textContent)]")
     model = WORK / "redo-wrong-model.bin"
     model.write_bytes(b"\0" * 16)
@@ -6813,65 +6786,58 @@ def redo_says_what_is_wrong(now: dt.datetime) -> None:
         try:
             with Window(meetings, "fr_FR.UTF-8", settings) as browser:
                 browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open") and b.execute_script(idle), 15)
                 if read_only:
                     meeting.chmod(0o555)
-                press(browser, "redo-transcript")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
-                press(browser, "redo-transcript-do")
+                redo_open(browser, "transcription")
+                press(browser, "redo-dialog-do")
                 told = wait_for(browser, lambda b: (b.execute_script(note) or [False, []])[1], 10)
                 got = browser.execute_script(note) or [False, []]
-                check(f"{case}: Refaire's button stays, and the panel says what is wrong and what to do, never « Non enregistré » (#771)",
+                check(f"{case}: Refaire's dialog stays, its button back, and it says what is wrong and what to do, never « Non enregistré » (#771)",
                       told and got[0] and len(got[1]) == 1 and got[1][0].startswith("Pas refait\u00a0: ") and "Non enregistré" not in got[1][0], got)
         finally:
             meeting.chmod(0o755)
-    # #777: open, its « Avancé » open, a model chosen and the focus on it; the window crosses 840 px both ways.
+    # #777: open, another engine checked and the focus on it; the window crosses 840 px both ways.
     meetings = WORK / "redo-break"
     meeting = meetings / "2026-10-18_12-00"
     session(meeting, now - dt.timedelta(hours=1), 10, {"local.wav": 1000})
     (meeting / "transcript.jsonl").write_text(
         '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":"fr","context":null}\n'
         '{"type":"segment","speaker":"me","track":"local","voice":null,"start":0.5,"end":1.5,"text":"Bonjour."}\n{"type":"complete","duration":2.0}\n')
-    state = ("const p = document.getElementById('redo-transcript-panel'), s = document.getElementById('redo-transcript-panel-transcription-model'),"
-             " a = document.getElementById('redo-transcript-panel-advanced');"
-             " return [!!p && p.isConnected && p.getClientRects().length > 0, s ? s.value : null, a ? a.getAttribute('aria-expanded') : null,"
-             " document.activeElement ? document.activeElement.id : null, p ? p.dataset.kept ?? null : null]")
+    state = ("const p = document.querySelector('dialog.redo-dialog'), s = p?.querySelector('input[type=radio]:checked');"
+             " return [!!p && p.open && p.getClientRects().length > 0, s ? s.value : null,"
+             " document.activeElement === s, p ? p.dataset.kept ?? null : null]")
     with Window(meetings, "fr_FR.UTF-8", f'after = "nothing"\nreminder = false\nmodel = "{model}"\n') as browser:
         browser.set_window_size(1100, 800)
         browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
-        press(browser, "redo-transcript")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-advanced"), 5)
-        press(browser, "redo-transcript-panel-advanced")
-        pick = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel-transcription-model"), 5) and \
-            Select(browser.find_element(By.ID, "redo-transcript-panel-transcription-model"))
-        if pick:
-            pick.select_by_index(len(pick.options) - 1)
-        # Marked: a panel drawn anew would come without the mark.
-        browser.execute_script("const p = document.getElementById('redo-transcript-panel'); p.dataset.kept = 'yes';"
-                               " document.getElementById('redo-transcript-panel-transcription-model').focus()")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open") and b.execute_script(idle), 15)
+        redo_open(browser, "transcription")
+        # The last card checked, then marked: a dialog drawn anew would come without the mark.
+        browser.execute_script("const p = document.querySelector('dialog.redo-dialog[open]'); const r = [...p.querySelectorAll('input[type=radio]')].at(-1);"
+                               " r.click(); r.focus(); p.dataset.kept = 'yes'")
         before = browser.execute_script(state)
         for width, side in ((830, "narrowed below 840 px"), (1100, "widened again")):
             browser.set_window_size(width, 800)
             time.sleep(1.5)
             after = browser.execute_script(state)
-            check(f"Refaire… open, the window {side}: the panel, its « Avancé », its choice and the focus stay as they were (#777)",
+            check(f"Refaire's dialog open, the window {side}: the dialog, its choice and the focus stay as they were (#777)",
                   before[0] and after == before, [before, after])
 
 
 def redo_says_what_follows(now: dt.datetime) -> None:
-    """CG. D113, criterion 1, as the decider settled it on 2026-11-18 (#804: the summary is kept):
-    « Refaire… » opened starts nothing; its one button names the transcript and its model, never the
-    summary; where the meeting has a summary, the panel says it is kept; the context's button names what it starts — the transcript, and the
+    """CG. D113, criterion 1, as the decider settled it on 2026-11-18 (#804: the summary is kept), in « Refaire ▾ »'s
+    dialog since D121: « Refaire la transcription » opened starts nothing; its one button names the transcript, never
+    the summary, nor an engine (D121, criterion 3, over D113's « and its model »); where the meeting has a summary, the
+    dialog says it is kept; the context's button names what it starts — the transcript, and the
     summary after it when one follows; Escape and « Annuler » leave everything as it was; pressed, the
     transcript alone is made again, its summary kept as it was. In French and in English."""
-    print("CG. Refaire… starts nothing; it makes the transcript alone, the summary kept and said so; the context's button names what it starts (D113)")
+    print("CG. Refaire's dialog starts nothing; it makes the transcript alone, the summary kept and said so; the context's button names what it starts (D113, D121)")
     words_of = {
-        "fr": {"do": "Refaire la transcription avec ", "summary": "compte rendu",
+        "fr": {"do": "Refaire la transcription", "summary": "compte rendu",
                "both": "Refaire la transcription et le compte rendu", "alone": "Refaire la transcription",
                "keeps": "Le compte rendu actuel est gardé\u202f; refaites-le ensuite si besoin.",
                "note": "La transcription actuelle reste en place jusqu’à ce que la nouvelle soit terminée, puis va à la corbeille. En cas d’échec, elle est conservée."},
-        "en": {"do": "Write the transcript again with ", "summary": "summary",
+        "en": {"do": "Write the transcript again", "summary": "summary",
                "both": "Write the transcript and the summary again", "alone": "Write the transcript again",
                "keeps": "The current summary is kept; write it again afterwards if needed.",
                "note": "The current transcript stays until the new one is finished, then goes to the trash. If something goes wrong, it’s kept."},
@@ -6882,10 +6848,10 @@ def redo_says_what_follows(now: dt.datetime) -> None:
                 'minutes_provider = "http://127.0.0.1:9/v1"\nminutes_model = "mistral"\n')
     idle = ("return window.__TAURI__.core.invoke('makings').then(m => m.transcript === null && m.minutes === null"
             " && m.minutes_waiting.length === 0 && m.transcripts_waiting.length === 0)")
-    panel = ("const p = document.getElementById('redo-transcript-panel'); if (!p) return null;"
-             " const go = document.getElementById('redo-transcript-do'), note = document.getElementById('redo-transcript-note'),"
-             " kept = document.getElementById('redo-keeps-minutes');"
-             " return [go ? go.textContent : null, note ? note.textContent : null, p.querySelector('h3').textContent, kept ? kept.textContent : null]")
+    panel = ("const p = document.querySelector('dialog.redo-dialog[open]'); if (!p) return null;"
+             " const go = document.getElementById('redo-dialog-do'), note = document.getElementById('redo-dialog-note'),"
+             " kept = document.getElementById('redo-dialog-keeps-minutes');"
+             " return [go ? go.textContent : null, note ? note.textContent : null, p.querySelector('h2').textContent, kept ? kept.textContent : null]")
     hearing, writing = WORK / "hearing-args", WORK / "summary-args"
     for language, short in (("fr_FR.UTF-8", "fr"), ("en_US.UTF-8", "en")):
         said = words_of[short]
@@ -6902,20 +6868,20 @@ def redo_says_what_follows(now: dt.datetime) -> None:
         with Window(meetings, language, settings) as browser:
             for meeting, summarised, what in ((both, True, "with a summary"), (alone, False, "without one")):
                 browser.execute_script("location.hash = arguments[0]", f"#/meeting/{meeting.name}")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript") and b.execute_script(idle), 15)
+                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open") and b.execute_script(idle), 15)
                 hearing.unlink(missing_ok=True)
                 writing.unlink(missing_ok=True)
                 summary = lambda: (meeting / "minutes.md").read_bytes() if (meeting / "minutes.md").exists() else None
                 summary_before = summary()
-                press(browser, "redo-transcript")
+                redo_open(browser, "transcription")
                 opened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
                 time.sleep(1.5)
                 got = browser.execute_script(panel) or [None, None, None, None]
                 quiet = not hearing.exists() and not writing.exists()
-                named = bool(got[0]) and got[0].startswith(said["do"]) and said["summary"] not in got[0]
-                check(f"{short}, {what}: Refaire… opened starts nothing; its button names the transcript and its model, never the summary (D113)",
+                named = got[0] == said["do"] and said["summary"] not in got[0]
+                check(f"{short}, {what}: Refaire's dialog opened starts nothing; its button names the transcript, never the summary nor an engine (D113, D121)",
                       opened and quiet and named and got[1] == said["note"] and got[2] == said["alone"], [got, quiet])
-                check(f"{short}, {what}: " + ("the panel says the summary is kept (D113, the decider 2026-11-18)" if summarised else "no summary, none said kept (D113)"),
+                check(f"{short}, {what}: " + ("the dialog says the summary is kept (D113, the decider 2026-11-18)" if summarised else "no summary, none said kept (D113)"),
                       got[3] == (said["keeps"] if summarised else None), got[3])
                 # Settings make none after a transcript: the context's button names the summary only where there is one.
                 context = browser.execute_script("const c = document.getElementById('context-redo'); return c ? c.textContent : null")
@@ -6924,20 +6890,19 @@ def redo_says_what_follows(now: dt.datetime) -> None:
                 ActionChains(browser).send_keys(Keys.ESCAPE).perform()
                 closed = wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
                 time.sleep(1)
-                check(f"{short}, {what}: Escape closes the panel, nothing started (D113)",
+                check(f"{short}, {what}: Escape closes the dialog, nothing started (D113)",
                       closed and not hearing.exists() and not writing.exists(), [closed, hearing.exists(), writing.exists()])
                 # « Annuler » as Escape (ines' pre-read: only Escape was pinned): the panel closed, nothing started.
-                press(browser, "redo-transcript")
+                redo_open(browser, "transcription")
                 reopened = wait_for(browser, lambda b: b.execute_script(panel) is not None, 5)
                 if reopened:
-                    press(browser, "redo-transcript-panel-cancel")
+                    press(browser, "redo-dialog-cancel")
                 shut = reopened and wait_for(browser, lambda b: b.execute_script(panel) is None, 3)
                 time.sleep(1)
-                check(f"{short}, {what}: « Annuler » closes the panel, nothing started (D113)",
+                check(f"{short}, {what}: « Annuler » closes the dialog, nothing started (D113)",
                       shut and not hearing.exists() and not writing.exists(), [reopened, shut, hearing.exists(), writing.exists()])
-                press(browser, "redo-transcript")
-                wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
-                press(browser, "redo-transcript-do")
+                redo_open(browser, "transcription")
+                press(browser, "redo-dialog-do")
                 heard = wait_for(None, lambda b: hearing.exists(), 15)
                 done = heard and wait_for(browser, lambda b: b.execute_script(idle), 20)
                 time.sleep(1)
@@ -10583,10 +10548,11 @@ def redo_from_the_bar(now: dt.datetime) -> None:
 
 
 def redo_choice_starts_nothing(now: dt.datetime) -> None:
-    """BO. A model chosen in a meeting's redo panel starts nothing, and the panel stays open, the choice shown;
-    Escape leaves everything as it was (D96, criterion 2: the decider saw a choice close the panel,
-    2026-11-15). The bar's « Avancé », which this held too, is gone with D125 (CV)."""
-    print("BO. a model chosen in a redo panel starts nothing and the panel stays open (D96)")
+    """BO. An engine checked in « Refaire ▾ »'s dialog starts nothing, and the dialog stays open, the choice shown;
+    Escape and « Annuler » leave everything as it was (D96, criterion 2: the decider saw a choice close the panel,
+    2026-11-15). Its button names the making alone, never an engine, before a choice and after (D121, criterion 3,
+    over D96's « names the making and its model »). The bar's « Avancé », which this held too, is gone with D125 (CV)."""
+    print("BO. an engine checked in Refaire's dialog starts nothing, the dialog stays open, its button names no engine (D96, D121)")
 
     # Answered late once `late` is set: a real Ollama answers a reading after the choice later than
     # the stand-in's at once (the coordinator's (c), 2026-11-15).
@@ -10627,52 +10593,43 @@ def redo_choice_starts_nothing(now: dt.datetime) -> None:
     try:
         with Window(meetings, "fr_FR.UTF-8", named, ollama=base) as browser:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-            # The one button that starts names the making and the model, as chosen (D96, criterion 2).
-            go = lambda b: b.find_element(By.ID, "redo-do").text
-            said = go(browser)
-            check("on the page: the button that starts names the making and its model — Settings' at first (D96)",
-                  said == "Refaire le compte rendu avec Qwen3 14b", said)
-            redo_pick(browser, "redo-panel", "minutes", 1)
-            picked = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : ''")
-            renamed = wait_for(browser, lambda b: go(b) == "Refaire le compte rendu avec Mistral 7b", 3)
-            check("on the page: another model chosen, the button names it — nothing started (D96)",
-                  renamed and browser.execute_script(idle) and untouched(), go(browser))
-            # Past the page's own reading, a second and a half: drawn again, the panel would be gone.
-            time.sleep(3)
-            kept = browser.execute_script("const p = document.getElementById('redo-panel-minutes-model'); return p ? p.value : null")
-            # Shown, not only there: the panel, its list and its button seen by the user (sam's o1, a panel hidden).
-            seen = lambda b: all(b.find_elements(By.ID, i) and b.find_element(By.ID, i).is_displayed()
-                                 for i in ("redo-panel", "redo-panel-minutes-model", "redo-do"))
-            check("on the page: a model chosen in the redo panel starts nothing, and the panel stays open, the choice shown (D96)",
-                  bool(picked) and kept == picked and seen(browser) and browser.execute_script(idle) and untouched(),
-                  (picked, kept, seen(browser), browser.execute_script(idle)))
+            got = redo_open(browser, "minutes") or {}
+            check("Refaire's dialog: its button names the making, never an engine — Settings' checked at first (D121, criterion 3)",
+                  got.get("go") == ["Annuler", "Refaire le compte rendu"] and got.get("checked") == "Qwen3 14b", got)
+            late.set()
+            redo_choose(browser, "Mistral 7b")
+            time.sleep(0.5)
+            got = browser.execute_script(REDO_DIALOG) or {}
+            check("another engine checked: the button still names the making alone — nothing started",
+                  got.get("go") == ["Annuler", "Refaire le compte rendu"] and browser.execute_script(idle) and untouched(), got)
+            # Past the page's own reading, a second and a half, and a late answer of Ollama: drawn again, the dialog would be gone.
+            time.sleep(3.5)
+            kept = browser.execute_script(REDO_DIALOG) or {}
+            seen = browser.execute_script("const d = document.querySelector('dialog.redo-dialog[open]'); return !!d && d.getClientRects().length > 0"
+                                          " && !!document.getElementById('redo-dialog-do')?.getClientRects().length")
+            check("an engine checked in Refaire's dialog starts nothing, and the dialog stays open, the choice shown (D96)",
+                  kept.get("checked") == "Mistral 7b" and seen and browser.execute_script(idle) and untouched(), [kept, seen])
+            late.clear()
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
-            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
-            check("on the page: Escape leaves everything as it was — the panel closed, nothing kept for the meeting, nothing made",
+            closed = redo_closed(browser)
+            check("Escape leaves everything as it was — the dialog closed, nothing kept for the meeting, nothing made",
                   closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
                   (closed, (meeting / "models.json").exists()))
             # « Annuler », after a choice: the same.
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-            redo_pick(browser, "redo-panel", "minutes", 1)
-            press(browser, "redo-panel-cancel")
-            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
-            check("on the page: « Annuler » after a choice leaves everything as it was — the panel closed, nothing kept, nothing made",
+            redo_open(browser, "minutes")
+            redo_choose(browser, "Mistral 7b")
+            press(browser, "redo-dialog-cancel")
+            closed = redo_closed(browser)
+            check("« Annuler » after a choice leaves everything as it was — the dialog closed, nothing kept, nothing made",
                   closed and not (meeting / "models.json").exists() and untouched() and browser.execute_script(idle),
                   (closed, (meeting / "models.json").exists()))
-        # No model for the summary in Settings, none chosen: the button names the making alone (D96).
+        # No model for the summary in Settings, none chosen: « Auto » first, the button the making alone (D96, D122).
         with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n', ollama=base) as browser:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-            alone = browser.find_element(By.ID, "redo-do").text
-            check("on the page, no model for the summary: the button names the making alone, never a model it does not have (D96)",
-                  alone == "Refaire le compte rendu", alone)
-            press(browser, "redo-panel-cancel")
+            got = redo_open(browser, "minutes") or {}
+            check("no model for the summary in Settings: « Auto » first and checked, the button the making alone",
+                  got.get("marked") == ["Auto"] and got.get("checked") == "Auto" and got.get("go") == ["Annuler", "Refaire le compte rendu"], got)
+            press(browser, "redo-dialog-cancel")
     finally:
         tags.shutdown()
 
@@ -10739,9 +10696,6 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
     window = Window(meetings, "fr_FR.UTF-8", ollama=f"http://127.0.0.1:{servers[1].server_address[1]}")
     window.env.update(KITOKEY_ONLINE=stand, KITOKEY_HEARING=f"http://127.0.0.1:{servers[2].server_address[1]}/api/v1")
     options = "return [...document.querySelectorAll(`#${arguments[0]} option`)].filter(o => !o.disabled).map(o => o.textContent)"
-    # Each group of a list: its label, and the entries under it.
-    grouped = ("const s = document.getElementById(arguments[0]); return s ? [...s.querySelectorAll('optgroup')]"
-               ".map(g => [g.label, [...g.querySelectorAll('option')].map(o => o.textContent)]) : null")
     try:
         with window as browser:
             # The service set up as Settings guide it (BJ): a service, its key tested and kept, a model saved.
@@ -10784,60 +10738,52 @@ def redo_offers_the_services_models(now: dt.datetime) -> None:
             press(browser, "transcription-save")
             heard = wait_for(browser, lambda b: 'transcription_model = "openai/whisper-large-v3-turbo"' in window.file.read_text(), 5)
             check("a service that transcribes set up, its key kept, a model saved", heard, window.file.read_text())
-            # A meeting's redo panel: the service's models, grouped under its name, beside this computer's.
+            # Refaire's dialog for the summary: the service's models, each named with the service, beside this computer's.
             browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-            offered = redo_offered(browser, "redo-panel", "minutes")
-            groups = wait_for(browser, lambda b: b.execute_script(grouped, "redo-panel-minutes-model"), 10)
-            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
-            service = [models for label, models in (groups or []) if label == "OpenRouter"]
-            check("Refaire offers the service's models, grouped under its name, each as people say it, beside this computer's (D96)",
-                  bool(service) and all(any(entry.startswith(name) for entry in service[0]) for name in ("GPT 4o Mini", "Mistral 7b Instruct Free"))
-                  and any("sur cet ordinateur" in o for o in offered), (groups, offered))
-            check("no raw identifier offered: no « / », no « : » in a model's name", not any("/" in o or ":free" in o for o in offered), offered)
-            # The transcript's redo panel: the service's transcription models, grouped under its name.
-            browser.execute_script("location.hash = '#/'")
-            browser.execute_script("location.hash = '#/meeting/2026-10-18_12-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 10)
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"), 5)
-            hearing = redo_offered(browser, "redo-transcript-panel", "transcription")
-            named = browser.find_element(By.ID, "redo-transcript-do").text
-            check("Refaire the transcript: the button that starts names the making and its model, as people say it (D96)",
-                  named == "Refaire la transcription avec Whisper Large V3 Turbo", named)
-            # Another of the service's models chosen: the button names it — nothing started.
-            other = next((o for o in browser.execute_script(options, "redo-transcript-panel-transcription-model")
-                          if o.startswith("Whisper Large V3,")), None)
+            redo_open(browser, "minutes")
+            got = browser.execute_script(REDO_DIALOG) or {}
+            service = [n for n in got.get("online", []) if n.endswith(" · OpenRouter")]
+            here = [n for n in got.get("names", []) if n not in got.get("online", [])]
+            check("Refaire's dialog offers the service's models, each as people say it and named with the service, beside this computer's (D96, D122)",
+                  all(any(entry.startswith(name) for entry in service) for name in ("GPT 4o Mini", "Mistral 7b Instruct Free"))
+                  and "Qwen3 14b" in here and "Mistral 7b" in here, got)
+            check("no raw identifier offered: no « / », no « : » in a model's name", not any("/" in o or ":free" in o for o in got.get("names", [])), got)
+            check("its button names the making, never a model (D121, criterion 3, over D96's « and its model »)",
+                  got.get("go") == ["Annuler", "Refaire le compte rendu"], got)
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
+            # Refaire la transcription: the service's transcription models, named with the service.
+            got = redo_open(browser, "transcription") or {}
+            service = [n for n in got.get("online", []) if n.endswith(" · OpenRouter")]
+            check("Refaire la transcription offers the service's transcription models, named with the service, as people say them (D96)",
+                  any(entry.startswith("Whisper Large V3") for entry in service) and not any("/" in entry for entry in got.get("names", [])), got)
+            check("Settings' own first, « Par défaut », checked; the button the making alone (D121, D122)",
+                  got.get("marked") == got.get("names", [None])[:1] and got.get("checked") == (got.get("names") or [None])[0]
+                  and got.get("go") == ["Annuler", "Refaire la transcription"], got)
+            other = next((n for n in service if n.startswith("Whisper Large V3 ·")), None)
             if other:
-                Select(browser.find_element(By.ID, "redo-transcript-panel-transcription-model")).select_by_visible_text(other)
-            renamed = wait_for(browser, lambda b: b.find_element(By.ID, "redo-transcript-do").text == "Refaire la transcription avec Whisper Large V3", 3)
-            check("Refaire the transcript: another model chosen, the button names it (D96)",
-                  bool(other) and renamed, (other, browser.find_element(By.ID, "redo-transcript-do").text))
-            wait_for(browser, lambda b: b.execute_script(grouped, "redo-transcript-panel-transcription-model"), 10)
-            groups = browser.execute_script(grouped, "redo-transcript-panel-transcription-model")
-            service = [models for label, models in (groups or []) if label == "OpenRouter"]
-            check("Refaire the transcript offers the service's transcription models, grouped under its name, as people say them (D96)",
-                  bool(service) and any(entry.startswith("Whisper Large V3") for entry in service[0])
-                  and not any("/" in entry for entry in service[0]), (groups, hearing))
+                redo_choose(browser, other)
+            time.sleep(0.5)
+            after = browser.execute_script(REDO_DIALOG) or {}
+            check("another of the service's models checked: the button unchanged, nothing started (D96, D121)",
+                  bool(other) and after.get("checked") == other and after.get("go") == ["Annuler", "Refaire la transcription"], [other, after])
+            press(browser, "redo-dialog-cancel")
+            redo_closed(browser)
             # Confidential: this computer's models alone.
             browser.execute_script("location.hash = '#/meeting/2026-10-18_14-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"), 5)
-            local = redo_offered(browser, "redo-panel", "minutes")
+            local = redo_open(browser, "minutes") or {}
             time.sleep(2)
-            groups = browser.execute_script(grouped, "redo-panel-minutes-model")
-            # The service's own answer for it: none. Settings' entry stays — the stand-in is on 127.0.0.1,
+            local = browser.execute_script(REDO_DIALOG) or local
+            # The service's own answer for it: none. Settings' card stays — the stand-in is on 127.0.0.1,
             # which D91 rightly counts as this computer; what D96 adds is held here.
             answered = browser.execute_async_script(
                 "const done = arguments[arguments.length - 1];"
                 " window.__TAURI__.core.invoke('services_offered', {name: arguments[0]}).then(done, (why) => done(String(why)))",
                 "2026-10-18_14-00")
-            check("a meeting said confidential: no service's models offered — none asked of the service, no group, none of its models (D91, D96)",
-                  answered == {"minutes": [], "transcription": []} and not groups and not any(o.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for o in local),
-                  (answered, groups, local))
+            check("a meeting said confidential: no service's models offered — none asked of the service, none of its models (D91, D96)",
+                  answered == {"minutes": [], "transcription": []} and bool(local.get("names"))
+                  and not any(n.endswith(" · OpenRouter") or n.startswith(("GPT 4o Mini", "Mistral 7b Instruct Free")) for n in local.get("names", [])),
+                  (answered, local))
     finally:
         for server in servers:
             server.shutdown()
@@ -11957,11 +11903,13 @@ def transcript_corrected(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "redo-corrections").text == "Refaire le compte rendu avec les corrections")
         time.sleep(2)
         check("nothing is made again without that click", (heard / "minutes.md").read_text() == minutes)
-        # Refaire… of a corrected transcript says its corrections will not be kept.
-        press(browser, "redo-transcript")
-        warned = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-loses-corrections"), 5)
-        check("Refaire… of a corrected transcript says, before it starts, that its corrections will not be kept",
-              warned and "seront perdues" in browser.find_element(By.ID, "redo-loses-corrections").text)
+        # « Refaire la transcription » of a corrected transcript says its corrections will not be kept (D121: its dialog).
+        redo_open(browser, "transcription")
+        warned = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-loses-corrections"), 5)
+        check("Refaire la transcription of a corrected transcript says, before it starts, that its corrections will not be kept",
+              warned and "seront perdues" in browser.find_element(By.ID, "redo-dialog-loses-corrections").text)
+        press(browser, "redo-dialog-cancel")
+        redo_closed(browser)
         browser.execute_script("location.hash = '#/'")
         wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
         browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
@@ -12126,7 +12074,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
     with Window(meetings, "fr_FR.UTF-8", service + 'minutes_agreed = "writes.example"\n') as browser:
         browser.set_window_size(1100, 800)
         wait_for(browser, lambda b: b.execute_script(page_of) is not None, 10)
-        for kind, keys in (("redo-minutes", (None, Keys.ENTER, Keys.SPACE)), ("redo-corrections", (None, Keys.ENTER, Keys.SPACE)), ("confidential-switch", (None, Keys.SPACE))):
+        for kind, keys in (("redo-open", (None, Keys.ENTER, Keys.SPACE)), ("redo-corrections", (None, Keys.ENTER, Keys.SPACE)), ("confidential-switch", (None, Keys.SPACE))):
             for key in keys:
                 at_page(browser, left)
                 args.unlink(missing_ok=True)
@@ -12135,7 +12083,7 @@ def press_on_the_page_left(now: dt.datetime) -> None:
                 browser.execute_script(late)
                 browser.execute_script(f"location.hash = '#/meeting/{asked.name}'")
                 pressed(browser, found, key)
-                during = browser.execute_script("return [document.getElementById('meeting').childElementCount, !!document.getElementById('redo-panel')]")
+                during = browser.execute_script("return [document.getElementById('meeting').childElementCount, !!document.querySelector('dialog.redo-dialog')]")
                 drawn = wait_for(browser, lambda b: b.execute_script(page_of) == asked.name, 5)
                 browser.execute_script("window.restore()")
                 check(f"{kind} ({'pointer' if key is None else 'key'}) while another meeting is asked for: nothing to press, nothing started, nothing sent",
@@ -13342,7 +13290,7 @@ def nothing_silent(now: dt.datetime) -> None:
 
 def gestures_answer(now: dt.datetime) -> None:
     """AQ. Each gesture answers at once, its command stood in to take two seconds (D68)."""
-    print("AQ. Démarrer and Arrêter answer before their command, a second click asks nothing; Refaire… closes; a setting says Enregistré (D68)")
+    print("AQ. Démarrer and Arrêter answer before their command, a second click asks nothing; Refaire's dialog closes; a setting says Enregistré (D68)")
     meetings = WORK / "answering"
     written = meetings / "2026-10-28_09-00"
     session(written, now - dt.timedelta(days=1), 10, {"local.wav": 1000})
@@ -13359,30 +13307,26 @@ def gestures_answer(now: dt.datetime) -> None:
     with Window(meetings, "fr_FR.UTF-8", 'after = "nothing"\nreminder = false\n') as browser:
         browser.set_window_size(1100, 800)
         browser.execute_script(f"location.hash = '#/meeting/{written.name}'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
-        # Refaire…: Annuler, then Escape, each giving the focus back, nothing changed.
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"), 10)
+        # Refaire's dialog (D121): Annuler, then Escape, each giving the focus back to « Refaire », nothing changed.
         before = (written / "minutes.md").read_text()
         for way in ("cancel", "escape"):
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel"), 5)
+            redo_open(browser, "minutes")
             if way == "cancel":
-                press(browser, "redo-panel-cancel")
+                press(browser, "redo-dialog-cancel")
             else:
                 browser.switch_to.active_element.send_keys(Keys.ESCAPE)
-            closed = wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3)
-            check(f"Refaire… closed by {way}: the focus back on it, nothing changed", closed
-                  and browser.execute_script("return document.activeElement.id") == "redo-minutes" and (written / "minutes.md").read_text() == before,
+            closed = redo_closed(browser)
+            check(f"Refaire's dialog closed by {way}: the focus back on « Refaire », nothing changed", closed
+                  and browser.execute_script("return document.activeElement.id") == "redo-open" and (written / "minutes.md").read_text() == before,
                   (closed, browser.execute_script("return document.activeElement.outerHTML.slice(0, 80)")))
-        press(browser, "redo-minutes")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-panel"), 5)
+        redo_open(browser, "minutes")
         browser.execute_script("document.activeElement.blur()")
         ActionChains(browser).send_keys(Keys.ESCAPE).perform()
-        check("Escape with the focus nowhere closes it too", wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-panel"), 3))
-        press(browser, "redo-transcript")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-panel"), 5)
+        check("Escape with the focus nowhere closes it too", redo_closed(browser))
+        redo_open(browser, "transcription")
         browser.switch_to.active_element.send_keys(Keys.ESCAPE)
-        check("the transcript's too", wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-transcript-panel"), 3)
-              and browser.execute_script("return document.activeElement.id") == "redo-transcript")
+        check("the transcript's too", redo_closed(browser) and browser.execute_script("return document.activeElement.id") == "redo-open")
         # The setting's word, a moment.
         browser.execute_script("location.hash = '#/settings'")
         wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"), 10)
@@ -15093,18 +15037,18 @@ def main() -> int:
                 " [...b.querySelectorAll('.chip')].filter(c => !c.hidden).map(c => c.textContent)]")
             check("the header: a bar of 56 px over its divider, its length and weight beside the title, no chip at rest (D89, board 4)",
                   bar == [56, True, ["16 min", "audio 8 ko"], True, []], bar)
-            beside = browser.execute_script(
-                "const f = document.querySelector('.transcript .top .finding'), r = document.getElementById('redo-transcript'), a = f.getBoundingClientRect(), b = r.getBoundingClientRect();"
-                " return [r.parentElement === f.parentElement, Math.abs((a.top + a.bottom) - (b.top + b.bottom)) < 4 && b.left >= a.right]")
-            check("the transcript's Refaire… beside its search, at its right (D89, board 4)", beside == [True, True], beside)
+            # D121, criterion 3 (part 3b): Refaire is the bar's « Refaire ▾ » alone — no card keeps its « Refaire… ».
+            on_cards = browser.execute_script("return [...document.querySelectorAll('#meeting .minutes [id^=redo-], #meeting .transcript [id^=redo-]')].map(e => e.id)")
+            check("no card keeps a « Refaire… » of its own: the bar's « Refaire ▾ » is the one way to make again (D121, criterion 3)",
+                  on_cards == [] and browser.execute_script("return !!document.getElementById('redo-open')"), on_cards)
             actions = browser.execute_script(
-                "return ['copy-minutes', 'redo-minutes', 'redo-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
+                "return ['copy-minutes', 'copy-transcript'].map(id => document.getElementById(id)).map(e => [e.id, e.textContent.trim(), e.getAttribute('aria-label'), e.title,"
                 " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
             searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
             check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
-            check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
+            check("each secondary action of a card: an icon button, its tooltip and its name (D89)", actions == [
                 ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
-                ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
+                ["copy-transcript", "", "Copier la transcription", "Copier la transcription", True]], actions)
             # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
             row = browser.execute_script(
                 "const r = document.querySelector('#meeting .settings-row'); if (!r) return null;"
@@ -15813,9 +15757,9 @@ def main() -> int:
             turn = wait_for(browser, lambda b: (other / "minutes.md").exists(), 10)
             (WORK / "slow-minutes").unlink()
             check("then the one waiting is made in its turn, never dropped", turn)
-            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes") and not b.find_element(By.ID, "minutes-state").is_displayed(), 5)
+            drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes") and not b.find_element(By.ID, "minutes-state").is_displayed(), 5)
             check("written, the page shows them by itself, the state gone", drawn,
-                  (state(browser), bool(browser.find_elements(By.ID, "redo-minutes")), browser.execute_async_script("window.__TAURI__.core.invoke('makings').then(arguments[arguments.length - 1])")))
+                  (state(browser), bool(browser.find_elements(By.ID, "copy-minutes")), browser.execute_async_script("window.__TAURI__.core.invoke('makings').then(arguments[arguments.length - 1])")))
             # The line never waits on an agreement: set aside, said on its page, the next one made.
             invoke = lambda command, args: browser.execute_script("window.__TAURI__.core.invoke(arguments[0], arguments[1])", command, args)
             makings = lambda: browser.execute_async_script("window.__TAURI__.core.invoke('makings').then(arguments[arguments.length - 1])")
@@ -15886,23 +15830,23 @@ def main() -> int:
             for made_before in (WORK / "data" / "Trash" / "files").glob("minutes-before-*.md"):
                 made_before.unlink()
                 (WORK / "data" / "Trash" / "info" / f"{made_before.name}.trashinfo").unlink(missing_ok=True)
-            # Refaire…: another model in its « Avancé », kept for this meeting (D91); the minutes there go to the trash once replaced.
+            # Refaire's dialog: another engine checked, kept for this meeting (D91, D121); the minutes there go to the trash once replaced.
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"))
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"))
-            browser.execute_script("document.getElementById('redo-panel').scrollIntoView({block: 'center'})")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            browser.execute_script("document.querySelector('dialog.redo-dialog[open] fieldset')?.scrollIntoView({block: 'center'})")
             shot(browser, "6-redo")
-            offered = redo_offered(browser, "redo-panel", "minutes")
+            offered = redo_offered(browser, "minutes")
             check(
-                "Refaire offers, in its « Avancé », Settings' model first, then the models on this computer",
-                offered == ["Celui des Réglages\u00a0: Qwen3 14b", "Mistral 7b — sur cet ordinateur"],
+                "Refaire's dialog offers Settings' model first, « Par défaut », then the models on this computer (D121, D122)",
+                offered == ["Qwen3 14b", "Mistral 7b"],
                 offered,
             )
             before = (asked / "minutes.md").read_text()
-            redo_pick(browser, "redo-panel", "minutes", 1)
-            browser.find_element(By.ID, "redo-do").click()
+            redo_pick(browser, "minutes", 1)
+            browser.find_element(By.ID, "redo-dialog-do").click()
             def aside(folder):
                 return sorted(folder.glob("minutes-before-*.md")) if folder.exists() else []
 
@@ -15934,11 +15878,11 @@ def main() -> int:
             before = (asked / "minutes.md").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"))
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"))
-            redo_pick(browser, "redo-panel", "minutes", 1)
-            browser.find_element(By.ID, "redo-do").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            redo_pick(browser, "minutes", 1)
+            browser.find_element(By.ID, "redo-dialog-do").click()
             # Made from its page, Kitokey's window in front: its end told there, never by a notification (D92).
             failed = wait_for(browser, lambda b: "Le dernier Refaire a échoué" in state(b) and b.find_elements(By.ID, "minutes-again"), 10)
             time.sleep(1)
@@ -15985,12 +15929,12 @@ def main() -> int:
             (WORK / "fail-plainly").touch()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"))
-            press(browser, "redo-minutes")
-            redo_pick(browser, "redo-panel", "minutes", 0)
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "minutes")
+            redo_pick(browser, "minutes", 0)
             time.sleep(1)
             since = len(heard.read_text())
-            browser.find_element(By.ID, "redo-do").click()
+            browser.find_element(By.ID, "redo-dialog-do").click()
             wait_for(browser, lambda b: b.find_elements(By.ID, "agree-send"))
             press(browser, "agree-send")
             # Only what is said after this gesture: a notice may show its title more than once.
@@ -16019,10 +15963,10 @@ def main() -> int:
             before = (asked / "minutes.md").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"))
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"))
-            browser.find_element(By.ID, "redo-do").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            browser.find_element(By.ID, "redo-dialog-do").click()
             # The new minutes written — they name their model —, then a moment for what follows them.
             written = wait_for(browser, lambda b: "model: qwen3:14b" in (asked / "minutes.md").read_text(), 10)
             time.sleep(2)
@@ -16032,11 +15976,11 @@ def main() -> int:
             second = (asked / "minutes.md").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"))
-            press(browser, "redo-minutes")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-do"))
-            redo_pick(browser, "redo-panel", "minutes", 1)
-            browser.find_element(By.ID, "redo-do").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "minutes")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            redo_pick(browser, "minutes", 1)
+            browser.find_element(By.ID, "redo-dialog-do").click()
             written = wait_for(browser, lambda b: "model: mistral:7b" in (asked / "minutes.md").read_text(), 10)
             time.sleep(2)
             kept = sorted(path.read_text() for path in aside(asked))
@@ -16048,7 +15992,7 @@ def main() -> int:
             (WORK / "summary-args").unlink()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes") or b.find_elements(By.ID, "make-minutes"))
+            wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes") or b.find_elements(By.ID, "make-minutes"))
             browser.execute_script("window.__TAURI__.core.invoke('minutes_redo', {name: '2026-10-18_11-00', provider: null, model: null})")
             time.sleep(3)
             (asked / "minutes.md").chmod(0o644)
@@ -16063,14 +16007,14 @@ def main() -> int:
             heard = (asked / "transcript.jsonl").read_text()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"))
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
-            offered = redo_offered(browser, "redo-transcript-panel", "transcription")
-            check("Refaire offers, in its « Avancé », Settings' model first, then the Whisper models of this computer",
-                  offered == ["Celui des Réglages\u00a0: Whisper large v3 turbo", "Whisper small"], offered)
-            redo_pick(browser, "redo-transcript-panel", "transcription", 1)
-            browser.find_element(By.ID, "redo-transcript-do").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "transcription")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            offered = redo_offered(browser, "transcription")
+            check("Refaire's dialog offers Settings' model first, « Par défaut », then the Whisper models of this computer (D121, D122)",
+                  offered == ["Whisper large v3 turbo", "Whisper small"], offered)
+            redo_pick(browser, "transcription", 1)
+            browser.find_element(By.ID, "redo-dialog-do").click()
             kept = asked / "transcript-previous.jsonl"
             redone = wait_for(browser, lambda b: kept.is_file() and kept.read_text() == heard, 10)
             check(
@@ -16085,10 +16029,10 @@ def main() -> int:
             (WORK / "fail-hearing").write_text("")
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"))
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
-            browser.find_element(By.ID, "redo-transcript-do").click()
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "transcription")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
+            browser.find_element(By.ID, "redo-dialog-do").click()
             time.sleep(3)
             (WORK / "fail-hearing").unlink()
             check(
@@ -16109,19 +16053,19 @@ def main() -> int:
             press(browser, "transcript-again")
             tried = wait_for(browser, lambda b: len(sorted(trash_files.glob("transcript-previous*"))) == trashed_before + 1, 10)
             check("Try again after a Refaire… makes it again with the meeting's own model it kept", tried and "Refait avec ggml-small" in (asked / "transcript.jsonl").read_text(), (asked / "transcript.jsonl").read_text() if (asked / "transcript.jsonl").exists() else "")
-            back_ = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"), 5)
-            check("Refaire… is offered again once asked, the panel gone", back_)
+            back_ = wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open") and b.execute_script(REDO_DIALOG) is None, 5)
+            check("Refaire is offered again once asked, the dialog gone", back_)
             # Being made: said on its card, by which model, for how long; a Refaire… meanwhile waits its
             # turn — the one being made too —, then is made, and the card shows it by itself.
             (WORK / "slow-hearing").touch()
             browser.execute_script("location.hash = '#/'")
             browser.execute_script("location.hash = '#/meeting/2026-10-18_11-00'")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript"))
-            press(browser, "redo-transcript")
-            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-transcript-do"))
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"))
+            redo_open(browser, "transcription")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-dialog-do"))
             paths = [browser.execute_script("return window.__TAURI__.core.invoke('settings_shown').then(s => s.model)")]
-            redo_pick(browser, "redo-transcript-panel", "transcription", 1)
-            browser.find_element(By.ID, "redo-transcript-do").click()
+            redo_pick(browser, "transcription", 1)
+            browser.find_element(By.ID, "redo-dialog-do").click()
             # Being made: said by the page's one bar, the step and what makes it, its card silent (D92, #938).
             bar = ("const m = document.getElementById('making'); return m && m.getClientRects().length"
                    " ? `${document.getElementById('making-step').textContent} · ${m.querySelector('.by').textContent}` : ''")

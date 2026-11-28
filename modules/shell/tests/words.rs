@@ -2462,13 +2462,14 @@ fn what_is_left_of_the_trial_is_said_in_days_and_in_meetings_each_in_its_number(
 }
 
 #[test]
-fn minutes_failed_by_the_meetings_own_model_name_it_and_send_to_refaire_advanced_not_settings() {
+fn minutes_failed_by_the_meetings_own_model_name_it_and_send_to_the_bars_redo_not_settings() {
     use kitokey_shell::summarising::Cause;
-    // Where the gesture is another model: the meeting's own named, and where it was chosen.
+    // Where the gesture is another model: the meeting's own named, and where it is chosen now: the bar's « Refaire »,
+    // its item for the minutes (D121, criterion 3; the coordinator, 2026-11-28).
     for cause in [Cause::TooSlow, Cause::UnknownModel, Cause::Down, Cause::CutShort, Cause::NotMinutes] {
         for (language, place, settings) in [
-            (Language::English, "Redo…\u{a0}› Advanced", "settings"),
-            (Language::French, "Refaire…\u{a0}› Avancé", "réglages"),
+            (Language::English, "Redo\u{a0}› Write the summary again", "settings"),
+            (Language::French, "Refaire\u{a0}› Refaire le compte rendu", "réglages"),
         ] {
             let said = words::cause_own(cause, language).unwrap_or_else(|| panic!("{cause:?} has no sentence of its own model"));
             assert!(
@@ -2521,8 +2522,8 @@ fn a_model_is_said_as_the_page_says_it() {
 fn a_notice_of_minutes_failed_by_the_meetings_own_model_says_what_its_page_says() {
     use kitokey_shell::{summarising::Cause, words::Minutes};
     for (language, place, settings) in [
-        (Language::English, "Redo…\u{a0}› Advanced", "settings"),
-        (Language::French, "Refaire…\u{a0}› Avancé", "réglages"),
+        (Language::English, "Redo\u{a0}› Write the summary again", "settings"),
+        (Language::French, "Refaire\u{a0}› Refaire le compte rendu", "réglages"),
     ] {
         for again in [false, true] {
             let own = words::minutes(
