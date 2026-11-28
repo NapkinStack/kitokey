@@ -110,18 +110,19 @@ in the settings file; one Kitokey could not read is said, and not written over. 
 longer than the settings say goes to the system's trash — at start, then every hour, said once —
 from sessions whose transcript is whole; their transcript and minutes stay.
 
-**The recording bar** (D90, in place of D35's small window) opens first: one row, 440 × 44 — the
+**The recording bar** (D90, in place of D35's small window) opens first: one row, 440 × 48, its controls 32 (D125, the decider's Round 4 of 2026-11-26) — the
 mark, ● to record, its options, the way to the full window, each an icon named by its words, the
 shortcut in ●'s tooltip; its options open under the row, the window as tall as it shows. A recording
-shows in it (D33) — the time and ■ in the row, the mark's dot red —, above the other windows until
+shows in it (D33) — the time in the text's colour, then a separator and ■, neutral, in the row; the mark's dot
+red, the bar's one red —, above the other windows until
 the stop; then it comes back to rest. While recording, the row holds a thin meter for each side
-(D49, D90), named by what it records from; a side silent two minutes is said in a grey line under
+(D49, D90), named by what it records from, and one lock, a toggle button (`aria-pressed`): pressed, the meeting is
+confidential (D60, #1204, D125); a side silent two minutes is said in a grey line under
 the row — the recording goes on —, a microphone that sends nothing or a side with no device at
 once, and ■ stays where it is as they come. « Plus d’options » opens, under the row ([board 6](../../docs/project/drawings/d89-d90-kitokey-look-and-bar/6-bar-opened-light.png)),
-at rest the microphone, « Vérifier le son » and « Avancé »; recording, the context, the microphone —
-the one recorded, a change being for the next recording —, « Confidentielle » and what follows the
-stop, then « Avancé ». « Avancé » is closed by default and says, until D91 offers a meeting's own
-models, that each meeting takes Settings', with a way to them. Escape closes the options. One window at a time: going from one
+at rest the microphone and « Vérifier le son »; recording, the context, the microphone —
+the one recorded, a change being for the next recording — and what follows the stop. No engine and no
+language (D125). Escape closes the options. One window at a time: going from one
 to the other replaces it, and the one left — `window` in the settings, `small` or `full` — is the
 one reopened. A settings file that cannot be read opens the full window, where it is said.
 
