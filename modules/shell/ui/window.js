@@ -761,6 +761,8 @@ function confidentialCard(session, confidential, words) {
 // A session's folder name: what the window calls it, and the only date it says when its start
 // cannot be read.
 const nameOf = (session) => session.folder.split(/[\\/]/).pop();
+// Whether the meeting shown has no channel to send to (D121): « Partager »'s send then adds one.
+let shareAddsChannel = false;
 // A sentence the shell told, begun with its capital where the page says it alone (« le fichier… » → « Le fichier… »).
 const sentenceOf = (told) => told.charAt(0).toUpperCase() + told.slice(1);
 
@@ -2445,6 +2447,12 @@ function sendPart(card, top, actions, session, words) {
     if (!shown) return;
     listSends(shown);
     sayFailed(shown);
+    // No channel set up (D121): « Partager »'s send becomes « Ajouter un canal ».
+    shareAddsChannel = shown.destinations.length === 0;
+    if (shareAddsChannel) {
+      const item = document.getElementById("share-send");
+      if (item) item.textContent = words.channel_add;
+    }
     if (!shown.offered) return;
     let offered = shown.destinations;
     let secret = shown.confidential;
@@ -3581,7 +3589,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
       shared.textContent = sentenceOf(String(why));
     }
   };
-  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")],
+  // « Envoyer… » sends where a channel is set up; with none, the summary's card says so (`sending_of`) and the item
+  // becomes « Ajouter un canal », Settings' form in a sheet of the page (D121, criterion 2).
+  shareAddsChannel = false;
+  const shareSend = () => (document.getElementById("send-open") ? press("send-open")() : shareAddsChannel && channelSheet(words));
+  const share = moreActions([["share-send", words.send_open, shareSend], ["share-copy", words.copy_minutes, press("copy-minutes")],
     ["share-pdf", words.export_pdf, exportTo("pdf")], ["share-md", words.export_md, exportTo("md")]], words,
     { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
   // A confidential meeting is shared explicitly, and the menu says how (PDR-0007, amended 2026-11-24): its line heard
