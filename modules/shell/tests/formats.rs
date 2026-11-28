@@ -45,9 +45,12 @@ fn a_format_made_is_kept_under_a_name_of_its_own_offered_after_the_built_in() {
     // A second of the same name is refused, whatever its case or spaces; one whose structure would
     // be taken gets one of its own.
     assert_eq!(formats.made(" point CLIENT hebdo ", weekly(), None), Err(Refused::NameTaken));
-    assert_eq!(formats.made("Point client hébdo", weekly(), None).unwrap(), "point_client_hebdo_2");
+    assert_eq!(
+        formats.made("Point client hebdo !", weekly(), None).unwrap(),
+        "point_client_hebdo_2"
+    );
     // A name that would be a built-in's structure never takes it.
-    assert_eq!(formats.made("General", weekly(), None).unwrap(), "general_2");
+    assert_eq!(formats.made("General.", weekly(), None).unwrap(), "general_2");
     // A name with no letter of [a-z0-9] still gets one.
     assert_eq!(formats.made("週報", weekly(), None).unwrap(), "format");
 }
@@ -263,4 +266,40 @@ sections = [{ title = "A", about = "x" }]
     // Only a built-in is hidden; the default, never: the one written is hidden, so `general` is.
     assert_eq!(formats.hidden, ["interview", "one_to_one"]);
     assert_eq!(formats.default, "general");
+}
+
+/// lina's remark on #1324, the coordinator's decision of 2026-11-28: a name is taken by a built-in format's
+/// name in either language Kitokey speaks, or by the person's own, whatever its case and its accents.
+#[test]
+fn a_name_a_built_in_format_or_another_has_is_taken_whatever_its_case_and_accents() {
+    let mut formats = Formats::default();
+    for taken in [
+        "Général",
+        "general",
+        "GÉNÉRAL",
+        "Entretien",
+        "entretien",
+        "Interview",
+        "One-to-one",
+        "revue de projet",
+        "Project review",
+    ] {
+        assert_eq!(formats.made(taken, weekly(), None), Err(Refused::NameTaken), "{taken}");
+    }
+    let made = formats.made("Pôint client", weekly(), None).unwrap();
+    assert_eq!(formats.made("point CLIENT", weekly(), None), Err(Refused::NameTaken));
+    assert_eq!(formats.renamed(&made, "Appel client"), Err(Refused::NameTaken));
+    assert_eq!(formats.own(&made).unwrap().name, "Pôint client");
+    // Written by hand under a built-in's name: left aside, as any other out of bounds.
+    let kept = Formats::kept(
+        vec![Format {
+            structure: "pris".into(),
+            name: "Point d’équipe".into(),
+            sections: weekly(),
+            actions: None,
+        }],
+        vec![],
+        None,
+    );
+    assert!(kept.own.is_empty(), "{kept:?}");
 }

@@ -6,6 +6,8 @@
 
 use serde_json::{Value, json};
 
+use crate::words::{self, Language};
+
 /// The structures `summarising/v1` builds in, in the order they are offered (`minutes/v5`).
 pub const BUILT_IN: [&str; 6] = ["general", "one_to_one", "stand_up", "client_call", "interview", "project_review"];
 
@@ -206,18 +208,24 @@ impl Formats {
             .ok_or(Refused::Unknown)
     }
 
-    /// The name trimmed, when it is one and no other format of the person's has it, whatever its case.
+    /// The name trimmed, when it is one that no other format has — a built-in one's name in either language
+    /// Kitokey speaks, or another of the person's —, whatever its case and its accents (lina, #1324).
     fn free_name(&self, name: &str, besides: Option<usize>) -> Result<String, Refused> {
         let name = name.trim();
         if !one_line(name, 40) {
             return Err(Refused::Name);
         }
-        let taken = self
+        let said = folded(name);
+        let built = [Language::English, Language::French]
+            .into_iter()
+            .flat_map(|language| words::window(language).format_names)
+            .any(|built| folded(built) == said);
+        let own = self
             .own
             .iter()
             .enumerate()
-            .any(|(at, format)| Some(at) != besides && format.name.to_lowercase() == name.to_lowercase());
-        if taken {
+            .any(|(at, format)| Some(at) != besides && folded(&format.name) == said);
+        if built || own {
             return Err(Refused::NameTaken);
         }
         Ok(name.to_string())
@@ -285,6 +293,36 @@ fn checked(sections: &[Section], actions: Option<usize>) -> Result<(), Refused> 
     Ok(())
 }
 
+/// A name as it is compared: lower case, the marks of Latin letters taken off (`plain`).
+fn folded(text: &str) -> String {
+    text.to_lowercase()
+        .chars()
+        .map(|character| plain(character).unwrap_or_else(|| character.to_string()))
+        .collect()
+}
+
+/// A Latin letter without its mark, or one of [a-z0-9] as it is; none for any other character.
+fn plain(character: char) -> Option<String> {
+    Some(
+        match character {
+            'a'..='z' | '0'..='9' => return Some(character.to_string()),
+            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => "a",
+            'ç' => "c",
+            'è' | 'é' | 'ê' | 'ë' => "e",
+            'ì' | 'í' | 'î' | 'ï' => "i",
+            'ñ' => "n",
+            'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' => "o",
+            'ù' | 'ú' | 'û' | 'ü' => "u",
+            'ý' | 'ÿ' => "y",
+            'œ' => "oe",
+            'æ' => "ae",
+            'ß' => "ss",
+            _ => return None,
+        }
+        .to_string(),
+    )
+}
+
 /// Not empty, not blank, on one line, of at most so many characters.
 fn one_line(text: &str, most: usize) -> bool {
     !text.trim().is_empty() && !text.contains(['\n', '\r']) && text.chars().count() <= most
@@ -295,21 +333,7 @@ fn one_line(text: &str, most: usize) -> bool {
 fn id_of(text: &str) -> Option<String> {
     let mut id = String::new();
     for character in text.to_lowercase().chars() {
-        let plain = match character {
-            'a'..='z' | '0'..='9' => character.to_string(),
-            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => "a".into(),
-            'ç' => "c".into(),
-            'è' | 'é' | 'ê' | 'ë' => "e".into(),
-            'ì' | 'í' | 'î' | 'ï' => "i".into(),
-            'ñ' => "n".into(),
-            'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' => "o".into(),
-            'ù' | 'ú' | 'û' | 'ü' => "u".into(),
-            'ý' | 'ÿ' => "y".into(),
-            'œ' => "oe".into(),
-            'æ' => "ae".into(),
-            'ß' => "ss".into(),
-            _ => "_".into(),
-        };
+        let plain = plain(character).unwrap_or_else(|| "_".into());
         if plain == "_" && (id.is_empty() || id.ends_with('_')) {
             continue;
         }
