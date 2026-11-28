@@ -157,7 +157,8 @@ function showFirstSound(words, offered, back) {
   let polls = [];
   let open = true;
   const end = async (then) => {
-    if (!open) return;
+    // Already ended (the window hidden meanwhile): what the button asks is done all the same.
+    if (!open) return then?.();
     open = false;
     for (const poll of polls) clearInterval(poll);
     window.removeEventListener("hashchange", left);
@@ -166,7 +167,18 @@ function showFirstSound(words, offered, back) {
     then?.();
   };
   const left = () => end();
-  const hidden = () => document.visibilityState === "hidden" && end();
+  // Hidden, the sound is no longer listened to; shown again, the screen is drawn again and listens again.
+  const hidden = () => {
+    if (document.visibilityState !== "hidden") return;
+    end(() => {
+      const shown = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", shown);
+        if (page.contains(made)) showFirstSound(words, offered, back);
+      };
+      document.addEventListener("visibilitychange", shown);
+    });
+  };
   window.addEventListener("hashchange", left);
   document.addEventListener("visibilitychange", hidden);
   invoke("sound_check_open").catch(() => ({ opened: false })).then(({ opened }) => {
