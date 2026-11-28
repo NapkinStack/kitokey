@@ -4066,7 +4066,7 @@ def settings_tabbed(now: dt.datetime) -> None:
     home_of = ("return arguments[0].map((id) => { const e = document.getElementById(id); const p = e?.closest('[role=tabpanel]');"
                " const t = p ? document.getElementById(p.getAttribute('aria-labelledby')) : null; return [id, t?.dataset.key ?? null]; })")
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\ndeveloper = true\n") as browser:
-        browser.execute_script("location.hash = '#/settings/listening'")
+        browser.execute_script("location.hash = '#/settings'")
         drawn = wait_for(browser, lambda b: b.execute_script(listed) is not None, 10)
         at_first = browser.execute_script("return [history.length, location.hash]")
         seen = browser.execute_script(listed)
@@ -6010,11 +6010,11 @@ def destinations_kept(now: dt.datetime) -> None:
     with window as browser:
         browser.execute_script("location.hash = '#/settings/sharing'")
         drawn = wait_for(browser, lambda b: b.find_elements(By.ID, "destination-open"), 10)
-        # A part of « Après un enregistrement », not a group of its own: Settings keep their three (D95).
+        # A part of « Partage », its tab: the channels moved there (D123, criterion 1).
         card = ("const b = document.getElementById('destination-open'); const p = b && b.closest('.sending'); const c = b && b.closest('section.card');"
                 " return p && c ? [c.querySelector('h2').textContent, p.querySelector('h3').textContent] : null")
-        check("Settings offer, in « Après un enregistrement », a part where a destination is added (D110, D95)",
-              drawn and browser.execute_script(card) == ["Après un enregistrement", "Envoi des comptes rendus"],
+        check("Settings offer, in « Partage », a part where a destination is added (D110, D123)",
+              drawn and browser.execute_script(card) == ["Partage", "Envoi des comptes rendus"],
               browser.execute_script(card) if drawn else None)
         # Folded at first, no address asked (E5); unfolded by its button (ARIA APG Disclosure), the focus in its first field.
         folded = ("const o = document.getElementById('destination-open'), a = document.getElementById('destination-address');"
@@ -6109,19 +6109,20 @@ def destinations_kept(now: dt.datetime) -> None:
 
 def settings_version(now: dt.datetime) -> None:
     """CJ. Settings' « Général » says Kitokey's version at its foot (#1089), as `--version` says it: « Version
-    1.0.0 », secondary text a person can select and copy for support, in French and in English."""
+    1.0.0 », secondary text a person can select and copy for support, in French and in English — in « À propos »,
+    « Général »'s last part since D123."""
     print("CJ. Settings: « Général » says the version, as --version does, selectable (#1089)")
     said = subprocess.run([str(BINARY), "--version"], capture_output=True, text=True, timeout=30).stdout.strip()
     version = said.removeprefix("kitokey ")
     line = ("const v = document.getElementById('app-version'); const c = v && v.closest('section.card');"
             " return v ? {text: v.textContent, card: c ? c.querySelector('h2').textContent : null,"
             " select: getComputedStyle(v).userSelect, shown: v.getClientRects().length > 0,"
-            " last: !!c && c.lastElementChild === v} : null")
+            " last: !!c && c.lastElementChild === v.closest('#about')} : null")
     for locale, card in (("fr_FR.UTF-8", "Général"), ("en_US.UTF-8", "General")):
         taping = WORK / f"settings-version-{locale[:2]}"
         taping.mkdir()
         with Window(taping, locale, 'after = "nothing"\n') as browser:
-            browser.execute_script("location.hash = '#/settings/listening'")
+            browser.execute_script("location.hash = '#/settings/general'")
             wait_for(browser, lambda b: b.execute_script(line) is not None, 10)
             got = browser.execute_script(line)
             check(f"{locale[:2]}: « Version {version} » at the foot of « {card} », shown and selectable (#1089)",
@@ -6846,7 +6847,10 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                     surfaces = (("the list", "#/", lambda b: b.find_element(By.ID, "list").is_displayed()),
                                 ("a meeting's page", f"#/meeting/{meeting.name}", drawn_for(meeting.name)),
                                 ("a meeting's page not played", f"#/meeting/{unplayed.name}", drawn_for(unplayed.name)),
-                                ("Settings", "#/settings", lambda b: b.find_element(By.ID, "reminder").is_displayed()))
+                                # Settings in tabs (D123): each tab its surface, its address, its panel shown.
+                                *((f"Settings, {key}", f"#/settings/{key}", lambda b, key=key: b.execute_script(
+                                    "const p = document.getElementById(arguments[0]); return !!p && !p.hidden", f"settings-panel-{key}"))
+                                  for key in ("recording", "listening", "sharing", "storage", "general")))
                 for what, address, drawn in surfaces:
                     if address:
                         browser.execute_script("location.hash = arguments[0]", address)
@@ -6876,7 +6880,8 @@ def keys_first_surfaces(now: dt.datetime) -> None:
                         if lead is None:
                             unmoved.append((group, "its Tab stop gone from the page"))
                             continue
-                        ActionChains(browser).send_keys(Keys.ARROW_DOWN).perform()
+                        # A list of tabs is moved through by → (WAI-ARIA APG's Tabs, horizontal), any other group by ↓.
+                        ActionChains(browser).send_keys(Keys.ARROW_RIGHT if group.startswith("tab ") else Keys.ARROW_DOWN).perform()
                         to = browser.execute_script(KEY_ARROWED)
                         if not (to[0] != lead and to[1] == group):
                             unmoved.append((group, to))
@@ -8353,66 +8358,74 @@ def focus_swept(now: dt.datetime) -> None:
                     elsewhere = how.endswith("keeping the focus")
                     done: set[str] = set()
                     swept = 0
-                    while swept < 60:
-                        todo = [c for c in browser.execute_script(listing) if (c["group"] or c["id"]) not in done]
-                        if not todo:
-                            break
-                        # From the page's end: the logs' level is met while the developer mode still shows it, the
-                        # mode turned after it — off by the keyboard, on again by a click, which shows it anew.
-                        control = todo[-1]
-                        key = control["group"] or control["id"]
-                        done.add(key)
-                        if mouse and control["kind"] == "field" or change_first and control["kind"] != "list" \
-                                or elsewhere and control["kind"] not in ("box", "radio"):
-                            continue
-                        browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
+                    # Settings in tabs (D123): each tab chosen in turn, its folds opened, its controls swept.
+                    for tab in ("recording", "listening", "sharing", "storage", "general"):
+                        browser.execute_script("document.getElementById(arguments[0])?.click()", f"settings-tab-{tab}")
                         time.sleep(0.4)
-                        before = browser.execute_script(where)
-                        # Where the control is in the window: what « the page where it was » means to whoever uses it. A
-                        # change can redraw the page in another length — Kitokey's language, every sentence above in
-                        # the other one —, and WebKit keeps the control where it was by scrolling: its place, not the
-                        # page's scroll, is held (#974's probe: [334, 334] while the scroll moved by 10).
-                        top = "const c = document.getElementById(arguments[0]); return c ? Math.round(c.getBoundingClientRect().top) : null"
-                        top_before = browser.execute_script(top, control["id"])
-                        # What the change is to leave, read from the page drawn again — what was saved: never a
-                        # focus kept over a choice lost (the coordinator, #944).
-                        if control["kind"] == "list" and control["options"] > 1:
-                            at = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
-                            wanted = browser.execute_script("return document.getElementById(arguments[0]).options[arguments[1]].value", control["id"], at)
-                        elif control["kind"] == "box":
-                            wanted = not browser.execute_script("return document.getElementById(arguments[0]).checked", control["id"])
-                        else:
-                            wanted = None
-                        try:
-                            expected = act(browser, control, mouse, change_first, elsewhere)
-                        except WebDriverException as why:
-                            check(f"{short}, {how}: #{key} ({control['kind']}) changed (#944)", False, str(why).splitlines()[0])
-                            continue
-                        if expected is None:
-                            continue
-                        swept += 1
-                        quiet = settle(browser)
-                        after = browser.execute_script(where)
-                        if expected == "radio":
-                            expected = next((rid for rid, on in browser.execute_script(radios, key) if on), "a radio of " + key)
-                        # The page cut shorter under the window by the change itself (the developer mode turned off, the
-                        # logs' rows gone): the browser brings it to its new end — as far as it can still be, no further.
-                        cut = before[1] > after[2] and abs(after[1] - after[2]) <= 1
-                        top_after = browser.execute_script(top, control["id"])
-                        placed = top_before is not None and top_after is not None and abs(top_after - top_before) <= 1
-                        shown = browser.execute_script("const c = document.getElementById(arguments[0]);"
-                                                       " return !c ? null : c.type === 'checkbox' ? c.checked : c.value", control["id"])
-                        kept = wanted is None or shown == wanted
-                        check(f"{short}, {how}: #{key} ({control['kind']}) changed and the choice kept, the focus on #{expected}, the page where it was (#944, D101)",
-                              after[0] == expected and (placed or cut) and kept,
-                              {"before": before, "after": after, "control's top before, after": [top_before, top_after], "still": quiet,
-                               "focus moves": browser.execute_script("return window.__moves"),
-                               "drawn": browser.execute_script("return window.__drawn"), "chosen": wanted, "shown": shown})
-                        if control["kind"] == "field":
-                            browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
-                            ActionChains(browser).send_keys(Keys.BACK_SPACE).perform()
-                            browser.execute_script("document.activeElement?.blur()")
+                        for _ in range(3):
+                            if browser.execute_script(opened) == 0:
+                                break
                             settle(browser)
+                        while swept < 60:
+                            todo = [c for c in browser.execute_script(listing) if (c["group"] or c["id"]) not in done]
+                            if not todo:
+                                break
+                            # From the page's end: the logs' level is met while the developer mode still shows it, the
+                            # mode turned after it — off by the keyboard, on again by a click, which shows it anew.
+                            control = todo[-1]
+                            key = control["group"] or control["id"]
+                            done.add(key)
+                            if mouse and control["kind"] == "field" or change_first and control["kind"] != "list" \
+                                    or elsewhere and control["kind"] not in ("box", "radio"):
+                                continue
+                            browser.execute_script("document.getElementById(arguments[0]).scrollIntoView({block: 'center'}); window.__moves = []; window.__drawn = 0", control["id"])
+                            time.sleep(0.4)
+                            before = browser.execute_script(where)
+                            # Where the control is in the window: what « the page where it was » means to whoever uses it. A
+                            # change can redraw the page in another length — Kitokey's language, every sentence above in
+                            # the other one —, and WebKit keeps the control where it was by scrolling: its place, not the
+                            # page's scroll, is held (#974's probe: [334, 334] while the scroll moved by 10).
+                            top = "const c = document.getElementById(arguments[0]); return c ? Math.round(c.getBoundingClientRect().top) : null"
+                            top_before = browser.execute_script(top, control["id"])
+                            # What the change is to leave, read from the page drawn again — what was saved: never a
+                            # focus kept over a choice lost (the coordinator, #944).
+                            if control["kind"] == "list" and control["options"] > 1:
+                                at = control["index"] - 1 if control["index"] == control["options"] - 1 else control["index"] + 1
+                                wanted = browser.execute_script("return document.getElementById(arguments[0]).options[arguments[1]].value", control["id"], at)
+                            elif control["kind"] == "box":
+                                wanted = not browser.execute_script("return document.getElementById(arguments[0]).checked", control["id"])
+                            else:
+                                wanted = None
+                            try:
+                                expected = act(browser, control, mouse, change_first, elsewhere)
+                            except WebDriverException as why:
+                                check(f"{short}, {how}: #{key} ({control['kind']}) changed (#944)", False, str(why).splitlines()[0])
+                                continue
+                            if expected is None:
+                                continue
+                            swept += 1
+                            quiet = settle(browser)
+                            after = browser.execute_script(where)
+                            if expected == "radio":
+                                expected = next((rid for rid, on in browser.execute_script(radios, key) if on), "a radio of " + key)
+                            # The page cut shorter under the window by the change itself (the developer mode turned off, the
+                            # logs' rows gone): the browser brings it to its new end — as far as it can still be, no further.
+                            cut = before[1] > after[2] and abs(after[1] - after[2]) <= 1
+                            top_after = browser.execute_script(top, control["id"])
+                            placed = top_before is not None and top_after is not None and abs(top_after - top_before) <= 1
+                            shown = browser.execute_script("const c = document.getElementById(arguments[0]);"
+                                                           " return !c ? null : c.type === 'checkbox' ? c.checked : c.value", control["id"])
+                            kept = wanted is None or shown == wanted
+                            check(f"{short}, {how}: #{key} ({control['kind']}) changed and the choice kept, the focus on #{expected}, the page where it was (#944, D101)",
+                                  after[0] == expected and (placed or cut) and kept,
+                                  {"before": before, "after": after, "control's top before, after": [top_before, top_after], "still": quiet,
+                                   "focus moves": browser.execute_script("return window.__moves"),
+                                   "drawn": browser.execute_script("return window.__drawn"), "chosen": wanted, "shown": shown})
+                            if control["kind"] == "field":
+                                browser.execute_script("document.getElementById(arguments[0])?.focus()", control["id"])
+                                ActionChains(browser).send_keys(Keys.BACK_SPACE).perform()
+                                browser.execute_script("document.activeElement?.blur()")
+                                settle(browser)
                     check(f"{short}, {how}: Settings swept, Kitokey's language, the logs' level and the transcription's model among the controls changed (#944)",
                           {"app-language", "log-level", "model"} <= done, sorted(done))
                 # The window's return, drawn anew or not, read on a mark a drawing would take away: what tells a
@@ -8425,6 +8438,8 @@ def focus_swept(now: dt.datetime) -> None:
                 settle(browser)
                 # Q4: the menu open while the list keeps the page's focus — no s.blur(): its return draws nothing,
                 # the list left as it is under the choice.
+                browser.execute_script(REVEAL, "meetings-language")  # its tab chosen (D123)
+                time.sleep(0.4)
                 browser.execute_script(marked, "meetings-language")
                 browser.execute_script("const s = document.getElementById('meetings-language'); s.focus(); " + away
                                        + "; s.selectedIndex = s.selectedIndex === s.options.length - 1 ? 0 : s.selectedIndex + 1; " + back)
@@ -8437,26 +8452,29 @@ def focus_swept(now: dt.datetime) -> None:
                 # Q1: a list left for another control, then the window left and come back to within a second: no menu,
                 # a real return — drawn anew.
                 time.sleep(1.2)
-                browser.execute_script(marked, "reminder")
-                browser.execute_script("document.getElementById('meetings-language').focus(); document.getElementById('reminder').focus(); "
+                # Another control of the list's own tab (D123): the transcription's model, beside it in « Écoute et rédaction ».
+                browser.execute_script(marked, "model")
+                browser.execute_script("document.getElementById('meetings-language').focus(); document.getElementById('model').focus(); "
                                        + away + "; " + back)
                 time.sleep(1.5)
                 check(f"{short}: a list left for another control, then the window left and come back to: drawn anew (#944, Q1)",
-                      not kept_mark(browser, "reminder"), browser.execute_script(where))
+                      not kept_mark(browser, "model"), browser.execute_script(where))
                 settle(browser)
                 # Q3: a menu, then later a real return without one: drawn anew — the menu read once, not for good.
                 time.sleep(1.2)
                 browser.execute_script("const s = document.getElementById('meetings-language'); s.focus(); s.blur(); " + away + "; " + back)
                 time.sleep(1.5)
-                browser.execute_script(marked, "reminder")
-                browser.execute_script("document.getElementById('reminder').focus(); " + away + "; " + back)
+                browser.execute_script(marked, "model")
+                browser.execute_script("document.getElementById('model').focus(); " + away + "; " + back)
                 time.sleep(1.5)
                 check(f"{short}: after a list's menu, a real return to the window: drawn anew (#944, Q3)",
-                      not kept_mark(browser, "reminder"), browser.execute_script(where))
+                      not kept_mark(browser, "model"), browser.execute_script(where))
                 settle(browser)
                 # P3 (ines, #951): a field left with the page's focus on nothing — « Garder … jours » typed, then Enter,
                 # which leaves it by itself — is found again by its change alone: once saved and drawn anew, the focus
                 # on it or, gone, on its list beside it; never the page's body (D101).
+                browser.execute_script(REVEAL, "keep")  # its tab chosen (D123)
+                time.sleep(0.4)
                 browser.execute_script("const k = document.getElementById('keep'); k.scrollIntoView({block: 'center'});"
                                        " k.value = 'other'; k.dispatchEvent(new Event('change', {bubbles: true}))")
                 if wait_for(browser, lambda b: b.execute_script("const o = document.getElementById('keep-other');"
@@ -13211,6 +13229,9 @@ def gestures_answer(now: dt.datetime) -> None:
         # A radio far down at the smallest size: said in its line, in view.
         time.sleep(0.5)
         browser.set_window_size(420, 400)
+        # Its tab first (D123): a radio clicked in a hidden panel says its word in no view, and « in view » would hold for nothing.
+        browser.execute_script(REVEAL, "after-title")
+        time.sleep(0.4)
         browser.execute_script("document.querySelector('input[name=after][value=nothing]').scrollIntoView(); document.querySelectorAll('input[name=after]')[1].click()")
         wait_for(browser, here, 3)
         check("said in a radio's line, in view", here(browser) and browser.execute_script(
@@ -13340,8 +13361,9 @@ def window_looks(now: dt.datetime) -> None:
         # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
         # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
         # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
-        # surface inside a step — and answers the pointer.
-        browser.execute_script("location.hash = '#/settings/listening'")
+        # surface inside a step — and answers the pointer. At « Stockage et confidentialité », the tab holding a list, a
+        # field and a secondary button at once (D123).
+        browser.execute_script("location.hash = '#/settings/storage'")
         wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
         token = ("const token = (v) => { const t = document.createElement('i'); t.style.color = `var(${v})`; document.body.append(t);"
                  " const c = getComputedStyle(t).color; t.remove(); return c; };")
@@ -13499,7 +13521,8 @@ def pages_seen(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.execute_script("return innerWidth") == width, 5)
                 got = browser.execute_script("return innerWidth")
                 check(f"{theme}: the page {width} CSS px wide", got == width, got)
-                for page, address in (("list", "#/"), ("meeting", f"#/meeting/{names[-1]}"), ("settings", "#/settings")):
+                # Settings at « Stockage et confidentialité », the tab holding the meetings' folder (D123).
+                for page, address in (("list", "#/"), ("meeting", f"#/meeting/{names[-1]}"), ("settings", "#/settings/storage")):
                     browser.execute_script("location.hash = arguments[0]", address)
                     shown = {"list": "#sidebar", "meeting": "#meeting", "settings": "#settings"}[page]
                     there = wait_for(browser, lambda b: b.find_element(By.CSS_SELECTOR, shown).is_displayed(), 10)
@@ -13969,7 +13992,8 @@ def store_shots(now: dt.datetime) -> None:
                 seen(browser, f"{short}/{shot_name}.png")
                 if shot_name == "3-list":
                     browser.execute_script("const f = document.getElementById('find'); f.value = ''; f.dispatchEvent(new Event('input'))")
-            browser.execute_script("location.hash = '#/settings'")
+            # Settings' shot at « Écoute et rédaction », the tab that holds the models (D123).
+            browser.execute_script("location.hash = '#/settings/listening'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
             # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
             # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
