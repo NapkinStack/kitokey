@@ -4107,8 +4107,10 @@ def settings_tabbed(now: dt.datetime) -> None:
               and "par le gestionnaire de paquets de votre système (Copr, PPA)" in about["text"], about)
         browsed.unlink(missing_ok=True)
         for link in ("about-source", "about-licences", "about-privacy"):
-            press(browser, link)
-            time.sleep(0.4)
+            # Pressed when there: a link missing fails the check below, it does not stop the scenario.
+            if browser.find_elements(By.ID, link):
+                press(browser, link)
+                time.sleep(0.4)
         handed = browsed.read_text().split() if browsed.exists() else []
         check("« Code source », « Licences des composants », « Politique de confidentialité »: each its closed address, opened by the shell (D123)",
               handed == ["https://github.com/NapkinStack/kitokey",
