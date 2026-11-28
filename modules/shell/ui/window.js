@@ -189,8 +189,26 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
       event.preventDefault();
       close(false);
     });
+    roundTheDialog(dialog);
     dialog.showModal();
     no.focus();
+  });
+}
+
+// A modal dialog's Tab and Shift+Tab go round its controls (WAI-ARIA APG, Dialog (Modal)): past its last, its first;
+// before its first, its last. The platform's `<dialog>` alone lets one Tab stop on the dialog itself (ines, after #1298).
+function roundTheDialog(dialog) {
+  dialog.addEventListener("keydown", (event) => {
+    // WebKitGTK says Shift+Tab « Unidentified » (GTK's ISO_Left_Tab): its code is still « Tab ».
+    if (event.key !== "Tab" && event.code !== "Tab") return;
+    const stops = [...dialog.querySelectorAll(FOCUSABLE)].filter((stop) => stop.getClientRects().length);
+    if (!stops.length) return;
+    const [first, last] = [stops[0], stops[stops.length - 1]];
+    const at = document.activeElement;
+    if (event.shiftKey ? at === first || at === dialog : at === last || at === dialog) {
+      event.preventDefault();
+      (event.shiftKey ? last : first).focus();
+    }
   });
 }
 
@@ -198,7 +216,7 @@ function ask({ title, says, cancel, confirm, destructive = false }) {
 // in the window's language and theme, as `components.css` draws it — for the eye and for the e2e (CT).
 function showGallery(words) {
   const page = document.getElementById("gallery");
-  const [buttons, banners, dialogs, engines] = words.gallery_parts;
+  const [buttons, banners, dialogs, engines, chips, options, progresses, toasts] = words.gallery_parts;
   const specimen = (made, component, state) => {
     made.dataset.component = component;
     made.dataset.state = state;
@@ -262,7 +280,81 @@ function showGallery(words) {
       shown("confirm", fill(words.send_to, destination), fill(words.send_confidential_ask, destination), words.send_cancel, words.send_confirm, false),
       shown("destructive", words.trash_ask, words.trash_restore, words.trash_cancel, words.trash_confirm, true),
       row(opener)),
-    section(engines, ...galleryEngines(words)));
+    section(engines, ...galleryEngines(words)),
+    section(chips, row(...galleryChips(words))),
+    section(options, galleryOptions(words)),
+    section(progresses, galleryProgress(words)),
+    section(toasts, row(...[["copied", words.minutes_copied], ["saved", words.saved]].map(([state, said]) => {
+      const made = element("div", "toast");
+      made.setAttribute("role", "status");
+      made.append(icon("check"), element("span", "", said));
+      return specimen(made, "toast", state);
+    }))));
+}
+
+// D120 2b's chip in its five tones, each with words it says in the window.
+function galleryChips(words) {
+  return [["neutral", words.transcript], ["accent", words.engine_default], ["success", words.engine_ready, "check"],
+    ["private", words.confidential_chip, "lock"], ["warning", words.engine_key, "triangle-alert"]].map(([tone, said, glyph]) => {
+    const made = element("span", `chip ${tone}`);
+    if (glyph) made.append(icon(glyph));
+    made.append(said);
+    made.dataset.component = "chip";
+    made.dataset.state = tone;
+    return made;
+  });
+}
+
+// D120 2b's option card: where an engine runs, a radio group of two, the first chosen; a third at rest kept focused.
+function galleryOptions(words) {
+  const box = element("div", "option-cards");
+  box.setAttribute("role", "radiogroup");
+  box.setAttribute("aria-label", words.gallery_parts[5]);
+  const card = (state, glyph, title, says, checked) => {
+    const made = element("label", `option-card${state === "focus" ? " focus" : ""}`);
+    const radio = element("input");
+    radio.type = "radio";
+    radio.name = "gallery-option";
+    radio.checked = checked;
+    const tile = element("span", "tile");
+    tile.append(icon(glyph));
+    const text = element("span");
+    text.append(element("span", "title", title), element("span", "says", says));
+    made.append(radio, tile, text);
+    made.dataset.component = "option-card";
+    made.dataset.state = state;
+    return made;
+  };
+  box.append(card("checked", "hard-drive", words.engine_here, words.engine_here_says, true),
+    card("rest", "globe", words.engine_online, words.engine_online_says, false),
+    card("focus", "globe", words.engine_online_kind, words.engine_online_says, false));
+  return box;
+}
+
+// D120 2b's progress: a summary being written, about three minutes left, its cancel; heard, then writing.
+function galleryProgress(words) {
+  const made = element("div", "progress");
+  made.dataset.component = "progress";
+  made.dataset.state = "running";
+  const label = element("div", "task");
+  const cancel = element("button", "button ghost", words.making_cancel);
+  cancel.type = "button";
+  label.append(icon("file-text"), element("b", "", words.minutes_making), element("span", "left", fill(words.making_left, 3)), cancel);
+  const bars = element("div", "bars");
+  for (const [name, now] of [[words.transcript, 100], [words.minutes_making, 38]]) {
+    const bar = element("div", "bar");
+    bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", name);
+    bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", "100");
+    bar.setAttribute("aria-valuenow", String(now));
+    const done = element("i");
+    done.style.width = `${now}%`;
+    bar.append(done);
+    bars.append(bar);
+  }
+  made.append(label, bars);
+  return made;
 }
 
 // The engine cards as D122 draws them (`engines.js`), from invented offers: their four states, and three groups
@@ -557,6 +649,8 @@ function confidentialCard(session, confidential, words) {
 // A session's folder name: what the window calls it, and the only date it says when its start
 // cannot be read.
 const nameOf = (session) => session.folder.split(/[\\/]/).pop();
+// A sentence the shell told, begun with its capital where the page says it alone (« le fichier… » → « Le fichier… »).
+const sentenceOf = (told) => told.charAt(0).toUpperCase() + told.slice(1);
 
 // An hour as each language writes it (#1075): US English « 2:30 PM », with no zero before the hour; French « 09:30 ».
 const hours = (words) => ({ hour: words.locale === "en" ? "numeric" : "2-digit", minute: "2-digit" });
@@ -3358,8 +3452,37 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.id = "meeting-actions";
   meetingBar = actions;
   const press = (id) => () => document.getElementById(id)?.click();
-  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")]], words,
+  // What an export became, said once in place (#1252): the file's name, or why it could not be written.
+  const shared = element("p", "note");
+  shared.id = "share-said";
+  shared.setAttribute("role", "status");
+  // « Partager »'s exports (D121): the summary alone, as a PDF or Markdown, where the user chooses in the system's
+  // dialog, written by `kitokey-export` (exporting/v1). Nothing when the dialog is closed.
+  const exportTo = (format) => async () => {
+    shared.textContent = "";
+    const to = await window.__TAURI__.core.invoke("export_file_chosen", { name, format }).catch(() => null);
+    if (!to) return;
+    try {
+      await window.__TAURI__.core.invoke("meeting_export", { name, format, to });
+      shared.textContent = fill(words.export_done, to.split(/[\\/]/).pop());
+    } catch (why) {
+      shared.textContent = sentenceOf(String(why));
+    }
+  };
+  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")],
+    ["share-pdf", words.export_pdf, exportTo("pdf")], ["share-md", words.export_md, exportTo("md")]], words,
     { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
+  // A confidential meeting is shared explicitly, and the menu says how (PDR-0007, amended 2026-11-24): its line heard
+  // as the menu's description, never a menu item.
+  if (session.confidential) {
+    const menu = share.querySelector(".menu");
+    const note = element("p", "menu-note");
+    note.append(icon("lock"), element("span", "", words.share_confidential));
+    note.id = "share-confidential";
+    note.setAttribute("role", "none");
+    menu.prepend(note);
+    menu.setAttribute("aria-describedby", note.id);
+  }
   const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
   redo.addEventListener("click", press("redo-minutes"));
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.
@@ -3410,7 +3533,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // bar shows it; at rest, the page's own switch says it.
   if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
   title.append(named, lasts, held);
-  head.append(title, top);
+  // What an export became, on its own line under the bar (the audit of #1320 against v5): never beside it, where a long
+  // file name would push the bar out of sight.
+  head.append(title, top, shared);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
@@ -5691,13 +5816,15 @@ function showSmall(words) {
   paintLast = () => {
     const last = recording === false ? lastStopped : null;
     const stage = last && lastStage(last);
-    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
+    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open, failed: stage.why !== undefined };
     else if (!last || lastShown?.name !== last.name) lastShown = null;
     const text = lastShown?.text ?? "";
     if (lastLive.textContent !== text) lastLive.textContent = text;
     lastSaid.textContent = text;
     lastSaid.title = text;
     lastOpen.hidden = !lastShown?.open;
+    // A failure in two lines (D125): the meeting and its cause read, never cut in their first words.
+    lastLine.classList.toggle("failed", !!lastShown?.failed);
     lastOpen.dataset.name = lastShown?.name ?? "";
     lastLine.hidden = text === "";
   };
@@ -6284,6 +6411,10 @@ document.addEventListener("focusout", (event) => {
 window.addEventListener("blur", () => {
   inMenu = document.activeElement instanceof HTMLSelectElement || Date.now() - listLeft < 1000;
 });
+// WebKitGTK matches no `:focus-visible` on a radio reached by an arrow (#1313): the document is marked while its
+// last input is a key, so that components.css rings a card whose radio has the focus; a pointer clears the mark.
+addEventListener("keydown", () => document.documentElement.setAttribute("data-keys", ""), true);
+addEventListener("pointerdown", () => document.documentElement.removeAttribute("data-keys"), true);
 const FOCUSABLE = "button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex='-1'])";
 function placeOf() {
   const place = { address: drawnAddress === location.hash ? location.hash : null, y: scrollY, id: null, near: [], before: [] };
@@ -6381,6 +6512,10 @@ async function draw(mine, again) {
   // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
   // overtakes stops at its first answer, and would leave it to be said again.
   if (location.hash !== "#/settings") notSaved = null;
+  // A refused language is said until its meeting's own page is left (#841): dropped by the same rule, before anything
+  // is awaited, or a drawing overtaken there would leave it said on the page come back to (#1306).
+  const pageAsked = location.hash.match(/^#\/meeting\/(.+)$/);
+  if (languageRefused && !(pageAsked && decodeURIComponent(pageAsked[1]) === languageRefused.name)) languageRefused = null;
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
@@ -6394,8 +6529,6 @@ async function draw(mine, again) {
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
   // Its page opened: the bar no longer says the meeting last stopped (D92).
   if (wanted && !document.hidden) window.__TAURI__.core.invoke("meeting_seen", { name }).catch(() => {});
-  // A refused language is said until its meeting's own page is left (#841).
-  if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another meeting shown, or none: its models are read again when it is (D93).
   if (pageOffered && pageOffered.name !== name) pageOffered = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.

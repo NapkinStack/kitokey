@@ -4,6 +4,7 @@
 // bar, the minutes) over the two voices' spectrogram (public/hero.js); the real capture comes after D121.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
+import Scene from "./Scene.astro";
 import { channels, landing as w } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
 import "../styles/walk.css";
@@ -29,6 +30,9 @@ const pr = t("price");
 const [faqKicker, faqH, faq] = t("faq");
 const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
+// Each system's own mark, unaltered, decorative beside its name (BRANDS.md); a link cannot sit in a tab, so Fedora's
+// and Debian's projects are linked in their panel.
+const marks = { fedora: ["/img/brands/fedora-logo-white-official.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
@@ -72,7 +76,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           <div class="mc-top"><span class="num">{when}</span><span class="chip chip-private"><Fragment set:html={ico("lock")} />{confidential}</span></div>
           <div class="mc-title">{mTitle}</div>
           <div class="mc-meta">{mMeta}</div>
-          <div class="prov">{mProv}</div>
+          <div class="prov"><Fragment set:html={ico("sparkles")} />{mProv}</div>
           <p class="mh">{mHigh}</p>
           <p>{mText}</p>
           <p class="mh">{mActs}</p>
@@ -165,8 +169,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         </div>
       </div>
       <div class="proof rise">{sv.proof.map(([icon, title, said], i) => <article class="pf"><span class={i === 0 ? "tile priv" : "tile"} set:html={ico(icon)} /><h3>{title}</h3><p>{said}</p></article>)}</div>
-      <p class="io-link"><a href={`/${lang}/privacy/`}>{sv.policy}</a></p>
-      <div class="shot-ph" role="note"><div><b>{sv.shot[0]}</b>{sv.shot[1]}</div></div>
+      <figure class="shot-f"><img class="shot" src={`/img/app/meeting-${lang}.webp`} alt={sv.shot} width="1920" height="1080" loading="lazy" decoding="async" /></figure>
     </div>
   </section>
 
@@ -190,7 +193,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
   <section class="mid" id={readyId} aria-labelledby={`${readyId}-h`}>
     <div class="wrap">
       <div class="sh rise"><p class="kicker">{rd.kicker}</p><h2 id={`${readyId}-h`}>{rd.h}</h2><p>{rd.lead}</p></div>
-      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><span class="tile" set:html={ico(icon)} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
+      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><Scene kind={icon} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
     </div>
   </section>
 
@@ -236,7 +239,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <div class="code" data-copied={copied} data-failed={failed}>
         <div class="code-bar">
           <div class="os-tabs" role="group" aria-label={osLabel}>
-            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}><span>{name}</span></button>)}
+            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}>{marks[os] && <img src={marks[os][0]} alt="" width={marks[os][1]} height={marks[os][2]} />}<span>{name}</span></button>)}
           </div>
           <button class="copy" type="button" aria-describedby="copy-status" hidden>{copy}</button>
         </div>
