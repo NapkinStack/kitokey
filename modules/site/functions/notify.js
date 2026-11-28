@@ -18,6 +18,17 @@ const LANGS = new Set(["en", "fr"]);
 // it again; the confirmation link proves it.
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Brevo's error `code` on a refusal, its enum (`invalid_parameter`, …): what a log needs to say why, read from at
+// most 4 KB of its answer. Never its `message`, which may say the address back; anything else is « unknown ».
+async function brevoCode(answer) {
+  try {
+    const code = JSON.parse((await answer.text()).slice(0, 4096))?.code;
+    return typeof code === "string" && /^[a-z_]{1,64}$/.test(code) ? code : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
 const log = (outcome, extra = {}) => console.log(JSON.stringify({ event: "notify", outcome, ...extra }));
 const go = (lang, page) => new Response(null, { status: 303, headers: { location: `/${lang}/notify/${page}/`, "cache-control": "no-store" } });
 
@@ -65,7 +76,7 @@ export async function onRequestPost({ request, env }) {
     return go(lang, "failed");
   }
 
-  let status;
+  let status, code;
   try {
     const answer = await fetch(BREVO, {
       method: "POST",
@@ -77,12 +88,13 @@ export async function onRequestPost({ request, env }) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     status = answer.status;
+    if (status < 200 || status > 299) code = await brevoCode(answer);
   } catch (error) {
     log("unreached", { error: error?.name ?? "error" });
     return go(lang, "failed");
   }
   if (status < 200 || status > 299) {
-    log("failed", { status });
+    log("failed", { status, code });
     return go(lang, "failed");
   }
   log("sent", { status });

@@ -163,7 +163,10 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
    [its terms of service](https://www.brevo.com/legal/termsofuse/), version of 1 October 2025 (read 2026-11-28).
 2. kitokey.com authenticated as a sender: Brevo's DKIM and DMARC records in Cloudflare's DNS.
 3. The list « Kitokey — sortie », the contact attribute `NOTIFY_SINCE` (text), and a double opt-in template
-   (sender support@kitokey.com), with the words written in the pull request.
+   (sender support@kitokey.com), with the words written in the pull request. The template carries the tag `optin`
+   (its advanced settings → *Tag*), and its confirmation link is `{{ doubleoptin }}`; `{{ params.DOIurl }}` is the
+   page the person lands on after it, not the link. Without the tag, Brevo refuses every request with a 400: the
+   first sends on kitokey.com, 2026-11-28, until it was set; `/notify` now logs Brevo's error code with the status.
 4. An API key, set as the secret `BREVO_API_KEY` on the Pages project, production only.
 5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
    Pages project, production only.
