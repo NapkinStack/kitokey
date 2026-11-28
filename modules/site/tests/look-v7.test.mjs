@@ -302,3 +302,28 @@ test("the language switch stays in the header at 420 px, a 44 px target, its glo
     }
   });
 });
+
+// lina's note on #1338 (fr-desk-light, 2026-11-28): the lock touched « Reste sur votre ordinateur ». The gap between
+// the icon's right edge and the title's first letter, measured, in both languages and themes.
+test("« Reste sur votre ordinateur »'s lock stands apart from its words: 6 px at least", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const scheme of ["light", "dark"]) {
+        const page = await open(browser, origin, lang, scheme);
+        const gap = await page.evaluate(() => {
+          const h3 = document.querySelector(".mid .box.here .box-h h3");
+          const svg = h3.querySelector("svg");
+          const words = [...h3.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+          const range = document.createRange();
+          range.setStart(words, 0);
+          range.setEnd(words, 1);
+          return range.getBoundingClientRect().left - svg.getBoundingClientRect().right;
+        });
+        if (!(gap >= 6)) found.push([lang, scheme, gap]);
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
