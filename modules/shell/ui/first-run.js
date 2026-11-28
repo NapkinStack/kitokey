@@ -48,7 +48,7 @@ async function showFirstRun(words) {
       if (chosen === "online") {
         firstRunEnded = true;
         focusMinutes = true;
-        location.hash = "#/settings";
+        location.hash = "#/settings/listening";
         return;
       }
       // This computer, named: Ollama's model « Auto » resolves to, saved as Settings save it.

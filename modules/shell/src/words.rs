@@ -631,6 +631,19 @@ pub struct Window {
     /// general (D123, ux-ia §2) —, and the gallery's tabs. When: Settings or the gallery shown. At most: about 28
     /// characters each. Placeholders: none.
     pub settings_tabs: [&'static str; 5],
+    /// Shows: « Général »'s last part, its heading (D123). When: Settings' « Général » shown. At most: one word.
+    /// Placeholders: none.
+    pub about_title: &'static str,
+    /// Shows: the licence, under « À propos » (D123, PDR-0001). When: Settings' « Général » shown. At most: one
+    /// line. Placeholders: none.
+    pub about_licence: &'static str,
+    /// Shows: « À propos »'s three links, as buttons — the source code, the components' licences, the privacy
+    /// policy (D123). When: Settings' « Général » shown. At most: about 30 characters each. Placeholders: none.
+    pub about_links: [&'static str; 3],
+    /// Shows: how the updates come, under « À propos »: through the Microsoft Store (Windows), through the
+    /// system's package manager (Linux) (D123, PDR-0001, PDR-0004). When: Settings' « Général » shown, on that
+    /// system; none on macOS. At most: one line each. Placeholders: none.
+    pub about_updates: [&'static str; 2],
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
@@ -2176,6 +2189,13 @@ pub fn window(language: Language) -> Window {
                 "Tabs",
             ],
             settings_tabs: ["Recording", "Listening and writing", "Sharing", "Storage and privacy", "General"],
+            about_title: "About",
+            about_licence: "Free software under GPL v3",
+            about_links: ["Source code", "Components’ licences", "Privacy policy"],
+            about_updates: [
+                "Updates through the Microsoft Store.",
+                "Updates through your system’s package manager (Copr, PPA).",
+            ],
             more_actions: "More actions",
             meeting_share: "Share",
             meeting_dates: "Calendar",
@@ -2740,6 +2760,13 @@ pub fn window(language: Language) -> Window {
                 "Partage",
                 "Stockage et confidentialité",
                 "Général",
+            ],
+            about_title: "À propos",
+            about_licence: "Logiciel libre sous GPL v3",
+            about_links: ["Code source", "Licences des composants", "Politique de confidentialité"],
+            about_updates: [
+                "Mises à jour par le Microsoft Store.",
+                "Mises à jour par le gestionnaire de paquets de votre système (Copr, PPA).",
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",

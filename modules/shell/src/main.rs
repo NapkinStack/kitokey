@@ -437,6 +437,7 @@ fn main() {
             open_folder,
             dates_resolved,
             date_google,
+            about_open,
             dates_file_chosen,
             dates_ics,
             open_logs,
@@ -2657,6 +2658,23 @@ fn dates_ics(shell: State<'_, Shell>, name: String, to: PathBuf, dates: Vec<expo
         .map_err(|why| shell.told(Failure::DatesNotSaved, why))
 }
 
+/// « À propos »'s links (D123): a closed list of addresses the shell opens in the system's browser. The page names
+/// one by its word — `source`, `licences`, `privacy` —, never hands an address: any other word is refused.
+#[tauri::command]
+fn about_open(shell: State<'_, Shell>, which: String) -> Result<(), Told> {
+    let address = match which.as_str() {
+        "source" => "https://github.com/NapkinStack/kitokey",
+        // Linked on the repository until the notice ships with the app (#1331).
+        "licences" => "https://github.com/NapkinStack/kitokey/blob/main/modules/shell/THIRD-PARTY-NOTICES.html",
+        "privacy" => match shell.language() {
+            Language::French => "https://kitokey.com/fr/privacy/",
+            Language::English => "https://kitokey.com/en/privacy/",
+        },
+        _ => return Err(shell.told(Failure::LinkNotOpened, "« À propos » has no such link")),
+    };
+    browsing(&shell, address)
+}
+
 /// Opens an address in the system's browser; `KITOKEY_BROWSER` names another program, as the e2e's stand-in that
 /// writes down the address it is handed and opens nothing.
 fn browsing(shell: &Shell, address: &str) -> Result<(), Told> {
@@ -2781,8 +2799,11 @@ struct SettingsShown {
     autostart_offered: bool,
     /// Where a summary can be sent (D110): names, kinds, addresses as shown — never one whole.
     destinations: Vec<kitokey_shell::destinations::Destination>,
-    /// The version this program says, as `--version` does: shown at the foot of « Général » (#1089).
+    /// The version this program says, as `--version` does: shown in « Général »'s « À propos » (#1089, D123).
     version: &'static str,
+    /// How its updates come, said in « À propos » (D123, PDR-0001, PDR-0004): `store` on Windows (the Microsoft
+    /// Store), `packages` on Linux (the system's package manager, Copr or a PPA); none on macOS, not yet released.
+    updates: Option<&'static str>,
     /// Who holds the switch when Kitokey cannot move it: the user in Windows, or a policy.
     autostart_held: Option<autostart::Held>,
     keep_audio: KeepAudio,
@@ -2875,6 +2896,13 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         autostart_offered,
         destinations: settings.destinations.clone(),
         version: VERSION,
+        updates: if cfg!(windows) {
+            Some("store")
+        } else if cfg!(target_os = "linux") {
+            Some("packages")
+        } else {
+            None
+        },
         autostart_held,
         keep_audio: settings.keep_audio,
         model: settings.model,
@@ -4321,7 +4349,8 @@ fn write_minutes_from(
                 return;
             }
             told(words::minutes(&words::Minutes::Unchosen, shell.language()));
-            return open_window_at(app, "#/settings");
+            // At « Écoute et rédaction », where who writes is chosen (D123).
+            return open_window_at(app, "#/settings/listening");
         }
     };
     if !matches!(meeting::transcript(&folder), meeting::Read::Present(transcript) if transcript.complete) {

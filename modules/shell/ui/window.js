@@ -4196,6 +4196,13 @@ function spoken(name) {
   return file ? `Whisper ${file[1].replace(/[-_]/g, " ")}` : name;
 }
 
+// The tab `#/settings/<tab>` asks for, the first otherwise (D123).
+const SETTINGS_TABS = ["recording", "listening", "sharing", "storage", "general"];
+function settingsTab() {
+  const asked = location.hash.match(/^#\/settings\/([a-z]+)$/)?.[1];
+  return SETTINGS_TABS.includes(asked) ? asked : SETTINGS_TABS[0];
+}
+
 function showSettings(shown, minutes, words) {
   const page = document.getElementById("settings");
   const locked = shown.unreadable !== null;
@@ -4223,14 +4230,14 @@ function showSettings(shown, minutes, words) {
   failed.textContent = notSaved ?? "";
   failed.hidden = notSaved === null;
   parts.push(failed);
-  // What is left of the trial, on a trial licence alone (D83): said first, nothing to change.
+  // What is left of the trial, on a trial licence alone (D83): said first in « Général », nothing to change.
+  let trial = null;
   if (shown.trial !== null) {
-    const trial = element("section", "card group state");
+    trial = element("section", "card group state");
     trial.id = "trial-left";
     const trialSaid = element("div", "said");
     trialSaid.append(element("span", "name", words.trial), element("span", "says", shown.trial));
     trial.append(trialSaid);
-    parts.push(trial);
   }
 
   const after = element("section", "card group");
@@ -4246,7 +4253,6 @@ function showSettings(shown, minutes, words) {
     one.querySelector("input").addEventListener("change", () => save({ after: value }));
     made.append(one);
   }
-  parts.push(after);
 
   // Where a summary can be sent (D110, PDR-0007), a part of « Après un enregistrement » — Settings keep
   // their three groups (D95): each destination by its name, its kind, and its address as its host and
@@ -4769,7 +4775,7 @@ function showSettings(shown, minutes, words) {
   step.append(offeredToggle, ...offeredPanel);
   paintOffered(offered);
   models.append(step, minutesRow(minutes, words, locked), element("p", "says", words.models_note));
-  parts.push(models);
+
 
   const more = element("section", "card group");
   more.append(element("h2", "", words.general_title));
@@ -5022,9 +5028,8 @@ function showSettings(shown, minutes, words) {
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
   // Outside Windows' package, no startup task: nothing offered (D84).
-  more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
-  // What becomes of a recording: where it goes and how long its sound stays, after what is made.
-  after.append(where, exporting, keep, sending);
+  more.append(speaks, looks, ...(shown.autostart_offered ? [start] : []));
+
 
   // Last, for whoever looks into a failure: the developer mode (D29), folded at the bottom of
   // « Général » (D95) — a disclosure (ARIA APG), as the redo panel's « Avancé ».
@@ -5087,19 +5092,73 @@ function showSettings(shown, minutes, words) {
     logs.append(logsSaid, openLogs);
     advanced.append(level, logs);
   }
-  // Its last line, for support: the version, as `--version` says it (#1089).
+  // « Refaire la configuration », for whoever wants the first run's questions again: under « Avancé » (D123).
+  advanced.prepend(redo);
+  // « À propos », last of « Général » (D123): the version, as `--version` says it (#1089), for support; the licence
+  // and its source (PDR-0001); the components' licences (#1331); the privacy policy; how the updates come here.
+  // Each link a closed address the shell opens (`about_open`): the page never hands it one.
+  const about = element("section", "about");
+  about.id = "about";
   const version = element("p", "says", `${words.version_said} ${shown.version}`);
   version.id = "app-version";
-  more.append(toggle, advanced, version);
-  parts.push(more);
+  about.append(element("h3", "", words.about_title), version, element("p", "says", words.about_licence));
+  const links = element("div", "about-links");
+  // A link not opened: why, said under them, as the calendar's link says it.
+  const linkSaid = element("p", "says", "");
+  linkSaid.setAttribute("role", "status");
+  for (const [at, which] of ["source", "licences", "privacy"].entries()) {
+    const link = element("button", "button secondary", words.about_links[at]);
+    link.type = "button";
+    link.id = `about-${which}`;
+    link.addEventListener("click", async () => {
+      linkSaid.textContent = "";
+      try {
+        await window.__TAURI__.core.invoke("about_open", { which });
+      } catch (why) {
+        linkSaid.textContent = why;
+      }
+    });
+    links.append(link);
+  }
+  about.append(links, linkSaid);
+  if (shown.updates) about.append(element("p", "says", words.about_updates[shown.updates === "store" ? 0 : 1]));
+  more.append(toggle, advanced, about);
+  // D123: five tabs (#1334's), each setting of today in its own (ux-ia §2). A tab its address, `#/settings/<tab>`,
+  // followed by `replaceState`: no step in the history, and opening Settings rewrites nothing that is asked.
+  const card = (title, ...rows) => {
+    const made = element("section", "card group");
+    made.append(element("h2", "", title), ...rows);
+    return made;
+  };
+  const [recordingName, listeningName, sharingName, storageName, generalName] = words.settings_tabs;
+  const tabs = tabsOf(
+    "settings",
+    words.settings,
+    [
+      ["recording", recordingName, card(recordingName, remind, check, offer, keys)],
+      ["listening", listeningName, [after, models]],
+      ["sharing", sharingName, card(sharingName, sending, exporting)],
+      ["storage", storageName, card(storageName, where, keep)],
+      ["general", generalName, [...(trial ? [trial] : []), more]],
+    ],
+    settingsTab(),
+    (key) => {
+      // The first tab, opened as `#/settings`, keeps that address: only another tab writes its own.
+      const asked = key === SETTINGS_TABS[0] && location.hash === "#/settings" ? "#/settings" : `#/settings/${key}`;
+      if (location.hash !== asked && location.hash.startsWith("#/settings")) history.replaceState(null, "", asked);
+    },
+  );
+  parts.push(tabs.list, ...tabs.panels);
   page.replaceChildren(...parts);
   if (focusLanguage) {
     focusLanguage = false;
+    tabs.choose("general");
     document.getElementById("app-language")?.focus();
   }
   // From the assistant's « Choisir mon service »: the minutes' choice, in view and focused.
   if (focusMinutes) {
     focusMinutes = false;
+    tabs.choose("listening");
     document.getElementById("minutes-online")?.click();
     const minutesPick = document.getElementById("minutes-service");
     minutesPick?.scrollIntoView({ block: "center" });
@@ -6316,7 +6375,7 @@ async function showWelcome(again, words) {
       primary = button("welcome-go", "primary", words.welcome_choose, async () => {
         if (!(await save())) return;
         focusMinutes = true;
-        done("#/settings");
+        done("#/settings/listening");
       });
     } else if (engine === "speechanalyzer" && status?.offered && !status.installed) {
       // Apple's model, fetched by macOS on this click, as Settings fetch it (D42).
@@ -6541,7 +6600,7 @@ async function draw(mine, again) {
   // What the last save could not do is said until the next save, or until Settings is left (#655):
   // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
   // overtakes stops at its first answer, and would leave it to be said again.
-  if (location.hash !== "#/settings") notSaved = null;
+  if (!/^#\/settings(\/[a-z]+)?$/.test(location.hash)) notSaved = null;
   // A refused language is said until its meeting's own page is left (#841): dropped by the same rule, before anything
   // is awaited, or a drawing overtaken there would leave it said on the page come back to (#1306).
   const pageAsked = location.hash.match(/^#\/meeting\/(.+)$/);
@@ -6566,7 +6625,7 @@ async function draw(mine, again) {
     player.stop();
     player = null;
   }
-  const settings = location.hash === "#/settings";
+  const settings = /^#\/settings(\/[a-z]+)?$/.test(location.hash);
   // The first run's assistant, alone in the window: no header, no other page (D58).
   const welcoming = /^#\/welcome(\/again)?$/.test(location.hash);
   const gallery = document.getElementById("gallery");
