@@ -35,6 +35,10 @@ kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mi
 # stand_up, client_call, interview, project_review. Without --structure, minutes/v4 as above.
 kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral --structure stand_up
 
+# In a format a person made (D129): a JSON file as summarising/v1's format.schema.json says — its
+# structure, one to six sections each an id and what goes in it, the one holding the actions; minutes/v5.
+kitokey-summary <session-folder> --provider http://localhost:11434/v1 --model mistral --format format.json
+
 # Whether a model answers, before any meeting: one sentence of the program's own is sent,
 # `sending` then `answered` said, or why not in one sentence. What the settings' Tester runs.
 kitokey-summary --test --provider http://localhost:11434/v1 --model mistral
