@@ -2184,6 +2184,8 @@ def first_run_screens(now: dt.datetime) -> None:
     progress = ("const p = document.getElementById('first-progress'); return p ? [p.getAttribute('role'),"
                 " document.getElementById('first-progress-said')?.textContent.replace(/\\s/g, ' ') ?? '', p.hasAttribute('aria-valuenow')] : null")
     size, left = r"\d[\d,.]*\s?(ko|Mo|Go|kB|MB|GB)", r"\d+\s?(s|min)\b"
+    published_host = ("const o = document.querySelector('#first-sound .first-once');"
+                      " if (o) o.textContent = o.textContent.replace(/127\\.0\\.0\\.1:\\d+/, 'huggingface.co')")
     logs = WORK / "state" / "kitokey" / "logs"
     pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
 
@@ -2337,6 +2339,8 @@ def first_run_screens(now: dt.datetime) -> None:
                           all(w == "1px" and r >= 3.0 for w, r in track.values()), track)
                 violations = axe_violations(browser)
                 check(f"{lang}: (2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                # No machine's address in a published shot: the stand-in's host said as the published one is (huggingface.co).
+                browser.execute_script(published_host)
                 for theme in ("light", "dark"):
                     shot_themed(browser, f"d126-sound-{lang}-{theme}", theme)
                 # A narrow window: nothing wider than it, shot in both themes.
@@ -2345,6 +2349,7 @@ def first_run_screens(now: dt.datetime) -> None:
                 time.sleep(0.5)
                 fits = browser.execute_script("const e = document.documentElement; return [innerWidth, e.scrollWidth <= e.clientWidth]")
                 check(f"{lang}: (2) at the window's {fits[0]} px, nothing wider than the window", fits[0] <= 420 and fits[1], fits)
+                browser.execute_script(published_host)
                 for theme in ("light", "dark"):
                     shot_themed(browser, f"d126-sound-{lang}-small-{theme}", theme)
                 browser.set_window_size(wide["width"], wide["height"])
