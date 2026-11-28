@@ -98,8 +98,8 @@ site sets no cookie, runs no tracker and no analytics, and loads nothing from an
 If you ask to be told when Kitokey is out, we keep your e-mail address for that alone: one message at the release,
 and the whole list is deleted right after it. You confirm it first, by a link we send you; until then it joins no
 list, and an address not confirmed is deleted at the latest 4 months after the request. If Kitokey is not out, your
-address is deleted at the latest 12 months after you signed up. The site passes it to Brevo (Sendinblue SAS, France), which keeps it in the European Union and sends these
-two messages on our behalf, under a data processing agreement. The basis is your consent (GDPR art. 6(1)(a)): you may
+address is deleted at the latest 12 months after you signed up. The site passes it to Brevo (Brevo SAS, France), which keeps it in the European Union and sends these
+two messages on our behalf, under its data processing agreement (appendix 3 of its terms of service, version of 1 October 2025). The basis is your consent (GDPR art. 6(1)(a)): you may
 withdraw it at any time, by the link in each message or by writing to support@kitokey.com; if you use the link,
 Brevo keeps your address only on its list of addresses not to write to, so as to never write to it again. You may also ask to access
 your address, to have it rectified or erased, to restrict or object to its use, and to receive it in a portable form.
@@ -200,8 +200,8 @@ Si vous demandez à être prévenu de la sortie de Kitokey, nous gardons votre a
 message à la sortie, et toute la liste est effacée aussitôt après ; nous l'effaçons donc avec elle. Vous la confirmez
 d'abord, par un lien que nous vous envoyons ; jusque-là, elle n'entre dans aucune liste, et une adresse non confirmée
 est effacée au plus tard 4 mois après la demande. Si Kitokey ne sort pas, votre adresse est effacée
-au plus tard 12 mois après votre inscription. Le site la transmet à Brevo (Sendinblue SAS, France),
-qui la conserve dans l'Union européenne et envoie ces deux messages pour nous, sous un contrat de sous-traitance. La
+au plus tard 12 mois après votre inscription. Le site la transmet à Brevo (Brevo SAS, France),
+qui la conserve dans l'Union européenne et envoie ces deux messages pour nous, sous son contrat de sous-traitance (annexe 3 de ses conditions d'utilisation, version du 1er octobre 2025). La
 base en est votre consentement (RGPD art. 6.1.a) : vous pouvez le retirer à tout moment, par le lien de chaque message
 ou en écrivant à support@kitokey.com ; si vous utilisez le lien, Brevo garde votre adresse sur sa seule liste des
 adresses auxquelles ne pas écrire, pour ne plus jamais lui écrire. Vous pouvez aussi demander à accéder à votre adresse, à la faire rectifier ou

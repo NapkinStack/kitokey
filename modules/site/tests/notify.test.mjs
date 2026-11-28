@@ -115,6 +115,8 @@ for (const [why, from] of [
   ["another site's form (Sec-Fetch-Site: cross-site)", { "sec-fetch-site": "cross-site", origin: "https://evil.example" }],
   ["a sibling site (same-site is not same-origin)", { "sec-fetch-site": "same-site", origin: "https://preview.kitokey.com" }],
   ["another Origin, no Sec-Fetch-Site", { origin: "https://evil.example" }],
+  // nora's m16 on #1343: an Origin that only begins with the site's is another site.
+  ["an Origin that only begins with the site's", { origin: "https://kitokey.com.evil.example" }],
   ["neither header", {}],
 ]) {
   test(`refused with a 403, Brevo never called: ${why}`, async () => {
@@ -236,10 +238,14 @@ test("the privacy policy says what the form keeps, who sends, for how long, on w
     // address at the latest 4 months after the request, the list right after the one message and at the latest 12 months
     // after the sign-up), every right that applies under consent. The CNIL's complaint page is in French alone (a complaint is
     // written in French), so both halves link it.
-    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "at the latest 4 months after", "right after", "at the latest 12 months after", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "never write to it again"] ],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "au plus tard 4 mois après", "aussitôt après", "au plus tard 12 mois après", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "ne plus jamais lui écrire"] ],
+    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "version of 1 October 2025", "at the latest 4 months after", "right after", "at the latest 12 months after", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "never write to it again"] ],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "version du 1er octobre 2025", "au plus tard 4 mois après", "aussitôt après", "au plus tard 12 mois après", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "ne plus jamais lui écrire"] ],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);
+    // The processor as its terms of service name it, the party to the DPA (nora's reading of #1344): Brevo SAS, not
+    // the name it had until 2023.
+    assert.ok(html.includes("Brevo SAS"), `/${lang}/privacy/ does not name Brevo SAS`);
+    assert.doesNotMatch(html, /Sendinblue/, `/${lang}/privacy/ names the processor by its old name`);
   }
 });
