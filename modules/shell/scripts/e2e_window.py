@@ -10472,6 +10472,8 @@ def redo_from_the_bar(now: dt.datetime) -> None:
                   and any("Mistral" in n for n in got.get("names", [])), got)
             if not opened:
                 return
+            # Read once the checked card's transition has ended: mid-way its colours are neither's (e117708, a contrast).
+            wait_for(browser, lambda b: b.execute_script("return document.getAnimations().every((a) => a.playState !== 'running')"), 3)
             found = axe_violations(browser)
             check("the dialog open: no violation of axe's WCAG 2.2 A and AA rules", found == [], found)
             shot_themed(browser, "dc-redo-minutes-fr-light", "light")
