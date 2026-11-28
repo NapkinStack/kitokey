@@ -1046,62 +1046,31 @@ async function askAgain(of, said, again) {
   readMakings();
 }
 
-// « Enregistré », a moment, in the line of what was changed (D68, D101): the page is drawn again by
-// what it says, so the sentence is put there after the drawing, by the name of what changed.
-let savedFor = null;
-let lastChanged = "";
-const remembered = (event) => {
-  const control = event.target.closest?.("input, select, textarea, button");
-  if (!control) return;
-  lastChanged = control.id ? `#${CSS.escape(control.id)}` : control.name ? `[name="${CSS.escape(control.name)}"][value="${CSS.escape(control.value)}"]` : "";
-};
-document.addEventListener("change", remembered, true);
-document.addEventListener("click", remembered, true);
-function savedSaid(saved) {
-  clearTimeout(savedFor);
-  savedGone();
-  if (!saved) return;
-  const savedSentence = element("span", "saved-said", words.saved);
-  savedSentence.id = "saved-said";
-  savedSentence.setAttribute("role", "status");
-  savedSentence.setAttribute("aria-live", "polite");
-  // Said in the line changed itself, at its end, as a system's settings say a setting applied on its
-  // own line: over its description, hidden the while — never over its name or its control —, or on
-  // its name's line when it has none, or beside a button in no line. Laid over the line, never in its
-  // flow: the page neither grows nor moves (the coordinator, 2026-11-17, D101).
-  const changed = lastChanged ? document.querySelector(`#settings ${lastChanged}`) : null;
-  const row = changed?.closest("label, .row, .field") ?? null;
-  const box = row ?? changed?.parentElement ?? document.getElementById("settings");
-  box.classList.add("saying");
-  box.append(savedSentence);
-  const description = row?.querySelector(".says:not(:empty)") ?? null;
-  const name = row?.querySelector(".name") ?? null;
-  if (description) {
-    // Its description's own box, the sentence at its end.
-    savedSentence.style.top = `${description.offsetTop}px`;
-    savedSentence.style.left = `${description.offsetLeft}px`;
-    savedSentence.style.width = `${description.offsetWidth}px`;
-    description.classList.add("saved-under");
-  } else if (name) {
-    // The name's line, at the end of the column it is in — its text left as it is.
-    const column = name.parentElement === box ? null : name.parentElement;
-    savedSentence.style.top = `${name.offsetTop}px`;
-    savedSentence.style.left = `${column ? column.offsetLeft : 0}px`;
-    savedSentence.style.width = `${column ? column.offsetWidth : box.clientWidth}px`;
-  } else if (changed) {
-    savedSentence.style.top = `${changed.offsetTop}px`;
-    savedSentence.style.left = `${changed.offsetLeft + changed.offsetWidth + 8}px`;
+// D120, criterion 4: an action that succeeds is said by the window's one toast (`#toast`, a status,
+// components.css's `.toast`), for 5 s, never in place: the copies, the diagnostic, the announcement,
+// « Enregistré » in Settings. A failure stays said in place, beside its cause. The host is there from the
+// start, so that a screen reader hears its first words; the small window gives it a line of its bar.
+let toastFor = null;
+function say(text) {
+  clearTimeout(toastFor);
+  toast.replaceChildren(icon("check"), element("span", "", text));
+  toast.classList.remove("high");
+  toast.hidden = false;
+  // Never over the focus (WCAG 2.2 SC 2.4.11): over what has it, at the window's foot, it says it at the top.
+  const focused = document.activeElement;
+  if (focused && focused !== document.body && !document.body.classList.contains("small-window")) {
+    const [t, f] = [toast.getBoundingClientRect(), focused.getBoundingClientRect()];
+    if (t.left < f.right && f.left < t.right && t.top < f.bottom && f.top < t.bottom) toast.classList.add("high");
   }
-  savedFor = setTimeout(savedGone, 1500);
+  toastFor = setTimeout(() => {
+    toast.hidden = true;
+    toast.replaceChildren();
+  }, 5000);
 }
 
-// « Enregistré » gone, and what it was laid over shown again.
-function savedGone() {
-  const sentence = document.getElementById("saved-said");
-  if (!sentence) return;
-  sentence.closest(".saying")?.classList.remove("saying");
-  for (const under of document.querySelectorAll(".saved-under")) under.classList.remove("saved-under");
-  sentence.remove();
+// « Enregistré », once a setting is written (D68): the toast says it, the page neither grows nor moves (D101).
+function savedSaid(saved) {
+  if (saved) say(words.saved);
 }
 
 // Each reading of the makings numbered: an answer a later reading has overtaken is dropped — the
@@ -1351,6 +1320,12 @@ const element = (tag, className, text) => {
   if (text !== undefined) made.textContent = text;
   return made;
 };
+// The window's one toast (`say`, D120 criterion 4), made once `element` is.
+const toast = element("div", "toast");
+toast.id = "toast";
+toast.setAttribute("role", "status");
+toast.hidden = true;
+document.body.append(toast);
 
 // A meeting's context (D59): the field, its count, and the script it is written in. Never more
 // than the shell takes, counted as it counts: in characters, not in UTF-16's units.
@@ -2480,7 +2455,7 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
   });
-  // Copied in one click, as written, to paste where the user writes (D45): said in place, a moment. As
+  // Copied in one click, as written, to paste where the user writes (D45): said by the toast, a failure in place. As
   // rich text and as Markdown together, so that a document or a chat keeps its headings and lists, and
   // a plain field takes the Markdown (D109). Without ClipboardItem, the Markdown alone, as before.
   const copy = iconButton("copy", words.copy_minutes, "copy-minutes");
@@ -2499,8 +2474,8 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
       } else {
         await navigator.clipboard.writeText(read.markdown);
       }
-      copied.textContent = words.minutes_copied;
-      setTimeout(() => mine === said && (copied.textContent = ""), 2000);
+      if (mine === said) copied.textContent = "";
+      say(words.minutes_copied);
     } catch {
       copied.textContent = words.minutes_not_copied;
     }
@@ -3027,8 +3002,8 @@ function transcriptCard(read, words, session, onPage, previous, speakers) {
     redo.replaceWith(panel);
     panel.querySelector("button:enabled").focus();
   });
-  // Copied in one click, each line with when and who said it, as the page names them (D109); said in
-  // place, a moment, as the minutes' copy is.
+  // Copied in one click, each line with when and who said it, as the page names them (D109); said by the
+  // toast, a failure in place, as the minutes' copy is.
   const copy = iconButton("copy", words.copy_transcript, "copy-transcript");
   const copied = element("span", "says copied");
   copied.id = "transcript-copied";
@@ -3039,8 +3014,8 @@ function transcriptCard(read, words, session, onPage, previous, speakers) {
     const lines = read.segments.map((segment) => fill(words.transcript_copied_line, clock(segment.start), whoSaid(segment, words, names), segment.text));
     try {
       await navigator.clipboard.writeText(`${lines.join("\n")}\n`);
-      copied.textContent = words.minutes_copied;
-      setTimeout(() => mine === said && (copied.textContent = ""), 2000);
+      if (mine === said) copied.textContent = "";
+      say(words.minutes_copied);
     } catch {
       copied.textContent = words.transcript_not_copied;
     }
@@ -3467,14 +3442,15 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // In developer mode: this meeting's logs, to send to whoever looks into it — nothing of the
   // meeting is in them (D29).
   if (developer) {
-    // What became of it, said where a screen reader hears it.
+    // A failure said where a screen reader hears it; what it copied, by the toast.
     const copied = element("span", "says", "");
     copied.setAttribute("role", "status");
     rarer.push(["copy-diagnostic", words.copy_diagnostic, async () => {
       try {
         const lines = await window.__TAURI__.core.invoke("diagnostic", { name });
         await navigator.clipboard.writeText(lines);
-        copied.textContent = lines ? words.diagnostic_copied : words.diagnostic_empty;
+        copied.textContent = "";
+        say(lines ? words.diagnostic_copied : words.diagnostic_empty);
       } catch {
         copied.textContent = words.diagnostic_not_copied;
       }
@@ -5648,11 +5624,12 @@ function showSmall(words) {
   announced.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(announcement);
-      said_copied.textContent = words.minutes_copied;
+      said_copied.textContent = "";
+      say(words.minutes_copied);
     } catch {
       said_copied.textContent = words.announcement_not_copied;
+      setTimeout(() => (said_copied.textContent = ""), 2000);
     }
-    setTimeout(() => (said_copied.textContent = ""), 2000);
   });
   const meters = element("span", "meters");
   meters.append(
@@ -5794,7 +5771,7 @@ function showSmall(words) {
     lastLine.hidden = text === "";
   };
   const lines = element("div", "bar-lines");
-  lines.append(lastLine, keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid);
+  lines.append(lastLine, keptNext, announce, ...checks.map((check) => check.sentence), unkeptSaid, toast);
   const options = element("div", "bar-options");
   options.id = "small-options";
   options.append(rest, live);
