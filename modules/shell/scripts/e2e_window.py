@@ -2357,8 +2357,27 @@ def first_run_screens(now: dt.datetime) -> None:
                     check("(2) « Retour »: screen (1) again, its heading focused, the sound no longer listened to",
                           back and focus == "welcome-heading" and wait_for(browser, lambda b: b.execute_script(listening) is False, 3),
                           (browser.execute_script(title), focus, browser.execute_script(listening)))
+                    # « Retour » keeps what was chosen on (1) (nora's reading of #1325): another card than « Auto », on to (2), back.
+                    checked = "return document.querySelector('#welcome .engine-card input:checked')?.closest('.engine-card').dataset.engine ?? null"
+                    browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=local] input').click()")
                     press(browser, "first-later")
                     wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                    press(browser, "first-back")
+                    wait_for(browser, lambda b: b.execute_script(title2) is None, 5)
+                    check("(2) « Retour »: screen (1) as it was left, the card chosen still chosen",
+                          browser.execute_script(checked) == "local", browser.execute_script(checked))
+                    browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=auto] input').click()")
+                    press(browser, "first-later")
+                    wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                    # The window hidden: the sound no longer listened to; shown again, screen (2) listens again and acts.
+                    seen = "Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => arguments[0]}); document.dispatchEvent(new Event('visibilitychange'))"
+                    browser.execute_script(seen, "hidden")
+                    hushed = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+                    browser.execute_script(seen, "visible")
+                    browser.execute_script("delete document.visibilityState")
+                    again = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 5)
+                    check("(2) the window hidden, the sound no longer listened to; shown again, listened to again",
+                          hushed and again, [hushed, browser.execute_script(title2), browser.execute_script(listening)])
                 press(browser, "first-works")
                 ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
                                  and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
@@ -2387,6 +2406,13 @@ def first_run_screens(now: dt.datetime) -> None:
             wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
             before = window.file.read_text()
             browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
+            # Screen (2) left by another address — Settings, from the address bar or a shortcut —: the sound no longer listened to.
+            browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=auto] input').click()")
+            press(browser, "first-later")
+            on_two = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 10)
+            browser.execute_script("location.hash = '#/settings'")
+            left = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+            check("(2) left for another page, the sound no longer listened to", on_two and left, browser.execute_script(listening))
         check("left midway, nothing of its answers is written", window.file.read_text() == before, window.file.read_text())
     finally:
         flowing.set()
