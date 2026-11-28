@@ -1310,7 +1310,7 @@ const ROLES: [&str; 26] = [
 
 /// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
 /// trace, a recording's dot, the focus ring 3:1 (1.4.11).
-const ROLE_PAIRS: [(&str, &str, f64); 36] = [
+const ROLE_PAIRS: [(&str, &str, f64); 37] = [
     ("--color-text", "--color-canvas", 4.5),
     ("--color-text", "--color-surface", 4.5),
     ("--color-text", "--color-raised", 4.5),
@@ -1341,6 +1341,8 @@ const ROLE_PAIRS: [(&str, &str, f64); 36] = [
     ("--color-private", "--color-surface", 4.5),
     ("--color-edge", "--color-surface", 3.0),
     ("--color-edge", "--color-canvas", 3.0),
+    // The chosen tab's edge on its list's sunken band (D123): its state seen by more than a shade (WCAG 1.4.11).
+    ("--color-edge", "--color-sunken", 3.0),
     // A neutral chip on a chosen card, its ground the card's tint: edged so that it stands out (#1312's audit).
     ("--color-edge", "--color-tint", 3.0),
     ("--color-accent", "--color-canvas", 3.0),
@@ -1698,10 +1700,13 @@ fn a_tab_is_a_segment_of_its_list_the_chosen_one_raised() {
         .find(|(selector, _)| selector == ".tab[aria-selected=\"true\"]")
         .map(|(_, body)| body)
         .unwrap_or_default();
+    // Its state seen by more than a shade: its surface is 1.12:1 on the band (light), its words 2.58:1 from the
+    // others' — under WCAG 1.4.11's 3:1 —, so it is edged in the edge role, 3:1 on the band (ROLE_PAIRS).
     for (name, value) in [
         ("background", "var(--color-surface)"),
         ("color", "var(--color-text)"),
         ("box-shadow", "var(--e1)"),
+        ("border-color", "var(--color-edge)"),
     ] {
         assert!(chosen.contains(&format!("{name}: {value}")), "the chosen tab: {name}: {chosen}");
     }
