@@ -14,6 +14,7 @@ pub mod engines;
 pub mod example;
 pub mod exporting;
 pub mod flac;
+pub mod formats;
 pub mod keys;
 pub mod levels;
 pub mod licence;
