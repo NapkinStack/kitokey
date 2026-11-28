@@ -21,7 +21,6 @@ function Wait-For([string]$What, [int]$Seconds, [scriptblock]$Until) {
 }
 
 $identity = Get-Content (Join-Path $here 'identity.json') -Raw | ConvertFrom-Json
-if ($identity.placeholder) { Write-Output "The identity is a placeholder: signed for this run, not submitted." }
 $version = (Get-Content (Join-Path $Artefacts 'shell/VERSION') -Raw).Trim()
 $first = Join-Path $Out "Kitokey-$version-x64.msix"
 $parts = $version.Split('.')

@@ -163,7 +163,9 @@ days on the run. Opened the first time through System Settings → Privacy & Sec
 Anyway (D38).
 
 On Windows, `nstack release` also makes `dist/install/Kitokey-<version>-x64.msix`, the package the
-Microsoft Store takes (D54, PDR-0004), unsigned; it needs the Windows SDK. `windows-app.yml` signs it
+Microsoft Store takes (D54, PDR-0004), unsigned; it needs the Windows SDK, and refuses to make it while
+`windows/identity.json` holds a placeholder (D102): the three values Partner Center's *Product identity*
+shows, or no package. `windows-app.yml` signs it
 for the run with a certificate it throws away, installs it, upgrades it and removes it
 (`windows/trial.ps1`) — it fails if the installed `kitokey.exe` holds `updater`, the name Tauri's
 updater plugin is routed by, since the Store updates the package (D102); at each start, it prints what the Store answers for a package it did

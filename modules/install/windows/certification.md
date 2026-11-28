@@ -45,8 +45,9 @@ Kitokey 0.2.0: **PASS overall, 24 tests, 1 failed**.
 
 Before that submission:
 
-- `identity.json` still holds a placeholder: fill it with the *Package/Identity* values from
-  Partner Center's *View app identity details*, and set `placeholder` to `false`.
+- `identity.json` holds Partner Center's three values — *Product identity*'s `Package/Identity/Name`,
+  `Package/Identity/Publisher`, `Package/Properties/PublisherDisplayName` — and `placeholder` is `false`:
+  `msix.py` refuses to make the package otherwise (D102).
 - The application's version must reach 1: the Store refuses a first part 0
   ([*App package requirements*](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements),
   read 2026-10-30).

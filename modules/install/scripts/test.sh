@@ -173,10 +173,14 @@ check("one startup task, for kitokey.exe, off until the user turns it on, named 
       and tasks[0][1].get("TaskId") == "KitokeyStartupTask" and tasks[0][1].get("Enabled") == "false"
       and tasks[0][1].get("DisplayName") == "Kitokey", tasks)
 placeholder = {**identity, "placeholder": True}
-check("a placeholder identity is said, and that the package is not to be submitted",
-      any("placeholder" in line and "not submitted" in line for line in msix.notices("1.2.3", placeholder)))
-check("a reserved identity is not said to be one",
-      not any("placeholder" in line for line in msix.notices("1.2.3", {**identity, "placeholder": False})))
+# D102: no package is made from a placeholder; the refusal names where the three values come from.
+refused = msix.refusal(placeholder)
+check("a placeholder identity is refused, Partner Center named as where its values come from",
+      refused is not None and "placeholder" in refused and "Partner Center" in refused, refused)
+check("a reserved identity is not refused", msix.refusal({**identity, "placeholder": False}) is None)
+for missing in ("name", "publisher", "publisher_display_name"):
+    check(f"an identity with no {missing} is refused",
+          msix.refusal({**identity, "placeholder": False, missing: ""}) is not None)
 check("a first part 0 is said: the Store refuses it", any("first part" in line for line in msix.notices("0.2.0", identity))
       and not any("first part" in line for line in msix.notices("1.2.0", identity)))
 caps = written.find("m:Capabilities", ns)

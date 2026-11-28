@@ -1,6 +1,7 @@
 """Run on Windows by scripts/release.sh, and by trial.ps1 for a later version: Kitokey-<version>-x64.msix,
 made with the Windows SDK's MakeAppx from AppxManifest.xml.in, identity.json, the six programs and
 Assets/ (D54). Unsigned: the Store signs what it publishes; outside it, whoever installs it signs it.
+Refused while identity.json holds a placeholder (D102): the identity is Partner Center's, or there is no package.
 
 Usage: msix.py <artefacts> <version> <out>
 """
@@ -31,6 +32,18 @@ def identity():
         return json.load(file)
 
 
+def refusal(who):
+    """Why no package is made from this identity, or None: Partner Center's three values, or nothing."""
+    if who.get("placeholder", True):
+        return (f"msix: identity.json holds a placeholder ({who.get('name')}): paste the three values Partner Center's "
+                "Product identity shows (Package/Identity/Name, Package/Identity/Publisher, "
+                "Package/Properties/PublisherDisplayName) and set placeholder to false")
+    empty = [key for key in ("name", "publisher", "publisher_display_name") if not who.get(key)]
+    if empty:
+        return f"msix: identity.json has no {', '.join(empty)}: Partner Center's Product identity gives each"
+    return None
+
+
 def manifest(version, who):
     with open(os.path.join(HERE, "AppxManifest.xml.in"), encoding="utf-8") as file:
         text = file.read()
@@ -43,9 +56,6 @@ def manifest(version, who):
 def notices(version, who):
     """What this package cannot do yet, for the run to say."""
     said = []
-    if who["placeholder"]:
-        said.append(f"identity {who['name']} is a placeholder until Partner Center reserves the name: "
-                    "this package is not submitted")
     if version.startswith("0."):
         said.append(f"version {four_parts(version)}: the Store refuses a first part 0, "
                     "the application's version must reach 1 before a submission")
@@ -73,6 +83,9 @@ def makeappx():
 
 
 def main(artefacts, version, out):
+    refused = refusal(identity())
+    if refused:
+        sys.exit(refused)
     folder = os.path.join(out, f"msix-{version}")
     shutil.rmtree(folder, ignore_errors=True)
     stage(artefacts, version, folder)
