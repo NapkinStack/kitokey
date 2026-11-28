@@ -3,7 +3,8 @@
    arriving waits 220 ms then fades and rises in. On a narrow screen and under reduced motion, four static cards. */
 .walk-band { padding: 104px 0; background: color-mix(in srgb, var(--bg-surface) 62%, transparent); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
 .walk-band .sh { max-width: 720px; margin-bottom: 48px; }
-.walk-band .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
+/* The kicker, v7's (l. 177): above its title's lead (.sh p), never taking its size or colour. */
+.walk-band .sh .kicker { font-size: 14px; margin: 0 0 var(--sp-3); font-weight: 700; color: var(--accent); letter-spacing: .01em; }
 .walk-band h2 { font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.1vw, 42px); line-height: 1.1; letter-spacing: -.02em; }
 .walk-band h3 { font-family: var(--display); font-weight: 700; font-size: 21px; line-height: 1.25; letter-spacing: -.01em; }
 .walk-band .ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -28,8 +29,9 @@
 .wtab[aria-selected="true"] .wn { background: var(--accent); color: var(--on-accent); }
 .wtab[aria-selected="true"] span.d { max-height: 9em; opacity: 1; margin-top: 2px; margin-bottom: 6px; }
 .wtab.priv[aria-selected="true"] .wn { background: var(--private); color: var(--on-accent); }
-.wtab .pg { position: absolute; left: 56px; right: 16px; bottom: 8px; height: 3px; border-radius: 3px; background: var(--bg-sunken); overflow: hidden; opacity: 0; }
+.wtab .pg { position: absolute; left: 56px; right: 16px; bottom: 8px; height: 3px; border-radius: 3px; background: var(--border-subtle); overflow: hidden; opacity: 0; }
 .wtab .pg i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; }
+/* The step's track, a line's colour so that it is seen against its tab (the audit of 2026-11-27). */
 .walk.auto .wtab[aria-selected="true"] .pg { opacity: 1; }
 .walk.auto .wtab[aria-selected="true"] .pg i { animation: pg var(--step-ms, 3000ms) linear forwards; }
 .walk.held .wtab[aria-selected="true"] .pg i { animation-play-state: paused; }

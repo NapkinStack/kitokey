@@ -105,7 +105,11 @@ python3 - "$1" "$here/export-input" <<'END'
 import json, pathlib, sys
 to = pathlib.Path(json.loads(pathlib.Path(sys.argv[2]).read_text())["to"])
 written = to.with_name(to.name + ".part")
-written.write_text((pathlib.Path(sys.argv[1]) / "minutes.md").read_text())
+args = (pathlib.Path(sys.argv[2]).parent / "export-args").read_text().split()
+summary = (pathlib.Path(sys.argv[1]) / "minutes.md").read_text()
+# What exporting/v1 promises, no more: `md` is CommonMark under a YAML front matter (l. 39), its first bytes « --- »;
+# `pdf` a PDF (l. 40), whose first bytes are « %PDF- » (ISO 32000-2, 7.5.2). Written beside, then renamed (l. 95).
+written.write_bytes(b"%PDF-1.7\\n" + summary.encode() if args[args.index("--format") + 1] == "pdf" else summary.encode())
 written.replace(to)
 print(json.dumps({"event": "written", "file": str(to), "bytes": to.stat().st_size}))
 END
@@ -430,6 +434,29 @@ def press(browser, element_id: str) -> None:
         except (StaleElementReferenceException, ElementNotInteractableException):
             time.sleep(0.2)
     browser.find_element(By.ID, element_id).click()
+
+
+# Keys a keyboard sends, through the compositor (Mutter's RemoteDesktop, as headless.sh makes the session's
+# keyboard), not WebDriver's: WebKitGTK matches `:focus-visible` differently for each (#1313).
+REAL_KEYS = (
+    "import sys, time\nfrom gi.repository import Gio, GLib\nbus = Gio.bus_get_sync(Gio.BusType.SESSION)\n"
+    "def call(path, interface, method, args=None, reply=None):\n"
+    "    return bus.call_sync('org.gnome.Mutter.RemoteDesktop', path, interface, method, args, reply, Gio.DBusCallFlags.NONE, -1, None)\n"
+    "s = call('/org/gnome/Mutter/RemoteDesktop', 'org.gnome.Mutter.RemoteDesktop', 'CreateSession', None, GLib.VariantType('(o)'))[0]\n"
+    "call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'Start')\n"
+    "for sym in sys.argv[1:]:\n"
+    "    for down in (True, False):\n"
+    "        call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'NotifyKeyboardKeysym', GLib.Variant('(ub)', (int(sym, 16), down)))\n"
+    "        time.sleep(0.05)\n"
+    "    time.sleep(0.3)\n"
+    "call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'Stop')\n"
+)
+
+
+def real_keys(*keysyms: str) -> bool:
+    """Each X keysym (hex: ff53 is →, ff51 ←, ff09 Tab) pressed and released as a keyboard does; True once sent."""
+    # The system's Python, where PyGObject is (headless.sh's own reason).
+    return subprocess.run(["/usr/bin/python3", "-c", REAL_KEYS, *keysyms], capture_output=True, text=True, timeout=20).returncode == 0
 
 
 def free(browser, element_id: str, case: str) -> None:
@@ -2996,10 +3023,12 @@ def meeting_language(now: dt.datetime) -> None:
         kept = sentence(browser)
         check("refused again: its own refusal said in place of the first, still after a redraw", "refused 2" in kept and "refused 1" not in kept, kept)
         browser.execute_script("window.restore()")
-        browser.execute_script("location.hash = '#/'")
-        wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
-        browser.execute_script(f"location.hash = '#/meeting/{heard.name}'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "meeting-language"), 10)
+        # Left, then come back to (#1306): the list's address, then the meeting's again in the same tick, as a run under load
+        # can go — the list's drawing overtaken by the page's before it reads its listing. The page's own drawing waited for.
+        browser.execute_script("document.getElementById('meeting-language').dataset.before = ''")
+        browser.execute_script(f"location.hash = '#/'; setTimeout(() => {{ location.hash = '#/meeting/{heard.name}'; }}, 0)")
+        wait_for(browser, lambda b: b.execute_script(
+            "const p = document.getElementById('meeting-language'); return document.body.dataset.at === 'page' && !!p && !('before' in p.dataset)"), 10)
         check("the page left and come back to: the refusal no longer said", sentence(browser) == "", sentence(browser))
         # Saved: the very language just refused, chosen again — the list put back must not keep it
         # from being heard as a change (#843).
@@ -6421,6 +6450,10 @@ GALLERY = {
     "button": ("primary", "secondary", "ghost", "icon", "destructive", "hover", "pressed", "focus", "disabled"),
     "banner": ("info", "private", "warning"),
     "dialog": ("confirm", "destructive"),
+    "chip": ("neutral", "accent", "success", "private", "warning"),
+    "option-card": ("rest", "checked", "focus"),
+    "progress": ("running",),
+    "toast": ("copied", "saved"),
 }
 
 
@@ -6486,11 +6519,58 @@ def gallery_shown(now: dt.datetime) -> None:
             opened = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('dialog[open]')"), 5)
             focused = browser.execute_script("const e = document.activeElement; return [e.dataset.role, e.closest('dialog') !== null]")
             check(f"{short}, {theme}: the dialog opened modal, its cancel focused (PDR-0008)", opened and focused == ["cancel", True], (opened, focused))
+            # WAI-ARIA APG's modal dialog: Tab and Shift+Tab go round its controls, never onto the dialog itself nor
+            # out of it (ines, on main after #1298: one Tab stopped on the <dialog>).
+            inside = ("const e = document.activeElement, d = document.querySelector('dialog[open]');"
+                      " return [e.tagName, e.dataset.role ?? e.className, !!d && d.contains(e) && e !== d]")
+            went = []
+            for back in (False,) * 3 + (True,) * 3:
+                keys = ActionChains(browser)
+                (keys.key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT) if back else keys.send_keys(Keys.TAB)).perform()
+                went.append(browser.execute_script(inside))
+            check(f"{short}, {theme}: Tab and Shift+Tab stay on the dialog's buttons, round and round (APG)",
+                  all(tag == "BUTTON" and held for tag, _, held in went), went)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             closed = wait_for(browser, lambda b: b.execute_script("return !document.querySelector('dialog[open]')"), 5)
             check(f"{short}, {theme}: Escape closes it, the focus back on what opened it",
                   closed and browser.execute_script("return document.activeElement.id") == "gallery-dialog-open",
                   (closed, browser.execute_script("return document.activeElement.id")))
+            # D120 2b. A toast says itself to a screen reader (`role=status`); a progress's bars are progress bars, each
+            # named and at its value; an option card a native radio in its label, one chosen; the engine card's
+            # « Par défaut » and its state are chips.
+            parts = browser.execute_script(
+                "const g = document.getElementById('gallery');"
+                "return [[...g.querySelectorAll('.toast')].map((t) => t.getAttribute('role')),"
+                " [...g.querySelectorAll('.progress [role=progressbar]')].map((b) => [!!b.getAttribute('aria-label'), b.getAttribute('aria-valuenow')]),"
+                " [...g.querySelectorAll('.option-card')].map((c) => [!!c.closest('label') || c.tagName === 'LABEL', c.querySelector('input[type=radio]')?.checked ?? null]),"
+                " [...g.querySelectorAll('.engine-card .default, .engine-card .state')].map((e) => e.classList.contains('chip'))]")
+            toasts, bars, options, chips = parts
+            check(f"{short}, {theme}: each toast a status (D120 2b)", toasts and set(toasts) == {"status"}, toasts)
+            check(f"{short}, {theme}: each progress bar named, at its value", len(bars) >= 2
+                  and all(named and now is not None for named, now in bars), bars)
+            check(f"{short}, {theme}: each option card a radio in its label, one chosen", len(options) >= 3
+                  and all(label for label, _ in options) and [chosen for _, chosen in options].count(True) == 1, options)
+            check(f"{short}, {theme}: the engine card's « Par défaut » and its state are chips", chips and all(chips), chips)
+            # A card's radio reached by an arrow, as a keyboard sends it: its card ringed, the focus seen (WCAG 2.4.7,
+            # #1313). WebKitGTK does not match `:focus-visible` there.
+            # Where the focus is in its group (its radio's place), whether it is checked, and its card's outline.
+            ringed = ("const a = document.activeElement, c = a.closest('.engine-card, .option-card'); if (!c) return null;"
+                      " const g = [...a.closest('.engine-cards, .option-cards').querySelectorAll('input[type=radio]')];"
+                      " const o = getComputedStyle(c); return [g.indexOf(a), a.checked, o.outlineStyle, parseFloat(o.outlineWidth)]")
+            arrowed = []
+            for group in ("#gallery .option-cards input:checked", "#gallery .engine-cards input:checked"):
+                browser.execute_script("document.querySelector(arguments[0]).focus()", group)
+                before = browser.execute_script(ringed)
+                # → from any radio but the last, ← from the last: WebKitGTK's arrows stop at a group's ends.
+                last = browser.execute_script(
+                    "const a = document.activeElement, g = a.closest('.engine-cards, .option-cards'); return !!g && [...g.querySelectorAll('input[type=radio]')].at(-1) === a")
+                there, back = ("ff51", "ff53") if last else ("ff53", "ff51")
+                sent = real_keys(there)
+                arrowed.append([sent, before, browser.execute_script(ringed)])
+                real_keys(back)
+            check(f"{short}, {theme}: a card's radio reached by an arrow shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
+                  all(sent and before and got and got[0] != before[0] and got[1] and got[2] == "solid" and got[3] >= 2
+                      for sent, before, got in arrowed), arrowed)
             found = axe_violations(browser)
             check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
             for width in (420, 1100):
@@ -7580,6 +7660,143 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             redrawn = wait_for(browser, lambda b: [e["id"] for e in b.execute_script(bar) or []] == ["share-open", "redo-open", "more-open"], 10)
             check(f"{short}: no date found, no « {said['dates']} » in the bar (D121)", redrawn, browser.execute_script(bar))
 
+
+
+def meeting_exported(now: dt.datetime) -> None:
+    """ME. D121, criterion 2: « Partager » offers « Exporter en PDF » and « Exporter en Markdown », each the file
+    `exporting/v1` writes where the user chooses in the system's dialog: the summary alone (PDR-0007 sends never the
+    transcript), its first bytes the format's own; said once, in place; nothing when the dialog is closed; a file
+    refused said, nothing else. A confidential meeting is exported too, explicitly, its menu saying so in a line
+    (PDR-0007, amended 2026-11-24); an ordinary one has no such line. French light, English dark."""
+    print("ME. « Partager »: « Exporter en PDF » and « Exporter en Markdown », the summary alone, where the user chooses (D121)")
+    meetings = WORK / "exported"
+    plain, private = meetings / "2026-11-24_15-00", meetings / "2026-11-23_09-00"
+    for folder, started in ((plain, now - dt.timedelta(days=1)), (private, now - dt.timedelta(days=2))):
+        session(folder, started, 20, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":4.0,"end":7.0,"text":"On valide le devis."}\n'
+            '{"type":"complete","duration":20.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v3\nmade: 2026-11-24T15:30:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe devis est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — jeudi\n\n## 3.\n\n- Rien\n")
+    (private / "confidential").write_bytes(b"")
+    menu = ("const m = document.getElementById('share-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
+            " return {items: [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim()]),"
+            " note: m.querySelector('.menu-note')?.textContent.trim() ?? null,"
+            " described: m.getAttribute('aria-describedby'), heard: document.getElementById(m.getAttribute('aria-describedby') ?? '')?.textContent.trim() ?? null}")
+    said = "return document.getElementById('share-said')?.textContent.trim() ?? null"
+    stub = ("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+            " asked === 'export_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)};"
+            " window.restore = () => { window.__TAURI__.core = real; };")
+    for language, theme, words in (
+        ("fr_FR.UTF-8", "light", {"pdf": "Exporter en PDF", "md": "Exporter en Markdown", "done": "Exporté\u00a0: «\u00a0{}\u00a0».",
+                                  "failed": "Le fichier n’a pas pu être écrit", "note": "Confidentielle"}),
+        ("en_US.UTF-8", "dark", {"pdf": "Export to PDF", "md": "Export to Markdown", "done": "Exported: “{}”.",
+                                 "failed": "The file couldn’t be written", "note": "Confidential"}),
+    ):
+        short = language[:2]
+        window = Window(meetings, language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            for folder, confidential in ((plain, False), (private, True)):
+                browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "share-open"), 10)
+                time.sleep(0.4)
+                press(browser, "share-open")
+                got = wait_for(browser, lambda b: b.execute_script(menu), 3)
+                got = browser.execute_script(menu) or {}
+                items = [said_ for _, said_ in got.get("items", [])]
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: « Partager » offers « {words['pdf']} » and « {words['md']} » after its sends (D121)",
+                      items[-2:] == [words["pdf"], words["md"]], got)
+                note = got.get("note")
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: the menu's line on a confidential meeting {'said' if confidential else 'absent'} (PDR-0007)",
+                      (note is not None and note.startswith(words["note"])) if confidential else note is None, note)
+                # Heard as the menu's description (ines, #1320, m7): the menu describedby the line, its words the line's;
+                # an ordinary meeting's menu describedby nothing.
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: the line {'is' if confidential else 'none is'} « Partager »'s description for a screen reader (aria-describedby)",
+                      [got.get("described"), got.get("heard")] == (["share-confidential", note] if confidential else [None, None]),
+                      [got.get("described"), got.get("heard")])
+                if confidential:
+                    # The line is the menu's description, never one of its items: the menu as axe reads it (WAI-ARIA's menu).
+                    found = axe_violations(browser)
+                    check(f"{short}, {theme}: « Partager » open on a confidential meeting, its line in it, no violation of axe's WCAG 2.2 A and AA rules",
+                          found == [], found)
+                # « Partager » open, for the eye against v5 (screens 4 and 9): an ordinary meeting's, a confidential one's.
+                shot_themed(browser, f"me-share-{short}-{'confidential' if confidential else 'ordinary'}-{theme}", theme)
+                ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+                for kind, opener, head in (("pdf", "share-pdf", b"%PDF-"), ("md", "share-md", b"---")):
+                    to = WORK / f"exported-{short}-{folder.name}.{kind}"
+                    to.unlink(missing_ok=True)
+                    for kept in ("export-args", "export-input"):
+                        (WORK / kept).unlink(missing_ok=True)
+                    browser.execute_script(stub, str(to))
+                    press(browser, "share-open")
+                    wait_for(browser, lambda b: b.execute_script(menu), 3)
+                    press(browser, opener)
+                    written = wait_for(browser, lambda b: to.is_file() and (b.execute_script(said) or "") != "", 10)
+                    args = (WORK / "export-args").read_text().split() if (WORK / "export-args").is_file() else []
+                    given = json.loads((WORK / "export-input").read_text()) if (WORK / "export-input").is_file() else {}
+                    first = to.read_bytes()[:len(head)] if to.is_file() else b""
+                    # exporting/v1: `--format pdf|md --lang <lang>`, the summary alone; `to` the dialog's path, on the input.
+                    check(f"{short}, {folder.name}, {kind}: written where chosen, the summary alone, its first bytes the format's (exporting/v1 l. 39-40, 95)",
+                          written and args[1:] == ["--format", kind, "--lang", short, "--without-transcript"] and given.get("to") == str(to) and first == head,
+                          [written, args[1:], given.get("to"), first])
+                    check(f"{short}, {folder.name}, {kind}: said once, in place: « {words['done'].format(to.name)} » (#1252)",
+                          browser.execute_script(said) == words["done"].format(to.name)
+                          and browser.execute_script("return [...document.querySelectorAll('[role=status], [aria-live]')].filter((e) => e.textContent.includes(arguments[0])).length", to.name) == 1,
+                          browser.execute_script(said))
+                    if kind == "pdf" and not confidential:
+                        shot_themed(browser, f"me-said-{short}-{theme}", theme)
+                    browser.execute_script("window.restore()")
+            # A long sentence said (the audit of #1320 against v5): on its own line under the bar, never pushing it; the
+            # whole bar in sight and the meeting's name there, at 1100 and 420 px.
+            long = WORK / ("exported-" + "un-nom-de-fichier-tres-long-pour-une-reunion-" * 2 + f"{short}.pdf")
+            browser.execute_script(stub, str(long))
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "share-pdf")
+            wait_for(browser, lambda b: long.name in (b.execute_script(said) or ""), 10)
+            browser.execute_script("window.restore()")
+            placed = ("const bar = document.getElementById('meeting-actions').getBoundingClientRect(), s = document.getElementById('share-said').getBoundingClientRect(),"
+                      " h = document.querySelector('#meeting h1').getBoundingClientRect(), buttons = [...document.querySelectorAll('#meeting-actions button')].filter((b) => b.getClientRects().length);"
+                      " return [innerWidth, buttons.every((b) => { const r = b.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 0.5 && r.width > 0; }),"
+                      " h.width > 40 && h.right <= innerWidth + 0.5, s.top >= bar.bottom - 0.5]")
+            for width, height in ((1100, 800), (420, 900)):
+                browser.set_window_size(width, height)
+                wait_for(browser, lambda b: abs(b.execute_script("return innerWidth") - width) < 40, 3)
+                time.sleep(0.3)
+                got = browser.execute_script(placed)
+                check(f"{short}, {width} px: a long « {words['done'].split(' ')[0]} » line under the bar, the whole bar in sight, the meeting's name there",
+                      got[1:] == [True, True, True], got)
+            if theme == "light":
+                shot(browser, f"me-said-long-{short}")
+            browser.set_window_size(1100, 800)
+            # The dialog closed: nothing written, nothing said.
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
+                                   " asked === 'export_file_chosen' ? Promise.resolve(null) : real.invoke(asked, ...rest)}; window.restore = () => { window.__TAURI__.core = real; };")
+            (WORK / "export-args").unlink(missing_ok=True)
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "share-pdf")
+            time.sleep(1)
+            check(f"{short}: the dialog closed, nothing written, nothing said", not (WORK / "export-args").exists() and browser.execute_script(said) == "", browser.execute_script(said))
+            browser.execute_script("window.restore()")
+            # Refused by the program: said, one action, the file not there.
+            to = WORK / f"refused-{short}.pdf"
+            (WORK / "export-refuse").write_bytes(b"")
+            try:
+                browser.execute_script(stub, str(to))
+                press(browser, "share-open")
+                wait_for(browser, lambda b: b.execute_script(menu), 3)
+                press(browser, "share-pdf")
+                refused = wait_for(browser, lambda b: (b.execute_script(said) or "").startswith(words["failed"]), 10)
+                check(f"{short}: a file refused is said, what to do with it, nothing written", refused and not to.exists(), browser.execute_script(said))
+                browser.execute_script("window.restore()")
+            finally:
+                (WORK / "export-refuse").unlink(missing_ok=True)
+            shot_themed(browser, f"me-exported-{short}-{theme}", theme)
 
 
 def meeting_trashed(now: dt.datetime) -> None:
@@ -16251,6 +16468,7 @@ def main() -> int:
     focus_kept(now)
     focus_swept(now)
     meeting_actions_bar(now)
+    meeting_exported(now)
     meeting_trashed(now)
     sound_checked(now)
     ends_on_sigterm(now)

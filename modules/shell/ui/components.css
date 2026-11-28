@@ -10,8 +10,11 @@
   height: 32px; padding: 0 var(--sp-3); border: 1px solid transparent; border-radius: var(--r-sm);
   background: transparent; color: var(--color-text); font: 600 var(--fs-body) var(--font-text);
   white-space: nowrap; cursor: pointer;
-  transition: background-color var(--d-instant) var(--ease-out);
+  transition: background-color var(--d-instant) var(--ease-out), transform var(--d-fast) var(--ease-out);
 }
+/* Pressed, it sinks by a pixel (v5); disabled, it does not. */
+.button:active { transform: translateY(1px); }
+.button[disabled]:active { transform: none; }
 .button.primary { background: var(--color-accent); color: var(--color-on-accent); }
 .button.primary:hover, .button.primary.hover { background: var(--color-accent-hover); }
 .button.secondary { background: var(--color-surface); border-color: var(--color-divider); border-bottom-color: var(--color-edge); }
@@ -23,7 +26,7 @@
 .button.destructive { background: var(--color-destructive); color: var(--color-on-destructive); }
 .button:focus-visible, .button.focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .button[disabled] { opacity: .45; cursor: not-allowed; }
-.button svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.button svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
 /* A banner: what holds for the whole page — information, « Confidentielle », a warning —, its icon, its
    words, an action at its end. Never red: red is a recording's or a deletion's. Always with its tone: the
@@ -33,7 +36,7 @@
   margin: 0; padding: var(--sp-3) var(--sp-4);
   border-radius: var(--r-md); background: var(--color-tint); color: var(--color-text); font: var(--fs-body) var(--font-text);
 }
-:is(.banner.info, .banner.private, .banner.warning) > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+:is(.banner.info, .banner.private, .banner.warning) > svg { width: 16px; height: 16px; flex: none; margin-top: 2px; fill: none; stroke: var(--color-accent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .banner.private { background: var(--color-private-ground); }
 .banner.private > svg { stroke: var(--color-private); }
 .banner.warning { background: var(--color-warning-ground); }
@@ -43,10 +46,12 @@
 
 /* A dialog: the platform's own, modal (`<dialog>`, `showModal()`): the rest of the window inert, Escape
    closing it, the focus back where it was. Its title in the titles' face; its actions at its end, the safe
-   one first and focused. */
+   one first and focused; Tab and Shift+Tab go round its controls (WAI-ARIA APG). It pops in, unless the system
+   asks for less motion (WCAG 2.2, 2.3.3). */
 .dialog {
   width: min(560px, calc(100vw - 32px)); padding: var(--sp-6); border: 0; border-radius: var(--r-xl);
   background: var(--color-raised); color: var(--color-text); box-shadow: var(--e3); font: var(--fs-body) var(--font-text);
+  animation: pop var(--d-slow) var(--ease-out);
 }
 .dialog::backdrop { background: var(--color-scrim); }
 .dialog h2 { margin: 0 0 var(--sp-3); font: 700 var(--fs-title) var(--font-display); }
@@ -58,22 +63,90 @@
 .engine-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--sp-3); margin: 0; padding: 0; border: 0; }
 .engine-cards > legend { margin-bottom: var(--sp-2); padding: 0; font: 600 var(--fs-small) var(--font-text); color: var(--color-text-soft); }
 .engine-card {
-  display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 1px solid var(--color-divider); border-radius: var(--r-lg);
+  display: grid; gap: var(--sp-2); padding: var(--sp-4); border: 1.5px solid var(--color-divider); border-radius: var(--r-lg);
   background: var(--color-surface); color: var(--color-text); font: var(--fs-body) var(--font-text);
 }
 .engine-card:hover { border-color: var(--color-edge); }
 .engine-card:has(input:checked) { border-color: var(--color-accent); background: var(--color-tint); }
-.engine-card:has(input:focus-visible) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.engine-card:has(input:focus-visible), [data-keys] .engine-card:has(input:focus) { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 .engine-card label { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-1) var(--sp-2); align-items: baseline; cursor: pointer; }
-.engine-card input { margin: 0; accent-color: var(--color-accent); }
+.engine-card input { margin: 0; align-self: center; accent-color: var(--color-accent); }
 .engine-card .name { font-weight: 600; }
-.engine-card .where, .engine-card .state, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
-.engine-card .state { font-weight: 600; }
-.engine-card[data-state="ready"] .state { color: var(--color-success); }
-.engine-card .default { font-size: var(--fs-caption); color: var(--color-accent); }
+.engine-card .where, .engine-card .facts { grid-column: 2 / -1; color: var(--color-text-soft); font-size: var(--fs-small); }
+/* Its state a chip under its name; « Par défaut » a chip at the name's end. */
+.engine-card .state { grid-column: 2 / -1; justify-self: start; }
 .engine-card details { font-size: var(--fs-small); color: var(--color-text-soft); }
 .engine-card details summary { cursor: pointer; }
 .engine-card .detail { margin: var(--sp-1) 0 0; color: var(--color-text-soft); }
+
+/* A chip: a short fact on an item, in one of five tones — neutral; accent, « Par défaut »; success, ready or sent;
+   private, « Confidentielle »; warning, what is missing. Always with its tone: the window's older chips (`.chip.live`,
+   `.gone`…) are window.css's until their screen comes over. */
+:is(.chip.neutral, .chip.accent, .chip.success, .chip.private, .chip.warning) {
+  display: inline-flex; align-items: center; gap: var(--sp-1); height: var(--sp-6); padding: 0 var(--sp-3);
+  border: 0; border-radius: var(--r-pill); background: var(--color-sunken); color: var(--color-text-soft);
+  font: var(--fs-small) var(--font-text); white-space: nowrap;
+}
+:is(.chip.accent, .chip.success, .chip.private, .chip.warning) { font-weight: 600; }
+.chip.accent { background: var(--color-tint); color: var(--color-accent); }
+.chip.success { background: var(--color-success-ground); color: var(--color-success); }
+.chip.private { background: var(--color-private-ground); color: var(--color-private); }
+.chip.warning { background: var(--color-warning-ground); color: var(--color-warning); }
+/* A neutral chip on a chosen card: the tint is its ground's shade, so it is edged (3:1 on the tint, #1312). */
+.engine-card:has(input:checked) .chip.neutral { outline: 1px solid var(--color-edge); outline-offset: -1px; }
+:is(.chip.neutral, .chip.accent, .chip.success, .chip.private, .chip.warning) > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* An option card: one choice among a few, a native radio in its label — its icon on a tile, its title, a sentence;
+   chosen, edged in the accent on the tint. The radios give the group and the arrow keys (WAI-ARIA APG). */
+.option-cards { display: grid; gap: var(--sp-3); margin: 0; padding: 0; border: 0; }
+.option-card {
+  display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4); border: 1.5px solid var(--color-divider);
+  border-radius: var(--r-lg); background: var(--color-surface); color: var(--color-text); font: var(--fs-body) var(--font-text); cursor: pointer;
+}
+.option-card:hover { border-color: var(--color-edge); }
+.option-card:has(input:checked) { border-color: var(--color-accent); background: var(--color-tint); }
+.option-card:has(input:focus-visible), [data-keys] .option-card:has(input:focus), .option-card.focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.option-card input { margin: var(--sp-1) 0 0; accent-color: var(--color-accent); }
+/* A card's radio, drawn here rather than by the platform: WebKitGTK rings an unchecked one at 1.57:1 (#1310); the edge
+   role holds 3:1 on the surface (WCAG 1.4.11). Checked, the accent's ring and its dot. */
+.engine-card input, .option-card input {
+  appearance: none; -webkit-appearance: none; flex: none; width: 20px; height: 20px; border: 1.5px solid var(--color-edge);
+  border-radius: var(--r-pill); background: var(--color-surface); cursor: pointer;
+}
+.engine-card input:checked, .option-card input:checked {
+  border-color: var(--color-accent); background: radial-gradient(circle closest-side, var(--color-accent) 55%, transparent 62%), var(--color-surface);
+}
+.option-card .tile {
+  display: grid; place-items: center; flex: none; width: var(--sp-8); height: var(--sp-8); border-radius: var(--r-md);
+  background: var(--color-sunken); color: var(--color-accent);
+}
+.option-card .tile > svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.option-card .title { display: block; font-weight: 600; }
+.option-card .says { display: block; margin: 0; color: var(--color-text-soft); font-size: var(--fs-small); }
+
+/* A progress: what is being made, how long is left, its cancel; a bar per step, each a progress bar named and at
+   its value. */
+.progress { display: grid; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-md); background: var(--color-surface); box-shadow: var(--e1); color: var(--color-text); font: var(--fs-body) var(--font-text); }
+.progress .task { display: flex; align-items: center; gap: var(--sp-3); }
+.progress .task > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--color-accent); stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.progress .task .left { color: var(--color-text-soft); }
+.progress .task .button { margin-left: auto; }
+.progress .bars { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--sp-1); }
+.progress .bar { height: var(--sp-2); border-radius: var(--r-pill); background: var(--color-sunken); overflow: hidden; }
+.progress .bar > i { display: block; height: 100%; border-radius: var(--r-pill); background: var(--color-accent); }
+
+/* A toast: an action's outcome, said once at the window's foot and gone after 5 s (`role=status`); in the text's
+   colour on the surface's, so that it stands out in both themes. It pops in, unless the system asks for less motion. */
+.toast {
+  position: fixed; left: 0; right: 0; bottom: calc(var(--sp-8) * 2 + var(--sp-2)); z-index: 50; width: max-content; max-width: calc(100vw - 32px); margin: 0 auto;
+  display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-4); border-radius: var(--r-md);
+  background: var(--color-text); color: var(--color-surface); box-shadow: var(--e2); font: var(--fs-body) var(--font-text);
+  animation: pop var(--d-base) var(--ease-out);
+}
+.toast > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+@keyframes pop { from { transform: scale(.98); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .dialog, .toast { animation: none; } }
 
 /* The gallery (#/gallery): the components on the canvas, a section each, its titles in the titles' face. */
 .gallery { min-height: 100vh; padding: var(--sp-6); background: var(--color-canvas); color: var(--color-text); font: var(--fs-body) var(--font-text); }
@@ -81,3 +154,5 @@
 .gallery-part { display: grid; gap: var(--sp-4); margin-bottom: var(--sp-8); }
 .gallery-part > h2 { margin: 0; font: 600 var(--fs-title-sm) var(--font-display); }
 .gallery-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+/* Its toasts shown where they stand, not at the window's foot. */
+.gallery .toast { position: static; margin: 0; }

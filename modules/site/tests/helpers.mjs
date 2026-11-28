@@ -17,6 +17,10 @@ export async function pages(dir = dist) {
   return out;
 }
 
+// A page's HTML as its words were written: the build wraps each compound word in <span class="nb"> to keep it
+// whole (src/lib/nb.mjs, its own tests in v7-content and look-v7); a test of the words reads them unwrapped.
+export const unwrapped = (html) => html.replace(/<span class="nb">([^<]*)<\/span>/g, "$1");
+
 export function route(file) {
   return file.slice(dist.length).replace(/index\.html$/, "");
 }
