@@ -59,11 +59,7 @@ for (const lang of ["en", "fr"]) {
 
 }
 
-test("the root sends a reader to the French landing, English one link away", async () => {
-  const html = await readFile(join(dist, "index.html"), "utf8");
-  assert.match(html, /<meta http-equiv="refresh" content="0; url=\/fr\/"/);
-  assert.match(html, /href="\/en\/" hreflang="en"/);
-});
+// The root: a 301 to /en/, no page (the decider, 2026-11-28), held by tests/b1.test.mjs.
 
 test("each hardware card says, in both languages, the figures README.md gives its way of working, and only those", async () => {
   const readme = await readFile(installSource, "utf8");

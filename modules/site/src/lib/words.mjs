@@ -19,7 +19,7 @@ export const words = {
   credit: { en: "Tux: Larry Ewing (lewing@isc.tamu.edu) and The GIMP.", fr: "Tux : Larry Ewing (lewing@isc.tamu.edu) et The GIMP.", keeps: "Tux's own terms, its author credited where it is shown (BRANDS.md, Wikimedia Commons)" },
   footer: { en: "Footer", fr: "Pied de page", keeps: "the footer's links (site v7)" },
   lost: {
-    en: ["Page not found", "This page doesn’t exist, or no longer does.", "Back to the home page"],
+    en: ["Not found", "This page doesn’t exist, or no longer does.", "Back to the home page"],
     fr: ["Page introuvable", "Cette page n’existe pas, ou plus.", "Revenir à l’accueil"],
     keeps: "/404.html, the page Cloudflare Pages answers an unknown address with (tests/notfound.test.mjs)",
   },

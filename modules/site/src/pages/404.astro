@@ -1,12 +1,11 @@
 ---
-// /404.html: what an unknown address gets (Cloudflare Pages answers it with a 404 once this file exists, instead of
-// the landing in 200). The site's own frame and ground, French first then English, each its sentence and its home.
+// /404.html: what an unknown address gets (Cloudflare Pages answers it with a 404 once this file exists). One page,
+// in English as the root's (the decider, 2026-11-28): « 404 », « Not found », the way home; the site's own frame and
+// ground; never indexed.
 import Page from "../layouts/Page.astro";
 import { say } from "../lib/words.mjs";
-const [frTitle, frSaid, frHome] = say("lost", "fr");
-const [enTitle, enSaid, enHome] = say("lost", "en");
+const [title, said, home] = say("lost", "en");
 ---
-<Page lang="fr" title={`${frTitle} · ${enTitle} · Kitokey`} description={frSaid} path="" kind="wrap lost-page" indexed={false}>
-  <div class="lost" lang="fr"><h1>{frTitle}</h1><p>{frSaid}</p><a class="home" href="/fr/">{frHome}</a></div>
-  <div class="lost" lang="en"><p class="lost-h">{enTitle}</p><p>{enSaid}</p><a class="home" href="/en/">{enHome}</a></div>
+<Page lang="en" title={`${title} · Kitokey`} description={said} path="" kind="wrap lost-page" indexed={false}>
+  <div class="lost"><p class="lost-code" aria-hidden="true">404</p><h1>{title}</h1><p>{said}</p><a class="home" href="/en/">{home}</a></div>
 </Page>

@@ -32,7 +32,7 @@ const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
 // Each system's own mark, unaltered, decorative beside its name (BRANDS.md); a link cannot sit in a tab, so Fedora's
 // and Debian's projects are linked in their panel.
-const marks = { fedora: ["/img/brands/fedora-logo-white-official.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
+const marks = { fedora: ["/img/brands/fedora-logo-official.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
@@ -49,11 +49,11 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         <div class="buy">
           <p class="buy-line">{buyLine}</p>
           <div class="cta">
-            <a class="store-soon" href={`#${priceId}`}>{storeSoon}</a>
+            <a class="store-soon" href={`#${priceId}`}><img class="mark" src="/img/brands/windows-logo-2021.svg" alt="" width="16" height="16" />{storeSoon}</a>
             <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
           </div>
         </div>
-        <p class="cta-note">{macSoon}</p>
+        <p class="cta-note"><img class="mark on-light" src="/img/brands/apple-logo-black.svg" alt="" width="14" height="17" /><img class="mark on-dark" src="/img/brands/apple-logo-white.svg" alt="" width="14" height="17" />{macSoon}</p>
         <p class="assure">{t("assure").map((said) => <span><Fragment set:html={ico("check")} />{said}</span>)}</p>
       </div>
       <div class="scene" role="img" aria-label={sceneAlt}>
@@ -160,7 +160,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <div class="sh rise"><p class="kicker">{sv.kicker}</p><h2 id={`${privacyId}-h`}>{sv.h}</h2><p>{sv.lead}</p></div>
       <div class="io rise">
         <div class="box here">
-          <div class="box-h"><span class="tile" set:html={ico("laptop")} /><div><h3>{sv.here[0]}</h3><p>{sv.here[1]}</p></div></div>
+          <div class="box-h"><span class="tile" set:html={ico("laptop")} /><div><h3><Fragment set:html={ico("lock")} />{sv.here[0]}</h3><p>{sv.here[1]}</p></div></div>
           <div class="items">{sv.stays.map(([icon, what, said]) => <div class="item"><Fragment set:html={ico(icon)} /><b>{what}</b><span class="d">{said}</span><span class="r here-i" role="img" aria-label={sv.here[2]} set:html={ico("laptop")} /></div>)}</div>
         </div>
         <div class="box">
@@ -275,7 +275,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       </svg>
       <h2 id="final-h">{finalH}</h2>
       <p>{finalP}</p>
-      <div class="cta"><a class="store-soon" href={`#${priceId}`}>{storeSoon}</a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
+      <div class="cta"><a class="store-soon" href={`#${priceId}`}><img class="mark" src="/img/brands/windows-logo-2021.svg" alt="" width="16" height="16" />{storeSoon}</a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
     </div>
   </section>
 </Page>

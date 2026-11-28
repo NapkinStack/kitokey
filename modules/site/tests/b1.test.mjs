@@ -78,11 +78,11 @@ test("« Reste sur votre ordinateur » begins with the lock", async () => {
   }
 });
 
-test("the Store's line bears the Microsoft Store's mark, the Mac's the Apple's", async () => {
+test("the Store's line bears the Windows mark (the coordinator, 2026-11-28: the Store's bag comes with its badge), the Mac's the Apple's", async () => {
   for (const lang of ["fr", "en"]) {
     const html = await page(lang);
     const store = html.match(/<a class="store-soon"[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
-    assert.match(store, /<img[^>]*src="\/img\/brands\/microsoft-store[^"]*\.svg"[^>]*alt=""/, `/${lang}/: the Store's mark`);
+    assert.match(store, /<img[^>]*src="\/img\/brands\/windows-logo-2021\.svg"[^>]*alt=""/, `/${lang}/: the Windows mark`);
     const mac = html.match(/<p class="cta-note">[\s\S]*?<\/p>/)?.[0] ?? "";
     assert.match(mac, /<img[^>]*src="\/img\/brands\/apple-logo-(black|white)\.svg"[^>]*alt=""/, `/${lang}/: the Mac's mark`);
   }
