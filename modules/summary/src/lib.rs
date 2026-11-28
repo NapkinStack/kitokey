@@ -260,6 +260,66 @@ pub fn structure(name: &str) -> Option<&'static Structure> {
     STRUCTURES.iter().find(|structure| structure.name == name)
 }
 
+/// A format a person made (`summarising/v1`'s `--format`, D129), read from its file's text: its sections asked
+/// in the person's words, the actions' as every structure asks them. Why it is not one, otherwise. The program
+/// reads one format and ends: its words are kept for the run, as the six structures' are.
+pub fn format(text: &str) -> Result<&'static Structure, String> {
+    let format: serde_json::Value = serde_json::from_str(text).map_err(|why| format!("the format is not JSON: {why}"))?;
+    let structure = name(format.get("structure")).ok_or("the format's structure is missing or out of bounds")?;
+    if self::structure(structure).is_some() {
+        return Err(format!("{structure} is one of the six structures: a format never takes its name"));
+    }
+    let given = format
+        .get("sections")
+        .and_then(serde_json::Value::as_array)
+        .filter(|given| (1..=6).contains(&given.len()));
+    let given = given.ok_or("the format holds no sections, or more than six")?;
+    let actions = match format.get("actions") {
+        None => None,
+        actions => Some(name(actions).ok_or("the format's actions are out of bounds")?),
+    };
+    let mut sections = Vec::with_capacity(given.len());
+    for section in given {
+        let id = name(section.get("id")).ok_or("a section's id is missing or out of bounds")?;
+        let about = section
+            .get("about")
+            .and_then(serde_json::Value::as_str)
+            .filter(|about| !about.is_empty() && about.chars().count() <= 200 && !about.contains(['\n', '\r']))
+            .ok_or("a section's about is missing, empty, longer than 200 characters or on two lines")?;
+        if sections.iter().any(|known: &Section| known.id == id) {
+            return Err(format!("the section {id} is named twice"));
+        }
+        let (id, about): (&'static str, &'static str) = (kept(id), kept(about));
+        sections.push(Section {
+            id,
+            about,
+            ask: if Some(id) == actions { ASK_ACTIONS } else { about },
+        });
+    }
+    if let Some(actions) = actions
+        && !sections.iter().any(|section| section.id == actions)
+    {
+        return Err(format!("the format's actions name no section: {actions}"));
+    }
+    Ok(Box::leak(Box::new(Structure {
+        name: kept(structure),
+        sections: Box::leak(sections.into_boxed_slice()),
+        actions: actions.map(kept),
+    })))
+}
+
+/// A name of `minutes/v5`'s: lowercase letters, digits and `_`, one to 40 of them.
+fn name(value: Option<&serde_json::Value>) -> Option<&str> {
+    value
+        .and_then(serde_json::Value::as_str)
+        .filter(|name| (1..=40).contains(&name.len()) && name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'))
+}
+
+/// A word of the format, kept for the run.
+fn kept(word: &str) -> &'static str {
+    Box::leak(word.to_owned().into_boxed_str())
+}
+
 /// The names a person gave the meeting's two sides (#1205), as `speakers.json` of `session-audio/v3` holds them;
 /// none, the side keeps the transcript's word alone. No producer tells voices apart yet: their names are not read.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
