@@ -1417,6 +1417,8 @@ fn a_component_reads_roles_and_scales_alone() {
         ".option-card",
         ".progress",
         ".toast",
+        ".tabs",
+        ".tab",
     ] {
         assert!(
             rules(COMPONENTS).iter().any(|(selector, _)| selector.starts_with(drawn)),
@@ -1680,4 +1682,35 @@ fn a_component_takes_no_global_class_and_sits_as_v5_sets_it() {
         })
         .unwrap_or_default();
     assert!(edged.ends_with("solid var(--color-edge)"), "{edged}");
+}
+
+/// D123's component, in the design system: tabs drawn as v5's segments (v5 l. 194-196, 712) — the list a sunken
+/// band, each tab its words in the soft text, the chosen one raised on the surface in the text's colour with e1;
+/// 32 px high as every control (D89); its focus ring the accent's, also when reached by an arrow (#1313).
+#[test]
+fn a_tab_is_a_segment_of_its_list_the_chosen_one_raised() {
+    assert_eq!(given(COMPONENTS, ".tabs", "background").as_deref(), Some("var(--color-sunken)"));
+    assert_eq!(given(COMPONENTS, ".tabs", "border-radius").as_deref(), Some("var(--r-sm)"));
+    assert_eq!(given(COMPONENTS, ".tab", "color").as_deref(), Some("var(--color-text-soft)"));
+    assert_eq!(given(COMPONENTS, ".tab", "height").as_deref(), Some("32px"));
+    let chosen = rules(COMPONENTS)
+        .into_iter()
+        .find(|(selector, _)| selector == ".tab[aria-selected=\"true\"]")
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+    for (name, value) in [
+        ("background", "var(--color-surface)"),
+        ("color", "var(--color-text)"),
+        ("box-shadow", "var(--e1)"),
+    ] {
+        assert!(chosen.contains(&format!("{name}: {value}")), "the chosen tab: {name}: {chosen}");
+    }
+    let ring = rules(COMPONENTS)
+        .into_iter()
+        .find(|(selector, _)| selector.contains(".tab:focus-visible") && selector.contains("[data-keys] .tab:focus"))
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+    assert!(ring.contains("var(--color-accent)"), "a tab's focus ring: {ring}");
+    // Its words read on the band, the chosen one's on the surface (ROLE_PAIRS).
+    assert!(ROLE_PAIRS.contains(&("--color-text-soft", "--color-sunken", 4.5)));
 }

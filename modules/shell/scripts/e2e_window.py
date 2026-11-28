@@ -6553,6 +6553,34 @@ def gallery_shown(now: dt.datetime) -> None:
             check(f"{short}, {theme}: a card's radio reached by an arrow shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
                   all(sent and before and got and got[0] != before[0] and got[1] and got[2] == "solid" and got[3] >= 2
                       for sent, before, got in arrowed), arrowed)
+            # D123's component (the design system's tabs): WAI-ARIA APG's Tabs, automatic activation. One list, named;
+            # each tab its panel; the chosen one the only stop of Tab; ← → Home End move and choose, ← from the first
+            # to the last; the panel next in Tab's order; the focus ring seen, an arrow's included (#1313).
+            tabs = ("const l = document.querySelector('#gallery [role=tablist]'); if (!l) return null;"
+                    " const t = [...l.querySelectorAll('[role=tab]')]; const a = document.activeElement;"
+                    " return {named: !!(l.getAttribute('aria-label') || l.getAttribute('aria-labelledby')), count: t.length,"
+                    " chosen: t.map((x) => x.getAttribute('aria-selected') === 'true'), stops: t.map((x) => x.tabIndex),"
+                    " panels: t.map((x) => { const p = document.getElementById(x.getAttribute('aria-controls')); return !!p && p.getAttribute('role') === 'tabpanel'"
+                    " && p.getAttribute('aria-labelledby') === x.id && p.hidden === (x.getAttribute('aria-selected') !== 'true'); }),"
+                    " focus: t.indexOf(a), panel: a?.getAttribute('role') === 'tabpanel',"
+                    " ring: t.includes(a) ? getComputedStyle(a).outlineStyle !== 'none' : null}")
+            seen = browser.execute_script(tabs)
+            check(f"{short}, {theme}: the tabs, a list named, each tab its panel, one chosen, the only stop of Tab (WAI-ARIA APG, D123)",
+                  seen is not None and seen["named"] and seen["count"] >= 3 and seen["chosen"].count(True) == 1 and all(seen["panels"])
+                  and sorted(seen["stops"]) == [-1] * (seen["count"] - 1) + [0], seen)
+            walked = []
+            if seen:
+                browser.execute_script("document.querySelector('#gallery [role=tab][aria-selected=true]').focus()")
+                for key in (Keys.ARROW_RIGHT, Keys.END, Keys.HOME, Keys.ARROW_LEFT):
+                    ActionChains(browser).send_keys(key).perform()
+                    got = browser.execute_script(tabs)
+                    walked.append([got["focus"], got["chosen"].index(True) if True in got["chosen"] else None, all(got["panels"]), got["ring"]])
+                ActionChains(browser).send_keys(Keys.TAB).perform()
+                walked.append(browser.execute_script(tabs)["panel"])
+                browser.execute_script("document.querySelector('#gallery [role=tab]').click()")
+            last = (seen or {}).get("count", 0) - 1
+            check(f"{short}, {theme}: → the next tab chosen, End the last, Home the first, ← from the first the last, each panel shown, the ring seen; Tab to the panel (APG, D123)",
+                  walked == [[1, 1, True, True], [last, last, True, True], [0, 0, True, True], [last, last, True, True], True], walked)
             found = axe_violations(browser)
             check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
             for width in (420, 1100):

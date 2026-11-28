@@ -264,6 +264,7 @@ fn the_index_its_book_and_its_components() {
         "OptionCard",
         "Progress",
         "Toast",
+        "Tabs",
         "Cover",
     ] {
         let folder = Path::new("design-system/project/components").join(component);
