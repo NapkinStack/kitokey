@@ -219,3 +219,42 @@ test("each « Bientôt » pill follows its card's title, as planche v4 draws it:
   });
   assert.deepEqual(found, []);
 });
+
+test("each section a nav link reaches lands just under the sticky header, at 1440 and 420 px", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const [width, lang] of [[1440, "fr"], [420, "fr"], [1440, "en"]]) {
+      const page = await browser.newPage({ colorScheme: "light", viewport: { width, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const ids = await page.evaluate(() => [...document.querySelectorAll(".top nav a[href^='#']")].map((a) => a.getAttribute("href").slice(1)));
+      for (const id of ids) {
+        const gap = await page.evaluate((id) => {
+          const el = document.getElementById(id);
+          el.scrollIntoView({ block: "start" });
+          const header = document.querySelector(".top").getBoundingClientRect().bottom;
+          const heading = el.querySelector("h2") ?? el;
+          return heading.getBoundingClientRect().top - header;
+        }, id);
+        if (!(gap >= 0 && gap <= 72)) found.push([lang, width, id, Math.round(gap)]);
+      }
+      if (!ids.length && width === 1440) found.push([lang, width, "no nav link"]);
+      await page.close();
+    }
+  });
+  assert.deepEqual(found, []);
+});
+
+test("the install tabs' marks stand at one optical height, drawn whole at 200 %", async () => {
+  await look(async (browser, origin) => {
+    for (const scheme of ["light", "dark"]) {
+      const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+      await page.goto(`${origin}/en/#still`, { waitUntil: "networkidle" });
+      const marks = await page.evaluate(() => [...document.querySelectorAll(".os-tab img")].map((i) => [i.getAttribute("src"), Math.round(i.getBoundingClientRect().height), i.complete && i.naturalWidth > 0]));
+      assert.ok(marks.length >= 3, `${scheme}: ${marks.length} marks`);
+      const heights = marks.map(([, h]) => h);
+      assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${scheme}: heights ${JSON.stringify(marks)}`);
+      assert.ok(marks.every(([, , drawn]) => drawn), `${scheme}: a mark not drawn ${JSON.stringify(marks)}`);
+      await page.close();
+    }
+  });
+});
