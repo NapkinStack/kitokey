@@ -439,6 +439,8 @@ fn main() {
             date_google,
             dates_file_chosen,
             dates_ics,
+            export_file_chosen,
+            meeting_export,
             open_logs,
             diagnostic,
             peaks_of,
@@ -869,7 +871,7 @@ fn show_welcome(app: &AppHandle) {
 /// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
 /// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
 /// 440 × 44 asked left a web view of 388 × 1.
-const BAR: (f64, f64) = (440.0, 44.0);
+const BAR: (f64, f64) = (440.0, 48.0);
 /// As tall as the bar may grow: what it holds beyond that scrolls.
 const BAR_TALLEST: f64 = 720.0;
 
@@ -2624,6 +2626,55 @@ async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
         .set_file_name(format!("{}.ics", named(&folder)))
         .add_filter("iCalendar", &["ics"]);
     chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Where a meeting's summary is exported (D121), chosen in the system's own dialog, its name the meeting's and its
+/// extension the format's; none when the user closes it. Allowed for a confidential meeting: the user exports it
+/// explicitly, and the file stays on this computer (PDR-0007, amended 2026-11-24).
+#[tauri::command]
+async fn export_file_chosen(app: AppHandle, name: String, format: exporting::Format) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let (filter, ext) = match format {
+        exporting::Format::Pdf => ("PDF", "pdf"),
+        exporting::Format::Md => ("Markdown", "md"),
+    };
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.{ext}", named(&folder)))
+        .add_filter(filter, &[ext]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes a meeting's summary at `to` as a PDF or Markdown, by `kitokey-export` (`exporting/v1`, D121): the summary
+/// alone, its title the meeting's, in the page's language.
+#[tauri::command]
+fn meeting_export(shell: State<'_, Shell>, name: String, format: exporting::Format, to: PathBuf) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me,
+        others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: None,
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::file(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, format, tag, &input)
+        .inspect(|()| tracing::info!(format = format.name(), "shell.meeting_exported"))
+        .map_err(|why| shell.told(Failure::ExportNotWritten, why))
 }
 
 /// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
