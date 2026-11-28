@@ -10122,18 +10122,26 @@ def dates_mentioned(now: dt.datetime) -> None:
                   and got[3] == "dates-cancel" and "dates-confidential" in got[4] and lines() == before, [got, lines(), before])
             press(browser, "dates-cancel")
             time.sleep(0.5)
-            check(f"{language}: « Annuler »: nothing opened, the question gone",
-                  browser.execute_script("return document.getElementById('dates-confidential')") is None and lines() == before, lines())
+            check(f"{language}: « Annuler »: nothing opened, the question gone, the focus back on the button",
+                  browser.execute_script("return document.getElementById('dates-confidential')") is None and lines() == before
+                  and browser.execute_script("return document.activeElement.id") == "dates-google",
+                  [lines(), browser.execute_script("return document.activeElement.id")])
             press(browser, "dates-google")
             wait_for(browser, lambda b: b.execute_script(ask), 5)
             press(browser, "dates-confirm")
             opened = wait_for(browser, lambda b: lines() == before + 1, 5)
-            check(f"{language}: « Ouvrir »: the ticked date alone handed to Google Calendar", opened, [lines(), before])
-            refused = browser.execute_async_script(
-                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('date_google', {name: arguments[0], item: "
-                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}).then(() => done('opened'), (why) => done(String(why)))", folder.name)
+            check(f"{language}: « Ouvrir »: the ticked date alone handed to Google Calendar, the focus back on the button",
+                  opened and browser.execute_script("return document.activeElement.id") == "dates-google",
+                  [lines(), before, browser.execute_script("return document.activeElement.id")])
+            # Unconfirmed, whether the page says nothing or says no: refused by the shell.
+            refused = [browser.execute_async_script(
+                "const done = arguments[arguments.length - 1], args = {name: arguments[0], item: "
+                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}; if (arguments[1] !== null) args.confirmed = arguments[1];"
+                " window.__TAURI__.core.invoke('date_google', args).then(() => done('opened'), (why) => done(String(why)))", folder.name, confirmed)
+                for confirmed in (None, False)]
             time.sleep(0.5)
-            check(f"{language}: a call the page did not confirm is refused by the shell, nothing handed", refused != "opened" and lines() == before + 1, [refused, lines()])
+            check(f"{language}: a call the page did not confirm (none, or false) is refused by the shell, nothing handed",
+                  "opened" not in refused and lines() == before + 1, [refused, lines()])
             press(browser, "dates-close")
     (folder / "confidential").unlink(missing_ok=True)
 
