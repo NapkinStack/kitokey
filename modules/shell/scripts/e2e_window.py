@@ -6574,6 +6574,10 @@ def gallery_shown(now: dt.datetime) -> None:
                 for key in (Keys.ARROW_RIGHT, Keys.END, Keys.HOME, Keys.ARROW_LEFT):
                     ActionChains(browser).send_keys(key).perform()
                     got = browser.execute_script(tabs)
+                    if key == Keys.ARROW_RIGHT:
+                        # A tab reached by the keyboard, its ring as a person sees it (#1334's audit).
+                        browser.execute_script("document.querySelector('#gallery [role=tablist]').scrollIntoView({block: 'center'})")
+                        shot(browser, f"d123-tab-keyboard-{short}-{theme}")
                     walked.append([got["focus"], got["chosen"].index(True) if True in got["chosen"] else None, all(got["panels"]), got["ring"]])
                 ActionChains(browser).send_keys(Keys.TAB).perform()
                 walked.append(browser.execute_script(tabs)["panel"])
