@@ -230,7 +230,7 @@ function destinationForm(words, locked, prefix, added) {
     add,
     result,
   );
-  return { adding, kind, result };
+  return { adding, kind, result, add };
 }
 
 // « Ajouter un canal » (D121, criterion 2): Settings' channel form in a sheet of the meeting's page, the platform's modal
@@ -247,7 +247,7 @@ function channelSheet(words) {
     dialog.remove();
     if (back instanceof HTMLElement && back.isConnected) back.focus();
   };
-  const { adding, kind } = destinationForm(words, false, "channel", (name) => {
+  const { adding, kind, add } = destinationForm(words, false, "channel", (name) => {
     close();
     return refresh().then(() => {
       const said = document.getElementById("share-said");
@@ -258,8 +258,10 @@ function channelSheet(words) {
   const cancel = element("button", "button secondary", words.send_cancel);
   cancel.type = "button";
   cancel.addEventListener("click", close);
+  // Its answers together, as the platform's dialogs and `ask()` put them: the safe one first, « Ajouter » the primary.
+  add.className = "button primary";
   const actions = element("div", "actions");
-  actions.append(cancel);
+  actions.append(cancel, add);
   dialog.append(heading, element("p", "says", words.destinations_said), adding, actions);
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
