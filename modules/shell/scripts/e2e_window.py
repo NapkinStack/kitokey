@@ -13907,7 +13907,6 @@ def store_shots(now: dt.datetime) -> None:
         " && ![...s.querySelectorAll('h2')].some(h => ['Modèles', 'Models'].includes(h.textContent))).map(s => s.querySelector('h2')?.textContent ?? 'SECTION'),"
         " ...[...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))"
         " && e.getBoundingClientRect().top < 0 && e.getBoundingClientRect().bottom > 0).map(e => e.textContent.trim() || e.tagName)],"
-        " fit: window.storeFit ?? null,"
         " live: (() => { const t = document.getElementById('page-time'), h = document.querySelector('#meeting h1'),"
         " m = [...document.querySelectorAll('#meeting .page-level')]; return t && t.getClientRects().length && h ? {time: t.textContent,"
         " large: parseFloat(getComputedStyle(t).fontSize) >= parseFloat(getComputedStyle(h).fontSize), title: h.textContent,"
@@ -14013,27 +14012,10 @@ def store_shots(now: dt.datetime) -> None:
             # Settings' shot at « Écoute et rédaction », the tab that holds the models (D123).
             browser.execute_script("location.hash = '#/settings/listening'")
             wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed(), 10)
-            # Its models at the top — on this computer, nothing sent —, the card above wholly out of the image, the one
-            # under them going on past its edge between two rows (lina and the coordinator, 2026-11-21); the page's
-            # scrollbar, an artefact of the shot's height, hidden for it alone.
-            # The scroll is chosen from the page as drawn, never tuned: the top anywhere from the card above's bottom to
-            # the Models heading's top — the card's own padding may go, a scrolled page (the coordinator, 2026-11-21) —,
-            # the nearest to the card's top at 14 px where neither edge crosses a control or a line of text, and the
-            # page long enough to scroll there. None: `storeFit` names both bands, for the edge check to say.
-            browser.execute_script(
-                "const box = e => { const r = e.getBoundingClientRect(); return {top: r.top + scrollY, bottom: r.bottom + scrollY}; };"
-                "const cards = [...document.querySelectorAll('#settings section.card')].filter(e => e.offsetParent);"
-                "const title = [...document.querySelectorAll('#settings h2')].find(h => ['Modèles', 'Models'].includes(h.textContent));"
-                "const card = title.closest('section'), before = cards[cards.indexOf(card) - 1];"
-                "const leaves = [...document.querySelectorAll('#settings *')].filter(e => e.offsetParent && (!e.children.length || e.matches('select'))).map(box);"
-                "const crosses = y => leaves.some(r => r.top < y && r.bottom > y);"
-                "const from = Math.ceil(before ? box(before).bottom : 0), to = Math.min(Math.floor(box(title).top), document.documentElement.scrollHeight - innerHeight);"
-                "const aim = Math.round(box(card).top) - 14;"
-                "const fits = [...Array(Math.max(0, to - from + 1)).keys()].map(i => from + i).sort((a, b) => Math.abs(a - aim) - Math.abs(b - aim))"
-                "  .find(y => !crosses(y) && !crosses(y + innerHeight));"
-                "window.storeFit = fits === undefined ? `no scroll fits: the top in ${from}..${to}, the bottom in ${from + innerHeight}..${to + innerHeight} (page px), every one across a control or a line of text` : null;"
-                "scrollTo(0, fits ?? aim);"
-                "document.documentElement.style.overflow = 'hidden'")
+            # From its top (D123, the coordinator, 2026-11-28): the tabs, « Après un enregistrement », then the models —
+            # on this computer, nothing sent —; the card under them going on past the image's edge between two rows,
+            # the edge check says; the page's scrollbar, an artefact of the shot's height, hidden for it alone.
+            browser.execute_script("scrollTo(0, 0); document.documentElement.style.overflow = 'hidden'")
             time.sleep(0.4)
             nothing_private(browser, f"{short}/4-settings")
             browser.save_screenshot(str(store / short / "4-settings.png"))
@@ -14158,7 +14140,7 @@ def store_shots(now: dt.datetime) -> None:
     crossing = {shot: page["crossing"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot: the card under its models goes on past the image's edge between two rows, never through a control or a line of text (D103)",
           len(crossing) == 2 and not any(crossing.values()),
-          {shot: {"crossing": crossing[shot], "fit": shown[shot]["fit"]} for shot in crossing})
+          crossing)
     # What only a run has — a loopback address, its stand-ins' ports — never on a buyer's screen.
     run = {shot: sorted(set(re.findall(r"127\.0\.0\.1(?::\d+)?|localhost:(?!11434\b)\d+", page["text"]))) for shot, page in shown.items()}
     check("no screenshot shows an address or a port only the run has (D103)", len(run) == 8 and not any(run.values()),
