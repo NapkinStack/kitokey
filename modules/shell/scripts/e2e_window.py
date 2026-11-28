@@ -10061,6 +10061,17 @@ def keys_taught(now: dt.datetime) -> None:
         capped = wait_for(browser, lambda b: b.execute_script(hash_) == rows[1], 3)
         browser.execute_script("document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'K', code: 'KeyK', bubbles: true}))")
         check("caps lock on: J and K move all the same", capped and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3), browser.execute_script(hash_))
+        # A key held down: its repeats act no more than once, and are still kept from the page (lina's reading of #1317).
+        # J moved above, so a repeat that acted would show rows[1]; Ctrl+R repeated would start a recording.
+        held = browser.execute_script(
+            "document.activeElement?.blur();"
+            " const kept = [{key: 'j', code: 'KeyJ'}, {key: 'r', code: 'KeyR', ctrlKey: true}]"
+            "   .map((k) => !document.body.dispatchEvent(new KeyboardEvent('keydown', {...k, repeat: true, bubbles: true, cancelable: true})));"
+            " return kept")
+        time.sleep(0.5)
+        after = browser.execute_script("return [location.hash, document.getElementById('record').classList.contains('live')]")
+        check("a key held down: J and Ctrl+R repeated do nothing (the same meeting, no recording), their repeats kept from the page",
+              held == [True, True] and after == [rows[0], False], [held, after])
         # Ctrl+Maj+C: the summary copied, « Copié » said where the button says it.
         browser.execute_script(stand_in)
         to_body(browser)
