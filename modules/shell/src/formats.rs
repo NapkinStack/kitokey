@@ -293,11 +293,16 @@ fn checked(sections: &[Section], actions: Option<usize>) -> Result<(), Refused> 
     Ok(())
 }
 
-/// A name as it is compared: lower case, the marks of Latin letters taken off (`plain`).
+/// A name as it is compared: lower case, the marks of Latin letters taken off (`plain`), one apostrophe and one space.
 fn folded(text: &str) -> String {
     text.to_lowercase()
         .chars()
-        .map(|character| plain(character).unwrap_or_else(|| character.to_string()))
+        // An apostrophe and a space as typed or as typeset are one (the coordinator, 2026-11-28).
+        .map(|character| match character {
+            '’' => "'".to_string(),
+            '\u{a0}' | '\u{202f}' => " ".to_string(),
+            _ => plain(character).unwrap_or_else(|| character.to_string()),
+        })
         .collect()
 }
 

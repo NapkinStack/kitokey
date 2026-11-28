@@ -286,6 +286,10 @@ fn a_name_a_built_in_format_or_another_has_is_taken_whatever_its_case_and_accent
     ] {
         assert_eq!(formats.made(taken, weekly(), None), Err(Refused::NameTaken), "{taken}");
     }
+    // The same name typed with a straight apostrophe, or a no-break space (the coordinator, 2026-11-28).
+    for taken in ["Point d'equipe", "Point\u{a0}d’équipe"] {
+        assert_eq!(formats.made(taken, weekly(), None), Err(Refused::NameTaken), "{taken}");
+    }
     let made = formats.made("Pôint client", weekly(), None).unwrap();
     assert_eq!(formats.made("point CLIENT", weekly(), None), Err(Refused::NameTaken));
     assert_eq!(formats.renamed(&made, "Appel client"), Err(Refused::NameTaken));
