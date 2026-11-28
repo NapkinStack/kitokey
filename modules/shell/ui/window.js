@@ -4230,14 +4230,15 @@ function showSettings(shown, minutes, words) {
   failed.textContent = notSaved ?? "";
   failed.hidden = notSaved === null;
   parts.push(failed);
-  // What is left of the trial, on a trial licence alone (D83): said first in « Général », nothing to change.
-  let trial = null;
+  // What is left of the trial, on a trial licence alone (D83): said first, nothing to change — a state above the tabs,
+  // whichever is open (D123); « Général »'s place for the licence waits for controls to buy one (ux-ia §2).
   if (shown.trial !== null) {
-    trial = element("section", "card group state");
+    const trial = element("section", "card group state");
     trial.id = "trial-left";
     const trialSaid = element("div", "said");
     trialSaid.append(element("span", "name", words.trial), element("span", "says", shown.trial));
     trial.append(trialSaid);
+    parts.push(trial);
   }
 
   const after = element("section", "card group");
@@ -5139,13 +5140,16 @@ function showSettings(shown, minutes, words) {
       ["listening", listeningName, [after, models]],
       ["sharing", sharingName, card(sharingName, sending, exporting)],
       ["storage", storageName, card(storageName, where, keep)],
-      ["general", generalName, [...(trial ? [trial] : []), more]],
+      ["general", generalName, more],
     ],
     settingsTab(),
     (key) => {
       // The first tab, opened as `#/settings`, keeps that address: only another tab writes its own.
       const asked = key === SETTINGS_TABS[0] && location.hash === "#/settings" ? "#/settings" : `#/settings/${key}`;
-      if (location.hash !== asked && location.hash.startsWith("#/settings")) history.replaceState(null, "", asked);
+      if (location.hash === asked || !location.hash.startsWith("#/settings")) return;
+      // The page drawn is the same: its address follows, so that the next drawing gives the focus back there (D101).
+      if (drawnAddress === location.hash) drawnAddress = asked;
+      history.replaceState(null, "", asked);
     },
   );
   parts.push(tabs.list, ...tabs.panels);
@@ -6899,6 +6903,12 @@ window.addEventListener("focus", () => {
   if (!choosing && !menu) refresh();
 });
 window.addEventListener("hashchange", () => {
+  // « Réglages » asked while Settings are drawn at one of their tabs: the same page — its tab's address kept,
+  // nothing drawn, what is typed stays (D123), as when Settings were one address.
+  if (location.hash === "#/settings" && drawnAddress?.startsWith("#/settings/") && !document.getElementById("settings").hidden) {
+    history.replaceState(null, "", drawnAddress);
+    return;
+  }
   // Another address: the page still shown, or its agreement, acts on its own meeting: no press and
   // no focus there until what was asked is drawn — never one sent for a meeting left.
   leavePage();
