@@ -210,6 +210,7 @@ async function redoDialog(session, words, step, corrected = false) {
     notes.push(lost);
   }
   const wrong = element("p", "note warn");
+  wrong.id = "redo-dialog-wrong";
   wrong.setAttribute("role", "status");
   wrong.hidden = true;
   const close = () => {
