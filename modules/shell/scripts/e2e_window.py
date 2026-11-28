@@ -2410,6 +2410,13 @@ def first_run_screens(now: dt.datetime) -> None:
                     again = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 5)
                     check("(2) the window hidden, the sound no longer listened to; shown again, listened to again",
                           hushed and again, [hushed, browser.execute_script(title2), browser.execute_script(listening)])
+                    # Hidden and shown again at once — another window glanced at —: shown while the sound still closes, screen (2)
+                    # listens again all the same (the attest of #1325 at 6d38cdaf, under the load of the whole e2e).
+                    browser.execute_script(seen, "hidden")
+                    browser.execute_script(seen, "visible")
+                    browser.execute_script("delete document.visibilityState")
+                    quick = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 5)
+                    check("(2) hidden and shown again at once, listened to again", quick, [browser.execute_script(title2), browser.execute_script(listening)])
                 press(browser, "first-works")
                 ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
                                  and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
