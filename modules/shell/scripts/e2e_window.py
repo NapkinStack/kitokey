@@ -8466,13 +8466,14 @@ def focus_swept(now: dt.datetime) -> None:
                 # Q1: a list left for another control, then the window left and come back to within a second: no menu,
                 # a real return — drawn anew.
                 time.sleep(1.2)
-                # Another control of the list's own tab (D123): the transcription's model, beside it in « Écoute et rédaction ».
-                browser.execute_script(marked, "model")
-                browser.execute_script("document.getElementById('meetings-language').focus(); document.getElementById('model').focus(); "
+                # Another control of the list's own tab (D123), and no list, as « Rappel » was: a list's focus is a menu's
+                # look (#944) — « Modèles à télécharger », in « Écoute et rédaction » beside it.
+                browser.execute_script(marked, "offered-toggle")
+                browser.execute_script("document.getElementById('meetings-language').focus(); document.getElementById('offered-toggle').focus(); "
                                        + away + "; " + back)
                 time.sleep(1.5)
                 check(f"{short}: a list left for another control, then the window left and come back to: drawn anew (#944, Q1)",
-                      not kept_mark(browser, "model"), browser.execute_script(where))
+                      not kept_mark(browser, "offered-toggle"), browser.execute_script(where))
                 settle(browser)
                 # Q3: a menu, then later a real return without one: drawn anew — the menu read once, not for good.
                 time.sleep(1.2)
