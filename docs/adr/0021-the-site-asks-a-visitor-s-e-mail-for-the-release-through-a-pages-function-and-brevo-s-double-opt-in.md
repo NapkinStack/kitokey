@@ -83,9 +83,10 @@ posted by the site's own server to the provider's API.
 
 Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
 
-- **The form.** The Store button, « Me prévenir de la sortie », opens a dialog of the page with one field, the
-  address, the sentence saying what it is kept for, and a link to the privacy page. Without JavaScript the button
-  leads to the same form in the page. It posts to `/notify`, the site's own origin: `_headers`' CSP becomes
+- **The form.** The Store buttons, « Me prévenir de la sortie », lead to a form in the price's card, where the
+  Store's line is: one field, the address, the sentence saying what it is kept for, and a link to the privacy
+  page. In the page rather than in a dialog: it needs no script and has no focus to manage, as the newsletter
+  forms of most product pages. It posts to `/notify`, the site's own origin: `_headers`' CSP becomes
   `form-action 'self'`, nothing else in it changes.
 - **The function**, `modules/site/functions/notify.js`. It takes only a form-encoded POST of at most 2 KB; it
   refuses an address longer than 254 characters or not of the form `local@domain.tld`, and a filled honeypot
@@ -96,7 +97,8 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   the key.
 - **The secret.** `BREVO_API_KEY`, set by the decider on the Pages project, production only. Without it (the
   preview) the function says the generic failure and calls nothing. The list's and the template's ids are not
-  secrets: they live in `site.config.mjs`.
+  secrets but belong to the same account: plain variables of the Pages project, `BREVO_LIST_ID` and
+  `BREVO_TEMPLATE_ID`, so that the decider sets the three together and no pull request waits on them.
 - **Abuse.** The honeypot; one rate limiting rule on `/notify` per IP (the free plan's one rule); double opt-in,
   so that an address typed by someone else receives one mail and never joins the list.
 - **The list.** Only confirmed addresses; one campaign at the release, then the list is deleted (`docs/privacy.md`,
@@ -144,7 +146,8 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 3. The list « Kitokey — sortie » and a double opt-in template (sender support@kitokey.com), with the words written
    in the pull request.
 4. An API key, set as the secret `BREVO_API_KEY` on the Pages project, production only.
-5. The list's and the template's ids, given to the coordinator: they go in `site.config.mjs`.
+5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
+   Pages project, production only.
 6. A rate limiting rule on the path `/notify` in Cloudflare's WAF.
 
 ---

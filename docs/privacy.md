@@ -1,6 +1,6 @@
 # Kitokey: privacy policy / politique de confidentialité
 
-Last changed / dernière modification: 2026-11-25. Publisher / éditeur: c12c (NapkinStack).
+Last changed / dernière modification: 2026-11-28. Publisher / éditeur: c12c (NapkinStack).
 [English](#english) · [Français](#français)
 
 ```mermaid
@@ -95,6 +95,12 @@ kitokey.com is served by Cloudflare Pages. To send you a page, Cloudflare receiv
 you ask for, as any web host does ([Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/)). The
 site sets no cookie, runs no tracker and no analytics, and loads nothing from another domain.
 
+If you ask to be told when Kitokey is out, we keep your e-mail address for that alone: one message at the release,
+then we delete it. You confirm it first, by a link we send you; until then it joins no list. The site passes it to
+Brevo (Sendinblue SAS, France), which keeps it in the European Union and sends these two messages on our behalf,
+under a data processing agreement. The basis is your consent (GDPR art. 6(1)(a)): you may withdraw it at any time
+by the link in each message or by writing to support@kitokey.com, and ask to see, correct or delete it.
+
 ### Contact
 
 Questions, or a request about your data: [support@kitokey.com](mailto:support@kitokey.com), or
@@ -184,6 +190,13 @@ kitokey.com est servi par Cloudflare Pages. Pour vous envoyer une page, Cloudfla
 page demandée, comme tout hébergeur web ([politique de confidentialité de Cloudflare](https://www.cloudflare.com/privacypolicy/)).
 Le site ne dépose aucun cookie, n'utilise aucun traceur ni outil de mesure d'audience, et ne charge rien depuis un
 autre domaine.
+
+Si vous demandez à être prévenu de la sortie de Kitokey, nous gardons votre adresse e-mail pour cela seul : un
+message à la sortie, puis nous l'effaçons. Vous la confirmez d'abord, par un lien que nous vous envoyons ; jusque-là,
+elle n'entre dans aucune liste. Le site la transmet à Brevo (Sendinblue SAS, France), qui la conserve dans
+l'Union européenne et envoie ces deux messages pour nous, sous un contrat de sous-traitance. La base en est votre
+consentement (RGPD art. 6.1.a) : vous pouvez le retirer à tout moment par le lien de chaque message ou en écrivant à
+support@kitokey.com, et demander à la voir, la corriger ou l'effacer.
 
 ### Contact
 

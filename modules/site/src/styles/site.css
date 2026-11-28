@@ -133,6 +133,7 @@ html[data-site="dark"] {
 .lost p { margin: 0 0 1rem; font-size: 1.15rem; color: var(--text-secondary); }
 .lost .home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.1rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 650; text-decoration: none; }
 .lost .home:hover { background: var(--accent-hover); }
+.lost .home + .home { margin-left: var(--sp-3); }
 .lost .lost-code { margin: 0; font-family: var(--display); font-size: clamp(5rem, 3rem + 10vw, 9rem); font-weight: 800; line-height: 1; letter-spacing: -.04em; color: var(--accent); }
 
 /* A section reached by the nav lands its heading just under the sticky header (scroll-padding-top, 64 px) and a small step

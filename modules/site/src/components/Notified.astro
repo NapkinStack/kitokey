@@ -1,0 +1,12 @@
+---
+// /<lang>/notify/<state>/: what /notify answers with (ADR-0021, functions/notify.js), and where Brevo's confirmation
+// link lands (confirmed). Never indexed; the way home, and from a failure the way back to the form.
+import Page from "../layouts/Page.astro";
+import { say } from "../lib/words.mjs";
+const { lang, state } = Astro.props;
+const [title, said, again] = say("notified", lang)[state];
+const home = say("lost", lang)[2];
+---
+<Page lang={lang} title={`${title} · Kitokey`} description={said} path={`notify/${state}/`} kind="wrap lost-page" indexed={false}>
+  <div class="lost"><h1>{title}</h1><p>{said}</p>{again && <a class="home" href={`/${lang}/#notify`}>{again}</a>}<a class="home" href={`/${lang}/`}>{home}</a></div>
+</Page>

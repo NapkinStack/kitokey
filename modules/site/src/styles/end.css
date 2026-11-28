@@ -55,6 +55,16 @@ html[data-site="dark"] .end .strip .mark-debian { background: #FFFFFF; border-ra
 .end .row-b { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: auto; min-height: 52px; }
 /* Until the Store's listing exists, the words where its badge will be, not a button. */
 .end .store-soon.is-soon { background: var(--bg-sunken); color: var(--text-secondary); outline: 1px solid var(--border-subtle); }
+/* « Me prévenir de la sortie » (ADR-0021): one field and its button on one line, the sentence under them. The trap
+   is out of sight and out of reach for everyone (aria-hidden, tabindex -1), not display: none, which robots skip. */
+.end .notify { display: grid; gap: var(--sp-2); scroll-margin-top: var(--sp-8); }
+.end .notify label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.end .notify-row { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.end .notify input[type="email"] { flex: 1 1 220px; min-height: 48px; padding: 0 var(--sp-4); border-radius: var(--r-md); border: 1px solid var(--border-control); background: var(--bg-surface); color: var(--text-primary); font: inherit; font-size: 16px; }
+.end .notify button { min-height: 48px; padding: 0 var(--sp-5); border: 0; border-radius: var(--r-md); background: var(--accent); color: var(--on-accent); font: inherit; font-weight: 600; font-size: 16px; cursor: pointer; }
+.end .notify button:hover { background: var(--accent-hover); }
+.end .notify-said { font-size: 14px; color: var(--text-secondary); margin: 0; }
+.end .notify .trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .end .install-l { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 var(--sp-5); border-radius: var(--r-md); background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle); border-bottom-color: var(--border-control); font-weight: 600; text-decoration: none; }
 .end .install-l:hover { background: var(--bg-hover); }
 .end .nosub { display: flex; align-items: center; gap: 10px; justify-content: center; margin-top: 20px; font-size: 15px; color: var(--text-secondary); }

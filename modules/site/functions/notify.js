@@ -1,0 +1,75 @@
+// POST /notify (ADR-0021): « Me prévenir de la sortie ». The site's one function, run by Cloudflare Pages. It takes
+// the landing's form, asks Brevo to send the address a confirmation link (double opt-in: only a confirmed address
+// joins the list), and answers with a page of the site. All input is hostile until checked; Brevo is called once,
+// with a timeout, never retried (the visitor may send again; Brevo answers the same for an address it has).
+// Its log is one JSON line per request, the outcome and Brevo's status: never the address, never the key.
+// Set on the Pages project by the decider (production only): BREVO_API_KEY, a secret; BREVO_LIST_ID and
+// BREVO_TEMPLATE_ID, plain variables. Without the key (the preview), nothing is called and the failure is said.
+
+const BREVO = "https://api.brevo.com/v3/contacts/doubleOptinConfirmation";
+const TIMEOUT_MS = 5000;
+const MAX_BODY = 2048;
+const MAX_EMAIL = 254; // RFC 5321's path limit
+const LANGS = new Set(["en", "fr"]);
+// One @, a local part and a domain with a dot, no space: what a mail can be sent to, not RFC 5322 whole. Brevo checks
+// it again; the confirmation link proves it.
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const log = (outcome, extra = {}) => console.log(JSON.stringify({ event: "notify", outcome, ...extra }));
+const go = (lang, page) => new Response(null, { status: 303, headers: { location: `/${lang}/notify/${page}/`, "cache-control": "no-store" } });
+
+export async function onRequestPost({ request, env }) {
+  const type = (request.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (type !== "application/x-www-form-urlencoded") {
+    log("refused", { why: "type" });
+    return go("en", "failed");
+  }
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) {
+    log("refused", { why: "size" });
+    return go("en", "failed");
+  }
+  const raw = await request.text();
+  if (raw.length > MAX_BODY) {
+    log("refused", { why: "size" });
+    return go("en", "failed");
+  }
+  const form = new URLSearchParams(raw);
+  const lang = LANGS.has(form.get("lang")) ? form.get("lang") : "en";
+
+  if ((form.get("website") ?? "") !== "") {
+    log("trapped");
+    return go(lang, "sent");
+  }
+  const email = (form.get("email") ?? "").trim();
+  if (email.length > MAX_EMAIL || !EMAIL.test(email)) {
+    log("refused", { why: "address" });
+    return go(lang, "failed");
+  }
+  const list = Number(env.BREVO_LIST_ID);
+  const template = Number(env.BREVO_TEMPLATE_ID);
+  if (!env.BREVO_API_KEY || !Number.isInteger(list) || !Number.isInteger(template)) {
+    log("unconfigured");
+    return go(lang, "failed");
+  }
+
+  const origin = new URL(request.url).origin;
+  let status;
+  try {
+    const answer = await fetch(BREVO, {
+      method: "POST",
+      headers: { "api-key": env.BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ email, includeListIds: [list], templateId: template, redirectionUrl: `${origin}/${lang}/notify/confirmed/` }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    status = answer.status;
+  } catch (error) {
+    log("unreached", { error: error?.name ?? "error" });
+    return go(lang, "failed");
+  }
+  if (status < 200 || status > 299) {
+    log("failed", { status });
+    return go(lang, "failed");
+  }
+  log("sent", { status });
+  return go(lang, "sent");
+}

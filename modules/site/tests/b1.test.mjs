@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { dist, root, pages, route } from "./helpers.mjs";
+import { dist, root, pages, route, unindexed } from "./helpers.mjs";
 
 const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
 const text = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -22,7 +22,7 @@ test("every page names English its x-default", async () => {
   for (const file of await pages()) {
     const html = await readFile(file, "utf8");
     const x = html.match(/<link rel="alternate" hreflang="x-default" href="([^"]+)"/)?.[1];
-    if (route(file) === "/404.html") continue;
+    if (unindexed(route(file))) continue;
     assert.equal(x, "https://kitokey.com/en/", route(file));
   }
 });

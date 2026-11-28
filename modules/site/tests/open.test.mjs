@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dist, pages, route } from "./helpers.mjs";
+import { dist, pages, route, unindexed } from "./helpers.mjs";
 import { open } from "../site.config.mjs";
 
 test("the site is open by the repository, not by a build's variable", () => {
@@ -19,13 +19,13 @@ test("robots.txt lets every robot in and names the sitemap", async () => {
   assert.doesNotMatch(robots, /Disallow/);
 });
 
-test("every page may be indexed, but the 404", async () => {
+test("every page may be indexed, but the 404 and the pages /notify answers with", async () => {
   const all = await pages();
   assert.ok(all.length > 0, "no page built");
   for (const file of all) {
     const html = await readFile(file, "utf8");
     const noindex = /<meta name="robots" content="noindex"/.test(html);
-    assert.equal(noindex, route(file) === "/404.html", `${route(file)}: noindex ${noindex}`);
+    assert.equal(noindex, unindexed(route(file)), `${route(file)}: noindex ${noindex}`);
   }
 });
 

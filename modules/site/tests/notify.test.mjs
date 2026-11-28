@@ -72,19 +72,20 @@ test("the address is taken trimmed", async () => {
   assert.equal(JSON.parse(calls[0][1].body).email, EMAIL);
 });
 
-for (const [why, body, type] of [
+for (const [why, body, type, lang] of [
   ["no address", form({ email: "" })],
   ["no @", form({ email: "someone.example.com" })],
   ["no domain's dot", form({ email: "someone@example" })],
   ["a space inside", form({ email: "some one@example.com" })],
   ["two @", form({ email: "a@b@example.com" })],
   ["longer than 254", form({ email: `${"a".repeat(243)}@example.com` })],
-  ["a body over 2 KB", form({ pad: "x".repeat(2100) })],
-  ["not a form", JSON.stringify({ email: EMAIL }), "application/json"],
+  ["a body over 2 KB", form({ pad: "x".repeat(2100) }), undefined, "en"],
+  ["not a form", JSON.stringify({ email: EMAIL }), "application/json", "en"],
 ]) {
   test(`refused, Brevo never called: ${why}`, async () => {
     const response = await post(body, type ? { type } : undefined);
-    assert.deepEqual(where(response), [303, `/${type ? "en" : "fr"}/notify/failed/`]);
+    // Refused before the form is read, the language unknown: English, as the root's.
+    assert.deepEqual(where(response), [303, `/${lang ?? "fr"}/notify/failed/`]);
     assert.equal(calls.length, 0);
     await nothingLeaks(response);
   });
@@ -152,10 +153,17 @@ for (const lang of ["fr", "en"]) {
       const html = await page(lang, `notify/${state}`);
       assert.match(html, /<meta name="robots" content="noindex"/);
       assert.match(html, /<h1[^>]*>[^<]+<\/h1>/);
-      assert.match(html, new RegExp(`<a href="/${lang}/">`), "no way back to the home page");
+      assert.match(html, new RegExp(`<a class="home" href="/${lang}/">`), "no way back to the home page");
     });
   }
 }
+
+test("the pages /notify answers with are not in the sitemap", async () => {
+  const { readdir } = await import("node:fs/promises");
+  const maps = (await readdir(dist)).filter((f) => /^sitemap.*\.xml$/.test(f));
+  assert.ok(maps.length > 0, "no sitemap");
+  for (const f of maps) assert.doesNotMatch(await readFile(join(dist, f), "utf8"), /\/notify\//, f);
+});
 
 test("_headers lets a form post to the site itself, and nowhere else", async () => {
   const headers = await readFile(join(dist, "_headers"), "utf8");
@@ -166,7 +174,7 @@ test("_headers lets a form post to the site itself, and nowhere else", async () 
 test("the privacy policy says what the form keeps, who sends, for how long, on what basis, in both languages", async () => {
   for (const [lang, said] of [
     ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it"]],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l'effaçons"]],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons"]],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);

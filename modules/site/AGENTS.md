@@ -14,7 +14,9 @@ Astro's telemetry is off in every script.
 
 ## What this module does not do
 
-- It runs nothing on a server: `astro build` writes static files, no adapter, no function.
+- It runs one thing on a server, `functions/notify.js` (`POST /notify`, ADR-0021): the release's form, passed to
+  Brevo's double opt-in. Every page stays static: `astro build` writes files, no adapter. Its secret,
+  `BREVO_API_KEY`, and the list's and template's ids are the Pages project's variables, never the repository's.
 - It writes no policy of its own: `/privacy/` is `docs/privacy.md`, read at build time.
 - It asks nothing of another domain: no analytics, no CDN, no font from another host, no embed.
 
@@ -40,6 +42,8 @@ Astro's telemetry is off in every script.
 
 - No request to another host from any page (`tests/own-domain.test.mjs`, `_headers`' CSP).
 - `/en/privacy/` and `/fr/privacy/` say their half of the source, word for word (`tests/privacy.test.mjs`).
+- `/notify` calls Brevo only for a well-formed request, once, with a timeout, and logs neither the address nor the
+  key (`tests/notify.test.mjs`).
 
 ## Known traps
 
