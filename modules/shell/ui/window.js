@@ -163,7 +163,7 @@ function icon(name) {
 // engine card for the meeting, its own choice checked — « Par défaut » being Settings' —, the panels' notes, « Annuler »
 // then a button naming the making, never an engine. Another engine chosen is kept for the meeting first, as Refaire…
 // keeps it (D93, D96); then the making starts, said where it is made (D25). Escape keeps everything as it was.
-async function redoDialog(session, words, step) {
+async function redoDialog(session, words, step, corrected = false) {
   const back = document.activeElement;
   const name = nameOf(session);
   // Not read: said under the bar, where the meeting says what it refused, and no dialog opens.
@@ -184,6 +184,12 @@ async function redoDialog(session, words, step) {
   const cards = engineCards({ job: writing ? "write" : "transcribe", offered, words, scope: "meeting", services });
   const notes = writing ? [element("p", "says", words.redo_note)] : [element("p", "says", words.redo_transcript_note)];
   if (!writing && session.minutes) notes.push(element("p", "says", words.redo_keeps_minutes));
+  // Made again, the transcript is another file: a person's corrections are not in it, said before it starts (ADR-0014).
+  if (!writing && corrected) {
+    const lost = element("p", "note warn", words.redo_loses_corrections);
+    lost.id = "redo-dialog-loses-corrections";
+    notes.push(lost);
+  }
   const wrong = element("p", "note warn");
   wrong.setAttribute("role", "status");
   wrong.hidden = true;
@@ -3561,7 +3567,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // « Refaire ▾ » (D121, criterion 3): a menu as « Partager »'s, each making again in a dialog with D122's engine card.
   const redoing = [];
   if (minutes.state === "present") redoing.push(["redo-minutes-item", words.redo_title, () => redoDialog(session, words, "minutes")]);
-  if (transcript.state === "present") redoing.push(["redo-transcript-item", words.redo_transcript_title, () => redoDialog(session, words, "transcription")]);
+  if (transcript.state === "present") redoing.push(["redo-transcript-item", words.redo_transcript_title, () => redoDialog(session, words, "transcription", transcript.segments.some((segment) => segment.edited))]);
   const redo = redoing.length
     ? moreActions(redoing, words, { id: "redo-open", menuId: "redo-menu", glyph: "rotate-ccw", label: words.meeting_redo, name: words.meeting_redo, chevron: true })
     : actionButton("rotate-ccw", words.meeting_redo, "redo-open");
