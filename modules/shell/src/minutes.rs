@@ -40,6 +40,9 @@ pub struct Minutes {
     /// Which section holds the actions, counted from one: v1 to v4's second, v5's whose id its
     /// `actions` names (D111), none when it names none. The page reads its actions there alone.
     pub actions: Option<usize>,
+    /// The format they were written in, as `minutes/v5`'s front matter names it (D130); v1 to v4
+    /// name none.
+    pub structure: Option<String>,
 }
 
 /// The minutes of a session's folder, their three sections named as the page names them.
@@ -401,5 +404,6 @@ fn parse_minutes(text: &str, sections: [&str; 3], by_id: &[(&str, &str)]) -> Opt
         body: html,
         markdown,
         actions,
+        structure: if fifth { field("structure") } else { None },
     })
 }

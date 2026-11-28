@@ -1531,6 +1531,15 @@ pub struct Window {
     /// Shows: Redo…'s list of formats, and the summary's line naming its format. When: a built-in
     /// format is offered or named. At most: about 20 characters. Placeholders: none.
     pub format_names: [&'static str; 6],
+    /// Shows: a meeting's page, its Redo… panel, as the label of the list of formats. When: redo the
+    /// minutes. At most: about 12 characters. Placeholders: none.
+    pub redo_format: &'static str,
+    /// Shows: Redo…'s list of formats, as a choice. When: the format Settings name the default.
+    /// At most: about 30 characters. Placeholders: {} the format's name.
+    pub format_default: &'static str,
+    /// Shows: a meeting's page, the summary's line of provenance, after who wrote it. When: the
+    /// minutes name their format. At most: about 30 characters. Placeholders: {} the format's name.
+    pub minutes_format: &'static str,
     /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
     /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
     /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
@@ -2489,6 +2498,9 @@ pub fn window(language: Language) -> Window {
             redo_title: "Write the summary again",
             redo_with: "Uses this meeting’s models (choose them under “Advanced”).",
             format_names: ["General", "One-to-one", "Stand-up", "Client call", "Interview", "Project review"],
+            redo_format: "Format",
+            format_default: "{} (default)",
+            minutes_format: "{} format",
             redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
             redo_minutes_do: "Write the summary again with {}",
             redo_transcript_do: "Write the transcript again with {}",
@@ -3067,6 +3079,9 @@ pub fn window(language: Language) -> Window {
                 "Entretien",
                 "Revue de projet",
             ],
+            redo_format: "Format",
+            format_default: "{} (par défaut)",
+            minutes_format: "Format «\u{a0}{}\u{a0}»",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_minutes_do: "Refaire le compte rendu avec {}",
             redo_transcript_do: "Refaire la transcription avec {}",

@@ -262,3 +262,21 @@ fn cancelled_minutes_end_within_two_seconds_with_what_they_started_the_minutes_t
     assert!(gone(&stat), "its child still runs a second after its making ended: {stat}");
     assert_eq!(fs::read_to_string(&minutes).unwrap(), "the minutes before");
 }
+
+#[test]
+fn the_format_chosen_is_given_after_the_model() {
+    let _held = ONE_AT_A_TIME.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let folder = session();
+    let path = folder.path().join("kitokey-summary");
+    fs::write(
+        &path,
+        "#!/bin/sh\n[ \"$6\" = --structure ] && [ \"$7\" = stand_up ] && [ $# = 7 ] || exit 9\necho '## A' > \"$1/minutes.md\"\necho '{\"event\":\"written\",\"file\":\"x\"}'\n",
+    )
+    .unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    let shape = ["--structure".to_string(), "stand_up".to_string()];
+    let (_making, events) =
+        Summarising::start_as(&path, &folder.path().join("session"), "http://127.0.0.1:9/v1", "m", None, &shape).unwrap();
+    let ended = std::iter::from_fn(|| events.recv_timeout(Duration::from_secs(10)).ok()).find(|event| matches!(event, Event::Ended(_)));
+    assert_eq!(ended, Some(Event::Ended(Made::Written(folder.path().join("session")))), "{ended:?}");
+}

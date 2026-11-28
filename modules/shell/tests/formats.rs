@@ -342,3 +342,44 @@ fn a_structure_taken_at_forty_characters_gets_one_of_forty_with_its_number() {
     assert_eq!(second, "reunion_hebdomadaire_de_l_equipe_produ_2");
     assert_eq!(second.chars().count(), 40);
 }
+#[test]
+fn kitokey_summary_is_given_the_format_chosen_as_summarising_v1_says() {
+    let folder = tempfile::tempdir().unwrap();
+    let mut formats = Formats::default();
+    let made = formats.made("Point client hebdo", weekly(), Some(2)).unwrap();
+    // `general`: no structure, as before — minutes/v4, its sections the same.
+    assert!(formats::argument(&formats, "general", folder.path()).unwrap().is_empty());
+    // Another built-in: its name.
+    assert_eq!(
+        formats::argument(&formats, "stand_up", folder.path()).unwrap(),
+        ["--structure", "stand_up"]
+    );
+    // A person's own: the file --format reads, written in the formats' folder.
+    let given = formats::argument(&formats, &made, folder.path()).unwrap();
+    let file = folder.path().join("point_client_hebdo.json");
+    assert_eq!(given, ["--format".to_string(), file.to_string_lossy().into_owned()]);
+    let written: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+    assert_eq!(written, formats::file(formats.own(&made).unwrap()));
+    // One deleted, or hidden, since it was chosen: the default.
+    formats.default_to("client_call").unwrap();
+    formats.hide("interview", true).unwrap();
+    for gone in ["interview", "deleted_since"] {
+        assert_eq!(
+            formats::argument(&formats, gone, folder.path()).unwrap(),
+            ["--structure", "client_call"]
+        );
+    }
+}
+
+/// lina's point 3 on #1340: the page names the built-in formats in `formats::BUILT_IN`'s order, its own copy
+/// the same — `words.format_names` follows that order.
+#[test]
+fn the_page_lists_the_built_in_formats_as_formats_rs_does() {
+    let page = include_str!("../ui/window.js");
+    let line = page
+        .lines()
+        .find(|line| line.starts_with("const BUILT_IN = ["))
+        .expect("window.js's BUILT_IN");
+    let listed: Vec<&str> = line.split('"').skip(1).step_by(2).collect();
+    assert_eq!(listed, formats::BUILT_IN);
+}

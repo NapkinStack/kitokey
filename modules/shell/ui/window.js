@@ -2011,9 +2011,40 @@ function redoWith(offered, session, words, button, id, title, notes, again, step
   return closes(panel, go, button, words);
 }
 
+// The six formats built in, in `formats::BUILT_IN`'s order: named by the page's words (D130).
+const BUILT_IN = ["general", "one_to_one", "stand_up", "client_call", "interview", "project_review"];
+
+// A format as a person reads it: a built-in one by the page's words, their own by its name.
+function formatSaid(words, format) {
+  const built = BUILT_IN.indexOf(format.structure);
+  return built >= 0 ? words.format_names[built] : format.name ?? format.structure;
+}
+
+// *Refaire…*'s formats (D130): those offered, the default marked and chosen; the choice for that
+// making alone. None read: no list, the making in the default.
+function formatPick(words) {
+  const row = element("label", "models-row");
+  row.htmlFor = "redo-format";
+  row.hidden = true;
+  const pick = element("select");
+  pick.id = "redo-format";
+  row.append(element("span", "name", words.redo_format), pick);
+  window.__TAURI__.core.invoke("formats_offered").then((formats) => {
+    for (const format of formats.filter((format) => format.shown)) {
+      const option = element("option", "", format.default ? fill(words.format_default, formatSaid(words, format)) : formatSaid(words, format));
+      option.value = format.structure;
+      option.selected = format.default;
+      pick.append(option);
+    }
+    row.hidden = pick.options.length === 0;
+  }, () => {});
+  return [row, () => pick.value || null];
+}
+
 function redoPanel(offered, session, words, button) {
-  return redoWith(offered, session, words, button, "redo-panel", words.redo_title, [element("p", "says", words.redo_note)], () =>
-    window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }), "minutes", words.redo_minutes_do);
+  const [row, chosen] = formatPick(words);
+  return redoWith(offered, session, words, button, "redo-panel", words.redo_title, [row, element("p", "says", words.redo_note)], () =>
+    window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null, format: chosen() }), "minutes", words.redo_minutes_do);
 }
 
 function redoTranscriptPanel(offered, session, words, button, corrected) {
@@ -2538,6 +2569,19 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
     const [pick, said] = modelOnPage(onPage, words, "minutes", version, go, words.redo_minutes_do, words.redo_title, box);
     card.append(lineWith(maker, pick), said, box);
   } else card.append(element("p", "maker", maker));
+  // The format they were written in, named (D130): v5 names it; v1 to v4, none; one deleted since, none.
+  if (read.structure) {
+    const named = element("p", "says", "");
+    named.id = "minutes-format";
+    named.hidden = true;
+    card.append(named);
+    window.__TAURI__.core.invoke("formats_offered").then((formats) => {
+      const format = formats.find((format) => format.structure === read.structure);
+      if (!format) return named.remove();
+      named.textContent = fill(words.minutes_format, formatSaid(words, format));
+      named.hidden = false;
+    }, () => named.remove());
+  }
   // A language model wrote them, said where they are read (Store Policies 11.16, #1092).
   const written = element("p", "note", words.minutes_ai);
   written.id = "minutes-ai";
