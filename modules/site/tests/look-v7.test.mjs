@@ -192,3 +192,30 @@ test("no compound word breaks between two lines, at 1440 and 420 px, in both lan
   });
   assert.deepEqual(found, []);
 });
+
+test("each « Bientôt » pill follows its card's title, as planche v4 draws it: on the title's line, clear of the scene, the accent on its tint", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const scheme of ["light", "dark"]) {
+        const page = await open(browser, origin, lang, scheme);
+        const pills = await page.evaluate(() => {
+          const probe = (value) => { const i = document.createElement("i"); i.style.color = value; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; };
+          const accent = probe("var(--accent)"), tint = probe("var(--bg-tint)");
+          return [...document.querySelectorAll(".ft h3 .chip")].map((chip) => {
+            const c = chip.getBoundingClientRect(), h = chip.closest("h3"), v = chip.closest(".ft").querySelector("svg.v")?.getBoundingClientRect();
+            const s = getComputedStyle(chip);
+            const lines = [...h.getClientRects()];
+            const onLine = lines.some((l) => c.top < l.bottom && c.bottom > l.top) && c.left >= h.getBoundingClientRect().left - 0.5;
+            const clear = !v || c.bottom <= v.top || c.top >= v.bottom || c.right <= v.left || c.left >= v.right;
+            return [h.firstChild?.textContent?.trim() ?? "", onLine && s.position !== "absolute", clear, s.color === accent, s.backgroundColor === tint, s.fontWeight === "700", s.fontSize === "12px"];
+          });
+        });
+        if (pills.length !== 3) found.push([lang, scheme, `${pills.length} pills`]);
+        for (const pill of pills) if (pill.slice(1).some((ok) => !ok)) found.push([lang, scheme, ...pill]);
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
