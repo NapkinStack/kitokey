@@ -3855,7 +3855,7 @@ def models_advanced(now: dt.datetime) -> None:
             got = redo_open(browser, "minutes") or {}
             check("« Refaire le compte rendu »: Settings' first, « Par défaut » and checked, Ollama's models after it, Settings' never twice",
                   got.get("marked") == ["Qwen3 14b"] and got.get("checked") == "Qwen3 14b"
-                  and got.get("names", [])[1:3] == ["Mistral 7b", LONG_SAID] and got.get("names", []).count("Qwen3 14b") == 1, got)
+                  and sorted(got.get("names", [])[1:]) == sorted(["Mistral 7b", LONG_SAID]) and got.get("names", []).count("Qwen3 14b") == 1, got)
             # A long name: wrapped inside its card, nothing out of the dialog, at 420 px as at 1100 (D91's UX pass).
             browser.set_window_size(420, 700)
             time.sleep(1)
@@ -10508,7 +10508,7 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             time.sleep(0.3)
             held = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
             browser.execute_script("window.release()")
-            refusal = "const w = document.querySelector('dialog[open] .note.warn'); return w && !w.hidden && w.textContent"
+            refusal = "const w = document.querySelector('dialog[open] #redo-dialog-wrong'); return w && !w.hidden && w.textContent"
             said = wait_for(browser, lambda b: b.execute_script(refusal), 3) and browser.execute_script(refusal)  # the text, not wait_for's True
             back = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
             check("asked, Escape keeps the dialog and its buttons wait; refused, « Non refait » said in it, its buttons back, nothing made",
