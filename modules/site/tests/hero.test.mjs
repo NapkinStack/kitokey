@@ -27,7 +27,7 @@ for (const lang of ["fr", "en"]) {
     const [line, store, linux, mac] = landing.buy[lang];
     assert.equal(line, lang === "fr" ? "Essai gratuit, puis 69 € une fois." : "Free trial, then $69 once.");
     assert.ok(html.includes(`<p class="buy-line">${line}</p>`));
-    assert.match(html, new RegExp(`<a class="store-soon" href="#[a-z]+">${store}</a>`));
+    assert.match(html, new RegExp(`<a class="store-soon" href="#[a-z]+"><img class="mark" src="/img/brands/windows-logo-2021\\.svg" alt=""[^>]*>${store}</a>`));
     assert.doesNotMatch(html, /ms-store|get\.microsoft\.com/, "a Store badge before the listing exists");
     assert.match(html, new RegExp(`<a class="quiet" href="#[a-z]+"><img class="tux" src="/img/brands/tux\\.svg"[^>]*>${linux}</a>`));
     assert.ok(html.includes(mac));

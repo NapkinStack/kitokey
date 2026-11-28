@@ -228,9 +228,12 @@ test("each section a nav link reaches lands just under the sticky header, at 144
       await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
       const ids = await page.evaluate(() => [...document.querySelectorAll(".top nav a[href^='#']")].map((a) => a.getAttribute("href").slice(1)));
       for (const id of ids) {
+        // Where the scroll ends, not mid-way: the page scrolls smoothly (html's scroll-behavior), and a heading that
+        // rises in (.rise, 12 px, .4 s) is measured once it has risen.
+        await page.evaluate((id) => document.getElementById(id).scrollIntoView({ block: "start", behavior: "instant" }), id);
+        await page.waitForTimeout(700);
         const gap = await page.evaluate((id) => {
           const el = document.getElementById(id);
-          el.scrollIntoView({ block: "start" });
           const header = document.querySelector(".top").getBoundingClientRect().bottom;
           const heading = el.querySelector("h2") ?? el;
           return heading.getBoundingClientRect().top - header;
