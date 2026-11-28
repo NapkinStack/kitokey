@@ -7,9 +7,10 @@ export const privacySource =
   resolve(process.env.PRIVACY_SOURCE ?? "../../docs/privacy.md");
 // Relative to the module's folder, where npm runs every script.
 
-// Closed until the decider opens it (D114, criterion 6): every page noindex, robots.txt « Disallow: / ».
-// SITE_OPEN=1 builds the opening's site, for Lighthouse's SEO score alone.
-export const open = process.env.SITE_OPEN === "1";
+// Open (D114, criterion 6; the decider's word relayed by the coordinator, 2026-11-28): robots.txt lets every robot in
+// and names the sitemap, no page but the 404 asks not to be indexed. Opened here, in the repository, never by a build's
+// variable.
+export const open = true;
 
 export const languages = ["en", "fr"];
 

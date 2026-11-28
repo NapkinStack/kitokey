@@ -649,6 +649,8 @@ function confidentialCard(session, confidential, words) {
 // A session's folder name: what the window calls it, and the only date it says when its start
 // cannot be read.
 const nameOf = (session) => session.folder.split(/[\\/]/).pop();
+// A sentence the shell told, begun with its capital where the page says it alone (« le fichier… » → « Le fichier… »).
+const sentenceOf = (told) => told.charAt(0).toUpperCase() + told.slice(1);
 
 // An hour as each language writes it (#1075): US English « 2:30 PM », with no zero before the hour; French « 09:30 ».
 const hours = (words) => ({ hour: words.locale === "en" ? "numeric" : "2-digit", minute: "2-digit" });
@@ -1190,7 +1192,8 @@ function paintRecord(recording, stopping) {
   const ending = recordAsked === false || (recordAsked === null && stopping);
   const said = ending ? words.record_stopping : live ? words.record_stop : words.record_start;
   document.getElementById("record-said").textContent = said;
-  document.getElementById("record").title = recordKeys ? `${said} (${recordKeys})` : said;
+  // Ctrl+R in the window (D128); the desktop's own shortcut beside it, which works from anywhere.
+  document.getElementById("record").title = `${said} (${[keysHeld()[0], recordKeys].filter(Boolean).join(" · ")})`;
   document.getElementById("record").classList.toggle("live", live);
   // The name says it too (D89): its dot red and larger while recording, the cut around it following.
   document.querySelector(".brand").classList.toggle("live", live);
@@ -1225,7 +1228,7 @@ function paintRefused(refused) {
 // A first run just ended (D126): its third screen is the empty window, said ready, until a meeting is there.
 let firstRunEnded = false;
 
-function show({ words, folder, sessions, recording, stopping, shortcut, folded, unreadable, refused }) {
+function show({ words, folder, sessions, recording, stopping, shortcut, folded, single_keys, unreadable, refused }) {
   document.documentElement.lang = words.locale;
   // The header's gesture, as the board has it: start or stop, with the shortcut beside.
   // The sidebar's secondary actions: icons, each with its tooltip and its name; the header's one
@@ -1236,6 +1239,12 @@ function show({ words, folder, sessions, recording, stopping, shortcut, folded, 
     button.title = name;
     button.setAttribute("aria-label", name);
   }
+  // D128: Settings' and the recording's own shortcuts, in the tooltip and to a screen reader.
+  const settingsLink = document.getElementById("settings-link");
+  settingsLink.title = `${words.settings} (${keysHeld()[2]})`;
+  settingsLink.setAttribute("aria-keyshortcuts", "Control+Comma");
+  document.getElementById("record").setAttribute("aria-keyshortcuts", "Control+R");
+  singleKeys = single_keys;
   document.getElementById("free-link").hidden = sessions.length === 0;
   // At rest too: the small window is the user's to choose (D35).
   document.getElementById("small-link").hidden = false;
@@ -2482,6 +2491,8 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
   // rich text and as Markdown together, so that a document or a chat keeps its headings and lists, and
   // a plain field takes the Markdown (D109). Without ClipboardItem, the Markdown alone, as before.
   const copy = iconButton("copy", words.copy_minutes, "copy-minutes");
+  copy.title = `${words.copy_minutes} (${keysHeld()[3]})`;
+  copy.setAttribute("aria-keyshortcuts", "Control+Shift+C");
   const copied = element("span", "says copied");
   copied.id = "minutes-copied";
   copied.setAttribute("role", "status");
@@ -3448,8 +3459,37 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   actions.id = "meeting-actions";
   meetingBar = actions;
   const press = (id) => () => document.getElementById(id)?.click();
-  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")]], words,
+  // What an export became, said once in place (#1252): the file's name, or why it could not be written.
+  const shared = element("p", "note");
+  shared.id = "share-said";
+  shared.setAttribute("role", "status");
+  // « Partager »'s exports (D121): the summary alone, as a PDF or Markdown, where the user chooses in the system's
+  // dialog, written by `kitokey-export` (exporting/v1). Nothing when the dialog is closed.
+  const exportTo = (format) => async () => {
+    shared.textContent = "";
+    const to = await window.__TAURI__.core.invoke("export_file_chosen", { name, format }).catch(() => null);
+    if (!to) return;
+    try {
+      await window.__TAURI__.core.invoke("meeting_export", { name, format, to });
+      shared.textContent = fill(words.export_done, to.split(/[\\/]/).pop());
+    } catch (why) {
+      shared.textContent = sentenceOf(String(why));
+    }
+  };
+  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")],
+    ["share-pdf", words.export_pdf, exportTo("pdf")], ["share-md", words.export_md, exportTo("md")]], words,
     { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
+  // A confidential meeting is shared explicitly, and the menu says how (PDR-0007, amended 2026-11-24): its line heard
+  // as the menu's description, never a menu item.
+  if (session.confidential) {
+    const menu = share.querySelector(".menu");
+    const note = element("p", "menu-note");
+    note.append(icon("lock"), element("span", "", words.share_confidential));
+    note.id = "share-confidential";
+    note.setAttribute("role", "none");
+    menu.prepend(note);
+    menu.setAttribute("aria-describedby", note.id);
+  }
   const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
   redo.addEventListener("click", press("redo-minutes"));
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.
@@ -3501,7 +3541,9 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   // bar shows it; at rest, the page's own switch says it.
   if (session.confidential && session.state === "recording") held.prepend(lockedChip(words));
   title.append(named, lasts, held);
-  head.append(title, top);
+  // What an export became, on its own line under the bar (the audit of #1320 against v5): never beside it, where a long
+  // file name would push the bar out of sight.
+  head.append(title, top, shared);
   const said = transcript.state === "present" ? transcript.segments : [];
   const total = session.seconds || said.reduce((end, s) => Math.max(end, s.end), 0) || 1;
   const drawn = element("section", "card drawn");
@@ -4718,6 +4760,21 @@ function showSettings(shown, minutes, words) {
   const remindSaid = element("span", "said");
   remindSaid.append(element("span", "name", words.reminder[0]), element("span", "says", words.reminder[1]));
   remind.append(remindSaid, box);
+  // J, K and « ? » (D128): a single key each, the user's to turn off (WCAG 2.2 SC 2.1.4).
+  const single = element("label", "row");
+  const singleBox = element("input");
+  singleBox.type = "checkbox";
+  singleBox.id = "single-keys";
+  singleBox.setAttribute("role", "switch");
+  singleBox.checked = shown.single_keys;
+  singleBox.disabled = locked;
+  singleBox.addEventListener("change", () => {
+    singleKeys = singleBox.checked;
+    save({ single_keys: singleBox.checked });
+  });
+  const singleSaid = element("span", "said");
+  singleSaid.append(element("span", "name", words.single_keys[0]), element("span", "says", words.single_keys[1]));
+  single.append(singleSaid, singleBox);
   // When another application takes the microphone (D30), as board 4 has it: offer to record,
   // or do nothing.
   const offer = element("div", "row");
@@ -4956,7 +5013,7 @@ function showSettings(shown, minutes, words) {
   checkButton.addEventListener("click", () => checkSound(words, checkButton));
   check.append(checkSaid, checkButton);
   // Outside Windows' package, no startup task: nothing offered (D84).
-  more.append(speaks, looks, remind, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
+  more.append(speaks, looks, remind, single, check, offer, ...(shown.autostart_offered ? [start] : []), keys, redo);
   // What becomes of a recording: where it goes and how long its sound stays, after what is made.
   after.append(where, exporting, keep, sending);
 
@@ -5783,13 +5840,15 @@ function showSmall(words) {
   paintLast = () => {
     const last = recording === false ? lastStopped : null;
     const stage = last && lastStage(last);
-    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open };
+    if (stage) lastShown = { name: last.name, text: fill(stage.said, last.said, stage.why ?? ""), open: !!stage.open, failed: stage.why !== undefined };
     else if (!last || lastShown?.name !== last.name) lastShown = null;
     const text = lastShown?.text ?? "";
     if (lastLive.textContent !== text) lastLive.textContent = text;
     lastSaid.textContent = text;
     lastSaid.title = text;
     lastOpen.hidden = !lastShown?.open;
+    // A failure in two lines (D125): the meeting and its cause read, never cut in their first words.
+    lastLine.classList.toggle("failed", !!lastShown?.failed);
     lastOpen.dataset.name = lastShown?.name ?? "";
     lastLine.hidden = text === "";
   };
@@ -6477,6 +6536,10 @@ async function draw(mine, again) {
   // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
   // overtakes stops at its first answer, and would leave it to be said again.
   if (location.hash !== "#/settings") notSaved = null;
+  // A refused language is said until its meeting's own page is left (#841): dropped by the same rule, before anything
+  // is awaited, or a drawing overtaken there would leave it said on the page come back to (#1306).
+  const pageAsked = location.hash.match(/^#\/meeting\/(.+)$/);
+  if (languageRefused && !(pageAsked && decodeURIComponent(pageAsked[1]) === languageRefused.name)) languageRefused = null;
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
@@ -6490,8 +6553,6 @@ async function draw(mine, again) {
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
   // Its page opened: the bar no longer says the meeting last stopped (D92).
   if (wanted && !document.hidden) window.__TAURI__.core.invoke("meeting_seen", { name }).catch(() => {});
-  // A refused language is said until its meeting's own page is left (#841).
-  if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another meeting shown, or none: its models are read again when it is (D93).
   if (pageOffered && pageOffered.name !== name) pageOffered = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.
@@ -6682,6 +6743,101 @@ document.addEventListener("keydown", (event) => {
   if (typing || narrow.matches || document.getElementById("frame").hidden || document.body.classList.contains("small-window")) return;
   event.preventDefault();
   fold(!document.body.classList.contains("folded"));
+});
+
+// D128a: Kitokey by the keyboard. Ctrl+R records or stops, Ctrl+F reaches the page's search, Ctrl+, opens
+// Settings, Ctrl+Maj+C copies the summary, Échap goes back; J and K the next and the previous meeting, « ? »
+// the sheet that lists them — a single key each, turned off by Settings' « Raccourcis à une touche » (WCAG 2.2
+// SC 2.1.4). None is taken while a field, a dialog or a menu has the keys: what is typed is typed.
+let singleKeys = true;
+// The keys, in the sheet's order (words.keys_does says what each does): Maj and Échap in the user's language.
+const keysHeld = () => ["Ctrl+R", "Ctrl+F", "Ctrl+,", `Ctrl+${words.keys_named[0]}+C`, "Ctrl+B", words.keys_named[1], "J", "K", "?"];
+function keysSheet() {
+  const back = document.activeElement;
+  const sheet = element("dialog", "dialog keys-sheet");
+  sheet.id = "keys-sheet";
+  const title = element("h2", "", words.keys_title);
+  title.id = "keys-sheet-title";
+  sheet.setAttribute("aria-labelledby", title.id);
+  const table = element("table", "keys-table");
+  // Its two columns named (WCAG 2.2 SC 1.3.1): what a screen reader says before each cell.
+  const head = element("thead");
+  const headRow = element("tr");
+  for (const said of words.keys_heads) {
+    const th = element("th", "", said);
+    th.setAttribute("scope", "col");
+    headRow.append(th);
+  }
+  head.append(headRow);
+  table.append(head);
+  for (const [at, keys] of keysHeld().entries()) {
+    const does = words.keys_does[at];
+    const row = element("tr");
+    const held = element("td");
+    held.append(element("kbd", "", keys));
+    row.append(held, element("td", "", does));
+    table.append(row);
+  }
+  const close = element("button", "button secondary", words.keys_close);
+  close.type = "button";
+  const actions = element("div", "actions");
+  actions.append(close);
+  sheet.append(title, table, actions);
+  document.body.append(sheet);
+  const gone = () => {
+    sheet.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus();
+  };
+  close.addEventListener("click", () => sheet.close());
+  sheet.addEventListener("close", gone);
+  // Tab and Shift+Tab round its controls, never onto the <dialog> itself (#1312).
+  roundTheDialog(sheet);
+  sheet.showModal();
+  close.focus();
+}
+document.addEventListener("keydown", (event) => {
+  if (event.altKey || event.isComposing || event.defaultPrevented || document.body.classList.contains("small-window")) return;
+  if (document.getElementById("frame").hidden) return;
+  const typing = event.target.closest?.("textarea, select, [contenteditable], input:not([type=checkbox], [type=radio], [type=button])");
+  // A dialog, a menu open or a panel of the meeting's own keeps its keys (Échap above all).
+  const held = document.querySelector("dialog[open], .menu:not([hidden]), #meeting .redo");
+  if (typing || held) return;
+  const ctrl = event.ctrlKey || event.metaKey;
+  const meeting = !document.getElementById("meeting").hidden;
+  const press = (id) => document.getElementById(id)?.click();
+  const acts = ctrl
+    ? event.shiftKey
+      ? { KeyC: () => meeting && press("copy-minutes") }[event.code]
+      : {
+          KeyR: () => press("record"),
+          Comma: () => (location.hash = "#/settings"),
+          KeyF: () => {
+            const search = meeting ? document.getElementById("search") : null;
+            if (search && !search.hidden) return search.focus();
+            if (document.body.classList.contains("folded")) fold(false);
+            document.getElementById("find").focus();
+          },
+        }[event.code]
+    : event.shiftKey && event.key !== "?"
+      ? undefined
+      : event.key === "Escape"
+        ? location.hash.startsWith("#/settings") || meeting ? () => (history.length > 1 ? history.back() : (location.hash = "#/")) : undefined
+        : !singleKeys
+          ? undefined
+          : event.key === "?"
+            ? keysSheet
+            : { j: 1, k: -1 }[event.key.toLowerCase()] && (() => {
+                const rows = [...document.querySelectorAll("#groups li:not([hidden]) .session")];
+                const at = rows.findIndex((row) => row.getAttribute("href") === location.hash);
+                const next = rows[at < 0 ? 0 : at + { j: 1, k: -1 }[event.key.toLowerCase()]];
+                if (!next) return;
+                next.focus();
+                location.hash = next.getAttribute("href");
+              });
+  if (!acts) return;
+  event.preventDefault();
+  if (event.repeat) return;
+  acts();
 });
 // ↑ and ↓ on the list: the meeting above or below shown in the pane, the focus on its row (D61).
 document.getElementById("groups").addEventListener("keydown", (event) => {

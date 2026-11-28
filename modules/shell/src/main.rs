@@ -439,6 +439,8 @@ fn main() {
             date_google,
             dates_file_chosen,
             dates_ics,
+            export_file_chosen,
+            meeting_export,
             open_logs,
             diagnostic,
             peaks_of,
@@ -1028,6 +1030,8 @@ struct Listing {
     shortcut: Option<String>,
     /// The sidebar folded, as the user left it (D61).
     folded: bool,
+    /// J, K and « ? » taken as shortcuts, as Settings leave them (D128).
+    single_keys: bool,
     /// Every window's look, as the settings hold it (D98): each window takes it when it draws.
     appearance: Appearance,
     /// The meetings' folder is there and cannot be read (D67): `sessions` is empty for that reason.
@@ -1096,6 +1100,7 @@ async fn listed(app: AppHandle) -> Result<Listing, Told> {
             stopping: *shell.stopping.lock().unwrap(),
             shortcut: shell.shortcut.lock().unwrap().clone(),
             folded: shell.settings().folded,
+            single_keys: shell.settings().single_keys,
             appearance: shell.settings().appearance,
             unreadable: {
                 let folder = shell.settings().sessions.clone();
@@ -2626,6 +2631,55 @@ async fn dates_file_chosen(app: AppHandle, name: String) -> Option<PathBuf> {
     chosen.blocking_save_file()?.into_path().ok()
 }
 
+/// Where a meeting's summary is exported (D121), chosen in the system's own dialog, its name the meeting's and its
+/// extension the format's; none when the user closes it. Allowed for a confidential meeting: the user exports it
+/// explicitly, and the file stays on this computer (PDR-0007, amended 2026-11-24).
+#[tauri::command]
+async fn export_file_chosen(app: AppHandle, name: String, format: exporting::Format) -> Option<PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    let folder = sessions::folder(&app.state::<Shell>().settings().sessions, &name)?;
+    let (filter, ext) = match format {
+        exporting::Format::Pdf => ("PDF", "pdf"),
+        exporting::Format::Md => ("Markdown", "md"),
+    };
+    let chosen = app
+        .dialog()
+        .file()
+        .set_file_name(format!("{}.{ext}", named(&folder)))
+        .add_filter(filter, &[ext]);
+    chosen.blocking_save_file()?.into_path().ok()
+}
+
+/// Writes a meeting's summary at `to` as a PDF or Markdown, by `kitokey-export` (`exporting/v1`, D121): the summary
+/// alone, its title the meeting's, in the page's language.
+#[tauri::command]
+fn meeting_export(shell: State<'_, Shell>, name: String, format: exporting::Format, to: PathBuf) -> Result<(), Told> {
+    let folder = session_folder(&shell, &name)?;
+    let language = shell.language();
+    let said = words::exported(language);
+    let meeting = meeting_said(&folder, language);
+    let kept = speakers::read(&folder);
+    let (me, others) = kept.sides(said.me, said.others);
+    let input = exporting::Input {
+        to: &to,
+        name: &meeting,
+        transcript: said.transcript,
+        me,
+        others,
+        time: said.time,
+        speaker: said.speaker,
+        text: said.text,
+        dates: None,
+    };
+    let tag = match language {
+        Language::French => "fr",
+        Language::English => "en",
+    };
+    exporting::file(&program("kitokey-export", "KITOKEY_EXPORT"), &folder, format, tag, &input)
+        .inspect(|()| tracing::info!(format = format.name(), "shell.meeting_exported"))
+        .map_err(|why| shell.told(Failure::ExportNotWritten, why))
+}
+
 /// Writes the ticked dates at `to` as an `.ics`, by `kitokey-export` (`exporting/v1`'s `ics`, D115): each a
 /// whole day, its title and notes as the page shows them, its UID stable for the meeting and the action.
 #[tauri::command]
@@ -2772,6 +2826,8 @@ struct SettingsShown {
     export_said: Option<String>,
     after: After,
     reminder: bool,
+    /// J, K and « ? » taken as shortcuts (D128).
+    single_keys: bool,
     /// A call another application starts is offered to be recorded (D30).
     offer: bool,
     /// Kitokey starts with the user's session (D32): its entry, as the desktop reads it; on
@@ -2870,6 +2926,7 @@ async fn settings_shown(app: AppHandle, shell: State<'_, Shell>) -> Result<Setti
         sessions: settings.sessions,
         after: settings.after,
         reminder: settings.reminder,
+        single_keys: settings.single_keys,
         offer: settings.offer,
         autostart,
         autostart_offered,
@@ -2934,6 +2991,8 @@ struct Change {
     meeting_language: Option<String>,
     /// The sidebar folded or not (D61).
     folded: Option<bool>,
+    /// J, K and « ? » taken as shortcuts or not (D128).
+    single_keys: Option<bool>,
     /// The language Kitokey speaks (D64): `fr`, `en`, or empty for the system's.
     language: Option<String>,
     /// Every window's look (D98).
@@ -3007,6 +3066,9 @@ fn settings_saved(app: AppHandle, shell: State<'_, Shell>, change: Change) -> Re
     }
     if let Some(folded) = change.folded {
         settings.folded = folded;
+    }
+    if let Some(single_keys) = change.single_keys {
+        settings.single_keys = single_keys;
     }
     if let Some(appearance) = change.appearance {
         settings.appearance = appearance;

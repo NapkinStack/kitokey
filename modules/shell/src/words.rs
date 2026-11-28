@@ -634,6 +634,20 @@ pub struct Window {
     /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
     /// characters. Placeholders: none.
     pub meeting_share: &'static str,
+    /// D121, « Partager »'s export of the summary alone as a PDF, written where the user chooses in the system's
+    /// dialog. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most: about 24 characters.
+    /// Placeholders: none.
+    pub export_pdf: &'static str,
+    /// D121, the same export as Markdown. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most:
+    /// about 24 characters. Placeholders: none.
+    pub export_md: &'static str,
+    /// D121, an export written, said once under the bar. Shows: a meeting's page, under its bar of actions. When: the
+    /// file is written. At most: one line. Placeholders: {} the file's name, never its folder.
+    pub export_done: &'static str,
+    /// PDR-0007, amended 2026-11-24: how a confidential meeting is shared, a send asked again, an export kept here.
+    /// Shows: a meeting's page, atop « Partager »'s menu, and its description for a screen reader. When: the meeting
+    /// is confidential. At most: two short lines. Placeholders: none.
+    pub share_confidential: &'static str,
     /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
     /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
     pub meeting_dates: &'static str,
@@ -914,6 +928,26 @@ pub struct Window {
     /// Shows: Settings, « Général », a switch: its name, then its line under it. When: always. At
     /// most: one line for the name, the line wraps. Placeholders: none.
     pub reminder: [&'static str; 2],
+    /// J, K and « ? » as shortcuts, a single key each (D128, WCAG 2.2 SC 2.1.4). Shows: Settings,
+    /// « Général », a switch: its name, then its line under it. When: always. At most: one line for
+    /// the name, the line wraps. Placeholders: none.
+    pub single_keys: [&'static str; 2],
+    /// The sheet of the window's shortcuts (D128), its title. Shows: a dialog opened by « ? ». When:
+    /// asked. At most: about 30 characters. Placeholders: none.
+    pub keys_title: &'static str,
+    /// What each shortcut does, in the sheet's order: Ctrl+R, Ctrl+F, Ctrl+, Ctrl+Maj+C, Ctrl+B, Échap,
+    /// J, K, « ? » (D128). Shows: the sheet, a row each, after its keys. When: asked. At most: one
+    /// line. Placeholders: none.
+    pub keys_does: [&'static str; 9],
+    /// The keys named in the user's language: Shift, then Escape (D128). Shows: the sheet and the
+    /// tooltips, in a shortcut. When: always. At most: 6 characters. Placeholders: none.
+    pub keys_named: [&'static str; 2],
+    /// Closes the sheet (D128). Shows: the sheet, as its button. When: asked. At most: 12
+    /// characters. Placeholders: none.
+    pub keys_close: &'static str,
+    /// The sheet's two column headers: the keys, then what they do (D128, WCAG 2.2 SC 1.3.1). Shows: the
+    /// sheet, atop its table. When: asked. At most: about 10 characters each. Placeholders: none.
+    pub keys_heads: [&'static str; 2],
     /// When an application takes the microphone (D30): its name and line, as board 4 has them.
     /// Shows: Settings, « Général », a list: its name, then its line under it (D30). When: always.
     /// At most: one line for the name, the line wraps. Placeholders: none.
@@ -1372,6 +1406,31 @@ pub struct Window {
     /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
     /// start. At most: about 20 characters. Placeholders: {} the screen's number.
     pub first_step: &'static str,
+    /// The first run's second screen, its title (D126, mock-up v5's screen 1b). Shows: the first run,
+    /// as its heading. When: after the first screen. At most: about 50 characters. Placeholders: none.
+    pub first_sound_title: &'static str,
+    /// Under it: what to do so that the two meters move (D126). Shows: the first run, under its
+    /// heading. When: after the first screen. At most: one line. Placeholders: none.
+    pub first_sound_lead: &'static str,
+    /// What is prepared meanwhile: the engine that hears, downloading (D126). Shows: the first run's
+    /// second screen, above its progress. When: it downloads. At most: about 40 characters.
+    /// Placeholders: none.
+    pub first_getting: &'static str,
+    /// How far it came, before its speed is known (D126). Shows: under the progress. When: it
+    /// downloads. At most: about 25 characters. Placeholders: {} the size come, {} the whole size.
+    pub first_got: &'static str,
+    /// How far it came and how long is left (D126). Shows: under the progress. When: it downloads.
+    /// At most: about 40 characters. Placeholders: {} the size come, {} the whole size, {} the time left.
+    pub first_got_left: &'static str,
+    /// That it comes once (D126), before `welcome_fetch_from`, which says where from and that it is checked.
+    /// Shows: under the progress. When: it downloads. At most: one line. Placeholders: none.
+    pub first_once: &'static str,
+    /// Back to the first screen (D126). Shows: the first run's second screen, as a button. When:
+    /// always there. At most: 12 characters. Placeholders: none.
+    pub first_back: &'static str,
+    /// The sound heard, on to the last screen (D126). Shows: the first run's second screen, as its
+    /// primary button. When: always there. At most: 16 characters. Placeholders: none.
+    pub first_works: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -1513,6 +1572,10 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: current minutes go to trash
     /// once new ones are ready. At most: no limit. Placeholders: none.
     pub redo_note: &'static str,
+    /// The formats a summary is written in (D130): the six built in, in `formats::BUILT_IN`'s order.
+    /// Shows: Redo…'s list of formats, and the summary's line naming its format. When: a built-in
+    /// format is offered or named. At most: about 20 characters. Placeholders: none.
+    pub format_names: [&'static str; 6],
     /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
     /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
     /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
@@ -2171,6 +2234,10 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "More actions",
             meeting_share: "Share",
+            export_pdf: "Export to PDF",
+            export_md: "Export to Markdown",
+            export_done: "Exported: “{}”.",
+            share_confidential: "Confidential: a send asks you first, an export stays on this computer.",
             meeting_dates: "Calendar",
             meeting_redo: "Redo",
             meeting_more: "More",
@@ -2259,6 +2326,25 @@ pub fn window(language: Language) -> Window {
                 "Remind me to tell participants",
                 "When a recording starts, a reminder prompts you to announce it.",
             ],
+            single_keys: [
+                "Single-key shortcuts",
+                "One key to move between meetings (J, K) or to see the shortcuts. Turn them off if voice control sets them off.",
+            ],
+            keys_title: "Keyboard shortcuts",
+            keys_does: [
+                "Record, or stop",
+                "Search in the page",
+                "Open Settings",
+                "Copy the summary",
+                "Fold or unfold the sidebar",
+                "Go back",
+                "Next meeting",
+                "Previous meeting",
+                "Show these shortcuts",
+            ],
+            keys_named: ["Shift", "Esc"],
+            keys_close: "Close",
+            keys_heads: ["Key", "Action"],
             offer: [
                 "When an app uses the microphone",
                 "Usually a call starting. Kitokey never records without you knowing.",
@@ -2421,6 +2507,14 @@ pub fn window(language: Language) -> Window {
             first_later: "I’ll choose later",
             first_next: "Continue",
             first_step: "Step {} of 3",
+            first_sound_title: "Let’s check the sound while everything gets ready.",
+            first_sound_lead: "Say a few words. Both meters should move.",
+            first_getting: "Downloading the listening engine",
+            first_got: "{} of {}",
+            first_got_left: "{} of {} · about {}",
+            first_once: "Only once.",
+            first_back: "Back",
+            first_works: "It works",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2466,6 +2560,7 @@ pub fn window(language: Language) -> Window {
             redo: "Redo…",
             redo_title: "Write the summary again",
             redo_with: "Uses this meeting’s models (choose them under “Advanced”).",
+            format_names: ["General", "One-to-one", "Stand-up", "Client call", "Interview", "Project review"],
             redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
             redo_minutes_do: "Write the summary again with {}",
             redo_transcript_do: "Write the transcript again with {}",
@@ -2728,6 +2823,10 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",
+            export_pdf: "Exporter en PDF",
+            export_md: "Exporter en Markdown",
+            export_done: "Exporté\u{a0}: «\u{a0}{}\u{a0}».",
+            share_confidential: "Confidentielle\u{a0}: un envoi vous est redemandé, un export reste sur cet ordinateur.",
             meeting_dates: "Agenda",
             meeting_redo: "Refaire",
             meeting_more: "Plus",
@@ -2819,6 +2918,25 @@ pub fn window(language: Language) -> Window {
                 "Me rappeler de prévenir les participants",
                 "Au début de chaque enregistrement, un rappel vous invite à annoncer que la réunion est enregistrée.",
             ],
+            single_keys: [
+                "Raccourcis à une touche",
+                "Une seule touche pour passer d’une réunion à l’autre (J, K) ou voir les raccourcis. Coupez-les si la commande vocale les déclenche.",
+            ],
+            keys_title: "Raccourcis clavier",
+            keys_does: [
+                "Enregistrer, ou arrêter",
+                "Rechercher dans la page",
+                "Ouvrir les Réglages",
+                "Copier le compte rendu",
+                "Replier ou déplier la barre latérale",
+                "Revenir en arrière",
+                "Réunion suivante",
+                "Réunion précédente",
+                "Afficher ces raccourcis",
+            ],
+            keys_named: ["Maj", "Échap"],
+            keys_close: "Fermer",
+            keys_heads: ["Touche", "Action"],
             offer: [
                 "Quand une application utilise le micro",
                 "Le plus souvent, un appel qui commence. Kitokey n’enregistre jamais à votre insu.",
@@ -2984,6 +3102,14 @@ pub fn window(language: Language) -> Window {
             first_later: "Je choisirai plus tard",
             first_next: "Continuer",
             first_step: "Étape {} sur 3",
+            first_sound_title: "On vérifie le son pendant que tout se prépare.",
+            first_sound_lead: "Parlez un peu. Les deux jauges doivent bouger.",
+            first_getting: "Téléchargement du moteur d’écoute",
+            first_got: "{} sur {}",
+            first_got_left: "{} sur {} · environ {}",
+            first_once: "Une seule fois.",
+            first_back: "Retour",
+            first_works: "Ça marche",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",
@@ -3032,6 +3158,14 @@ pub fn window(language: Language) -> Window {
             redo: "Refaire…",
             redo_title: "Refaire le compte rendu",
             redo_with: "Refait avec les modèles de cette réunion (à choisir dans «\u{a0}Avancé\u{a0}»).",
+            format_names: [
+                "Général",
+                "Point individuel",
+                "Point d’équipe",
+                "Appel client",
+                "Entretien",
+                "Revue de projet",
+            ],
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_minutes_do: "Refaire le compte rendu avec {}",
             redo_transcript_do: "Refaire la transcription avec {}",
@@ -3296,6 +3430,8 @@ pub enum Failure {
     FolderNotOpened,
     LinkNotOpened,
     DatesNotSaved,
+    /// A meeting exported (D121): the file not written where the user chose.
+    ExportNotWritten,
     KeyboardSettings,
     Keyring,
     ProgramNotStarted,
@@ -3384,6 +3520,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
         (Failure::DatesNotSaved, English) => "the calendar file wasn’t written. Choose another folder, then try again.",
         (Failure::DatesNotSaved, French) => "le fichier d’agenda n’a pas pu être écrit. Choisissez un autre dossier, puis réessayez.",
+        (Failure::ExportNotWritten, English) => "the file couldn’t be written. Choose another folder, or free some space, then try again.",
+        (Failure::ExportNotWritten, French) => "le fichier n’a pas pu être écrit. Choisissez un autre dossier, ou libérez de la place, puis réessayez.",
         (Failure::LinkNotOpened, English) => "Couldn’t open your browser. Save the dates as a calendar file instead.",
         (Failure::LinkNotOpened, French) => "Impossible d’ouvrir le navigateur. Enregistrez plutôt les dates dans un fichier d’agenda.",
         (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",
