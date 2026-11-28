@@ -50,4 +50,5 @@ Puts Kitokey's four steps in the user's hands: a tray, a global shortcut, notifi
 
 ## Non-standard commands
 
+- `KITOKEY_SPEED=<runs> bash scripts/headless.sh`: Kitokey's speed on its release build, in a session of its own (`scripts/speed.sh`, `scripts/speed.py`, D105) — the start to the first contentful paint, the memory at rest, a meeting of an hour's page opened, each the median of its runs, written to `.evidence/speed.json` with the commit and the machine. Run alone on the machine: what runs beside it is measured with it.
 - `KITOKEY_E2E_ONLY=<scenario>[,…] bash scripts/headless.sh`: the window's e2e scenarios named, by their function in `scripts/e2e_window.py`, played alone (`scripts/e2e_only.py`, as pytest's `-k`); the tray's and `main()`'s own are not. A red check is replayed so before a pull request is blamed for it. A name `main()` does not call is refused before anything is built or started; a blank value is a full run. Such a run says « partial run » first and last, and never exits 0: it is never the module's e2e.
