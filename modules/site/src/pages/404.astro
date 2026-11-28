@@ -6,7 +6,7 @@ import { say } from "../lib/words.mjs";
 const [frTitle, frSaid, frHome] = say("lost", "fr");
 const [enTitle, enSaid, enHome] = say("lost", "en");
 ---
-<Page lang="fr" title={`${frTitle} · ${enTitle} · Kitokey`} description={frSaid} path="" kind="wrap lost-page">
+<Page lang="fr" title={`${frTitle} · ${enTitle} · Kitokey`} description={frSaid} path="" kind="wrap lost-page" indexed={false}>
   <div class="lost" lang="fr"><h1>{frTitle}</h1><p>{frSaid}</p><a class="home" href="/fr/">{frHome}</a></div>
   <div class="lost" lang="en"><p class="lost-h">{enTitle}</p><p>{enSaid}</p><a class="home" href="/en/">{enHome}</a></div>
 </Page>

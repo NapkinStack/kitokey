@@ -928,6 +928,26 @@ pub struct Window {
     /// Shows: Settings, « Général », a switch: its name, then its line under it. When: always. At
     /// most: one line for the name, the line wraps. Placeholders: none.
     pub reminder: [&'static str; 2],
+    /// J, K and « ? » as shortcuts, a single key each (D128, WCAG 2.2 SC 2.1.4). Shows: Settings,
+    /// « Général », a switch: its name, then its line under it. When: always. At most: one line for
+    /// the name, the line wraps. Placeholders: none.
+    pub single_keys: [&'static str; 2],
+    /// The sheet of the window's shortcuts (D128), its title. Shows: a dialog opened by « ? ». When:
+    /// asked. At most: about 30 characters. Placeholders: none.
+    pub keys_title: &'static str,
+    /// What each shortcut does, in the sheet's order: Ctrl+R, Ctrl+F, Ctrl+, Ctrl+Maj+C, Ctrl+B, Échap,
+    /// J, K, « ? » (D128). Shows: the sheet, a row each, after its keys. When: asked. At most: one
+    /// line. Placeholders: none.
+    pub keys_does: [&'static str; 9],
+    /// The keys named in the user's language: Shift, then Escape (D128). Shows: the sheet and the
+    /// tooltips, in a shortcut. When: always. At most: 6 characters. Placeholders: none.
+    pub keys_named: [&'static str; 2],
+    /// Closes the sheet (D128). Shows: the sheet, as its button. When: asked. At most: 12
+    /// characters. Placeholders: none.
+    pub keys_close: &'static str,
+    /// The sheet's two column headers: the keys, then what they do (D128, WCAG 2.2 SC 1.3.1). Shows: the
+    /// sheet, atop its table. When: asked. At most: about 10 characters each. Placeholders: none.
+    pub keys_heads: [&'static str; 2],
     /// When an application takes the microphone (D30): its name and line, as board 4 has them.
     /// Shows: Settings, « Général », a list: its name, then its line under it (D30). When: always.
     /// At most: one line for the name, the line wraps. Placeholders: none.
@@ -1552,6 +1572,10 @@ pub struct Window {
     /// Shows: a meeting's page, its Redo… panel, as a help line. When: current minutes go to trash
     /// once new ones are ready. At most: no limit. Placeholders: none.
     pub redo_note: &'static str,
+    /// The formats a summary is written in (D130): the six built in, in `formats::BUILT_IN`'s order.
+    /// Shows: Redo…'s list of formats, and the summary's line naming its format. When: a built-in
+    /// format is offered or named. At most: about 20 characters. Placeholders: none.
+    pub format_names: [&'static str; 6],
     /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
     /// (D96): « Refaire le compte rendu avec Qwen3 14b ». When: a summary model is known, the meeting's,
     /// the one chosen in « Avancé » or Settings'; else `redo_title`. At most: wraps inside the panel.
@@ -2302,6 +2326,25 @@ pub fn window(language: Language) -> Window {
                 "Remind me to tell participants",
                 "When a recording starts, a reminder prompts you to announce it.",
             ],
+            single_keys: [
+                "Single-key shortcuts",
+                "One key to move between meetings (J, K) or to see the shortcuts. Turn them off if voice control sets them off.",
+            ],
+            keys_title: "Keyboard shortcuts",
+            keys_does: [
+                "Record, or stop",
+                "Search in the page",
+                "Open Settings",
+                "Copy the summary",
+                "Fold or unfold the sidebar",
+                "Go back",
+                "Next meeting",
+                "Previous meeting",
+                "Show these shortcuts",
+            ],
+            keys_named: ["Shift", "Esc"],
+            keys_close: "Close",
+            keys_heads: ["Key", "Action"],
             offer: [
                 "When an app uses the microphone",
                 "Usually a call starting. Kitokey never records without you knowing.",
@@ -2517,6 +2560,7 @@ pub fn window(language: Language) -> Window {
             redo: "Redo…",
             redo_title: "Write the summary again",
             redo_with: "Uses this meeting’s models (choose them under “Advanced”).",
+            format_names: ["General", "One-to-one", "Stand-up", "Client call", "Interview", "Project review"],
             redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
             redo_minutes_do: "Write the summary again with {}",
             redo_transcript_do: "Write the transcript again with {}",
@@ -2874,6 +2918,25 @@ pub fn window(language: Language) -> Window {
                 "Me rappeler de prévenir les participants",
                 "Au début de chaque enregistrement, un rappel vous invite à annoncer que la réunion est enregistrée.",
             ],
+            single_keys: [
+                "Raccourcis à une touche",
+                "Une seule touche pour passer d’une réunion à l’autre (J, K) ou voir les raccourcis. Coupez-les si la commande vocale les déclenche.",
+            ],
+            keys_title: "Raccourcis clavier",
+            keys_does: [
+                "Enregistrer, ou arrêter",
+                "Rechercher dans la page",
+                "Ouvrir les Réglages",
+                "Copier le compte rendu",
+                "Replier ou déplier la barre latérale",
+                "Revenir en arrière",
+                "Réunion suivante",
+                "Réunion précédente",
+                "Afficher ces raccourcis",
+            ],
+            keys_named: ["Maj", "Échap"],
+            keys_close: "Fermer",
+            keys_heads: ["Touche", "Action"],
             offer: [
                 "Quand une application utilise le micro",
                 "Le plus souvent, un appel qui commence. Kitokey n’enregistre jamais à votre insu.",
@@ -3095,6 +3158,14 @@ pub fn window(language: Language) -> Window {
             redo: "Refaire…",
             redo_title: "Refaire le compte rendu",
             redo_with: "Refait avec les modèles de cette réunion (à choisir dans «\u{a0}Avancé\u{a0}»).",
+            format_names: [
+                "Général",
+                "Point individuel",
+                "Point d’équipe",
+                "Appel client",
+                "Entretien",
+                "Revue de projet",
+            ],
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_minutes_do: "Refaire le compte rendu avec {}",
             redo_transcript_do: "Refaire la transcription avec {}",
