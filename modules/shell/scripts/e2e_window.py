@@ -10541,7 +10541,8 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             time.sleep(0.3)
             held = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
             browser.execute_script("window.release()")
-            said = wait_for(browser, lambda b: b.execute_script("const w = document.querySelector('dialog[open] .note.warn'); return w && !w.hidden && w.textContent"), 3)
+            refusal = "const w = document.querySelector('dialog[open] .note.warn'); return w && !w.hidden && w.textContent"
+            said = wait_for(browser, lambda b: b.execute_script(refusal), 3) and browser.execute_script(refusal)  # the text, not wait_for's True
             back = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
             check("asked, Escape keeps the dialog and its buttons wait; refused, « Non refait » said in it, its buttons back, nothing made",
                   held == [True, True] and bool(said) and "refusé pour l’essai" in (said or "") and back == [False, False]
