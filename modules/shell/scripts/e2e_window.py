@@ -10097,8 +10097,8 @@ def dates_mentioned(now: dt.datetime) -> None:
             check(f"{language}: no date named, « {opens} » not offered", not browser.execute_script(offered), browser.execute_script(offered))
             # Confidential (PDR-0007 §4, amended 2026-11-24): the link offered, asked again in one plain sentence
             # saying what leaves; nothing opens before the confirmation — nor by a call the page did not confirm.
-            asked = {"fr": "Cette réunion est confidentielle\u00a0: ses échéances, avec la phrase où chacune a été dite, vont quitter cet ordinateur pour Google Agenda.",
-                     "en": "This meeting is confidential: its dates, each with the words it was said in, will leave this computer for Google Calendar."}[language[:2]]
+            asked = {"fr": "Cette réunion est confidentielle\u00a0: ses échéances, avec la phrase où chacune a été dite, la personne concernée et le titre de la réunion, vont quitter cet ordinateur pour Google Agenda.",
+                     "en": "This meeting is confidential: its dates, each with the words it was said in, the person it concerns and the meeting’s title, will leave this computer for Google Calendar."}[language[:2]]
             (folder / "confidential").write_bytes(b"")
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script(offered), 10)
