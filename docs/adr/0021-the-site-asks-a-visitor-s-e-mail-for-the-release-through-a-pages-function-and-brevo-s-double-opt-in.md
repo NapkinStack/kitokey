@@ -111,8 +111,9 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   documentation does not say what it keeps of an address created through the API and never confirmed, nor does it
   delete a list's contacts after a time. **The decider holds these bounds by hand**, each quarter (the decider,
   2026-11-28: few sign-ups are expected before the launch; the coordinator keeps the reminder). The promise rests on
-  the run's cutoffs (the coordinator, 2026-11-28): each run deletes every unconfirmed address older than 30 days, the
-  confirmation link's life, so at worst about 122 days after the request, within 4 months; and every sign-up whose
+  the run's cutoffs (the coordinator, 2026-11-28): each run deletes every unconfirmed address older than 28 days, within
+  the confirmation link's 30, so at worst 28 days plus a quarter of at most 92, 120 days after the request, which no
+  4 months fall short of, February included (nora's remark); and every sign-up whose
   mark is more than 9 months old, so at worst 12 months. `/notify` marks the
   contact `NOTIFY_SINCE`, a text attribute, the day it asked: in Brevo, a filter on it finds this form's sign-ups
   alone, never a contact of the account's other uses (step 7). A contact who withdrew by the link stays on Brevo's
@@ -166,7 +167,7 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
    Pages project, production only.
 6. A rate limiting rule on the path `/notify` in Cloudflare's WAF.
-7. Each quarter, by hand: delete the contacts marked `NOTIFY_SINCE` more than 30 days ago that are not in the list
+7. Each quarter, by hand: delete the contacts marked `NOTIFY_SINCE` more than 28 days ago that are not in the list
    (unconfirmed), and the list's contacts marked more than 9 months ago. At the release: the one campaign, then the
    list and its contacts deleted the same day.
 
