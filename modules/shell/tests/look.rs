@@ -504,14 +504,13 @@ fn rules(style: &str) -> Vec<(String, String)> {
 
 /// What draws a recording, the one use of the red (D89): the header's button and the name's dot while it
 /// records, a row's live chip, the bar's ● and ■, its handle's dot while it records (D90).
-const RECORDING: [&str; 7] = [
+const RECORDING: [&str; 6] = [
     ".brand.live #name-dot",
     ".chip.live",
     ".act .primary.live",
     "#small .handle.live .dot",
     "#small .record",
     "#small .record .record-dot",
-    ".danger",
 ];
 
 /// CSS Color 4's named colours, its table of 148 (https://www.w3.org/TR/css-color-4/#named-colors):
@@ -718,11 +717,8 @@ fn the_dark_chosen_in_settings_is_the_systems_dark() {
 fn red_says_a_recording_and_nothing_else() {
     assert_eq!(red_outside_a_recording(STYLE), Vec::<String>::new());
     assert_eq!(colours_in_page(PAGE), Vec::<String>::new());
-    assert_eq!(
-        PAGE.matches("\"danger\"").count(),
-        1,
-        "the red button is the small window's Arrêter alone"
-    );
+    // ■ neutral (D125, the decider's Round 4): no red button; a recording's red is its live dot.
+    assert_eq!(PAGE.matches("\"danger\"").count(), 0, "no red button");
     // The red written out on a failure's border, named, or by its function, is refused as the token is.
     for red in [
         "#C2352D",
@@ -776,13 +772,12 @@ fn red_says_a_recording_and_nothing_else() {
 /// The controls of the window and Settings (D89): 32 px high; the small window's are D90's. A
 /// meeting's settings row and its « Plus d’actions » menu, board 4's. Each must be found, so that
 /// none leaves the scan below by a renamed rule.
-const CONTROLS: [&str; 12] = [
+const CONTROLS: [&str; 11] = [
     ".open, .search",
     "select",
     ".picks input",
     ".field input",
     ".primary",
-    ".danger",
     ".act .primary",
     ".sidebar .act .primary",
     ".icon-button",
@@ -793,7 +788,7 @@ const CONTROLS: [&str; 12] = [
 
 /// What makes a rule a control's: an element a user presses or types in, or a class or id the page
 /// gives one. A rule whose selector ends on one of them and sets a height sets 32 px.
-const CONTROL_PARTS: [&str; 21] = [
+const CONTROL_PARTS: [&str; 20] = [
     "input",
     "select",
     "textarea",
@@ -801,7 +796,6 @@ const CONTROL_PARTS: [&str; 21] = [
     ".open",
     ".search",
     ".primary",
-    ".danger",
     ".icon-button",
     ".edit",
     ".correcting",
@@ -819,8 +813,10 @@ const CONTROL_PARTS: [&str; 21] = [
 
 /// The heights a control keeps under 32 px, each with its reason: a box to tick, a switch's track
 /// inside its setting, a time in a line of text that is a link and no button.
-const SMALLER: [(&str, f64); 6] = [
+const SMALLER: [(&str, f64); 7] = [
     (".choice input, .row input[type=\"checkbox\"]", 20.0),
+    // A card's radio, drawn by the design system at the window's box size (#1310): the card is its target.
+    (".engine-card input, .option-card input", 20.0),
     // A switch's track, inside its 32 px setting.
     (".setting input[type=\"checkbox\"]", 20.0),
     (".remember input", 20.0),
@@ -1283,7 +1279,7 @@ fn each_older_name_keeps_the_value_it_had() {
 }
 
 /// D120's roles (PDR-0008; the v5 mock-up the decider accepted on 2026-11-26), each in both themes.
-const ROLES: [&str; 25] = [
+const ROLES: [&str; 26] = [
     "--color-canvas",
     "--color-surface",
     "--color-sunken",
@@ -1302,6 +1298,7 @@ const ROLES: [&str; 25] = [
     "--color-success",
     "--color-warning",
     "--color-warning-ground",
+    "--color-success-ground",
     "--color-record",
     "--color-destructive",
     "--color-on-destructive",
@@ -1313,7 +1310,7 @@ const ROLES: [&str; 25] = [
 
 /// Each pair a component draws, and its threshold (WCAG 2.2): words 4.5:1 (1.4.3); an edge, a voice's
 /// trace, a recording's dot, the focus ring 3:1 (1.4.11).
-const ROLE_PAIRS: [(&str, &str, f64); 33] = [
+const ROLE_PAIRS: [(&str, &str, f64); 36] = [
     ("--color-text", "--color-canvas", 4.5),
     ("--color-text", "--color-surface", 4.5),
     ("--color-text", "--color-raised", 4.5),
@@ -1336,11 +1333,16 @@ const ROLE_PAIRS: [(&str, &str, f64); 33] = [
     ("--color-on-accent", "--color-accent-hover", 4.5),
     ("--color-on-destructive", "--color-destructive", 4.5),
     ("--color-success", "--color-surface", 4.5),
+    // A chip's words on its ground (D120 2b): success on its own, the neutral one's soft text on the sunken ground.
+    ("--color-success", "--color-success-ground", 4.5),
+    ("--color-text-soft", "--color-sunken", 4.5),
     ("--color-warning", "--color-warning-ground", 4.5),
     ("--color-private", "--color-private-ground", 4.5),
     ("--color-private", "--color-surface", 4.5),
     ("--color-edge", "--color-surface", 3.0),
     ("--color-edge", "--color-canvas", 3.0),
+    // A neutral chip on a chosen card, its ground the card's tint: edged so that it stands out (#1312's audit).
+    ("--color-edge", "--color-tint", 3.0),
     ("--color-accent", "--color-canvas", 3.0),
     ("--color-record", "--color-surface", 3.0),
     ("--color-voice-you", "--color-surface", 3.0),
@@ -1406,7 +1408,16 @@ fn read_outside_the_roles(style: &str) -> Vec<String> {
 
 #[test]
 fn a_component_reads_roles_and_scales_alone() {
-    for drawn in [".button", ".banner", ".dialog", ".engine-card"] {
+    for drawn in [
+        ".button",
+        ".banner",
+        ".dialog",
+        ".engine-card",
+        ".chip",
+        ".option-card",
+        ".progress",
+        ".toast",
+    ] {
         assert!(
             rules(COMPONENTS).iter().any(|(selector, _)| selector.starts_with(drawn)),
             "{drawn} is not drawn"
@@ -1433,4 +1444,240 @@ fn a_components_red_is_a_recording_or_a_deletion() {
         }
     }
     assert_eq!(found, Vec::<String>::new());
+}
+
+/// The rules whose selector list names `one`, an `:is(…)` read as the list it holds: each body, in order. A rule
+/// inside `@media` holds only when its query does: it is left out.
+fn bodies_of(style: &str, one: &str) -> Vec<String> {
+    rules(style)
+        .into_iter()
+        .filter(|(selectors, _)| {
+            !selectors.contains('@')
+                && selectors
+                    .replace(":is(", "")
+                    .replace(')', "")
+                    .split(',')
+                    .any(|part| part.trim() == one)
+        })
+        .map(|(_, body)| body)
+        .collect()
+}
+
+/// What the last of those rules gives `name`.
+fn given(style: &str, one: &str, name: &str) -> Option<String> {
+    bodies_of(style, one)
+        .iter()
+        .filter_map(|body| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .rfind(|(key, _)| key.trim() == name)
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .next_back()
+}
+
+/// D120 2b: a chip in five tones — neutral, accent, success, private, warning —, its words on its own ground,
+/// 4.5:1 in both themes (WCAG 2.2, 1.4.3): v5's success on a 14 % tint was 4.46:1 in the light theme, so its
+/// ground is a primitive, the same in every place it is laid. The window's older chips (`.chip.live`, `.gone`…)
+/// keep window.css's: a tone is what makes a chip the design system's.
+#[test]
+fn a_chip_says_its_tone_and_its_words_read_on_it() {
+    let themes = themes(STYLE);
+    let mut below = Vec::new();
+    for tone in ["neutral", "accent", "success", "private", "warning"] {
+        let chip = format!(".chip.{tone}");
+        let text = given(COMPONENTS, &chip, "color").unwrap_or_else(|| panic!("{chip}: no colour"));
+        let ground = given(COMPONENTS, &chip, "background").unwrap_or_else(|| panic!("{chip}: no ground"));
+        for (index, theme) in themes.iter().enumerate() {
+            let (Some(a), Some(b)) = (value(&text, theme), value(&ground, theme)) else {
+                below.push(format!("theme {index}, {chip}: {text} on {ground} cannot be read"));
+                continue;
+            };
+            let ratio = contrast(a, b);
+            if ratio < 4.5 {
+                below.push(format!("theme {index}, {chip}: {ratio:.2}"));
+            }
+        }
+    }
+    assert_eq!(below, Vec::<String>::new());
+    // Each tone its own words and ground: a tone that reads well in another's colour says the wrong thing (sam's
+    // mutant L5 on #1312, the warning in --color-text-faint).
+    for (tone, words, ground) in [
+        ("neutral", "--color-text-soft", "--color-sunken"),
+        ("accent", "--color-accent", "--color-tint"),
+        ("success", "--color-success", "--color-success-ground"),
+        ("private", "--color-private", "--color-private-ground"),
+        ("warning", "--color-warning", "--color-warning-ground"),
+    ] {
+        let chip = format!(".chip.{tone}");
+        assert_eq!(given(COMPONENTS, &chip, "color"), Some(format!("var({words})")), "{chip}");
+        assert_eq!(given(COMPONENTS, &chip, "background"), Some(format!("var({ground})")), "{chip}");
+    }
+    // The older chips are not the design system's: no rule of components.css names `.chip` alone.
+    assert!(
+        bodies_of(COMPONENTS, ".chip").is_empty(),
+        "components.css restyles the window's older chips"
+    );
+}
+
+/// D120 2b, after v5's `.ico`: a button's icon and a banner's drawn at a 1.75 stroke; window.css's `.glyph` stays at 2
+/// until each screen comes over. A button pressed sinks by a pixel; an engine card's edge is 1.5 px.
+#[test]
+fn an_icon_is_drawn_at_its_stroke_a_press_sinks_a_card_is_edged() {
+    assert_eq!(given(COMPONENTS, ".button svg", "stroke-width").as_deref(), Some("1.75"));
+    let banner = rules(COMPONENTS)
+        .into_iter()
+        .filter(|(selector, _)| selector.contains(".banner.info") && selector.ends_with("> svg"))
+        .find_map(|(_, body)| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .rfind(|(key, _)| key.trim() == "stroke-width")
+                .map(|(_, value)| value.trim().to_string())
+        });
+    assert_eq!(banner.as_deref(), Some("1.75"));
+    assert_eq!(given(COMPONENTS, ".button:active", "transform").as_deref(), Some("translateY(1px)"));
+    // A disabled button does not sink: it cannot be pressed (sam's mutant L6 on #1312).
+    assert_eq!(given(COMPONENTS, ".button[disabled]:active", "transform").as_deref(), Some("none"));
+    assert!(
+        given(COMPONENTS, ".engine-card", "border").is_some_and(|border| border.starts_with("1.5px solid")),
+        "{:?}",
+        given(COMPONENTS, ".engine-card", "border")
+    );
+}
+
+/// D120 2b: a dialog pops in (`--d-slow`) and a toast (`--d-base`), both scaling from .98 with the ease out, and
+/// neither moves for who asked the system for less motion (WCAG 2.2, 2.3.3). No spring: nothing overshoots.
+#[test]
+fn a_dialog_and_a_toast_pop_and_not_for_who_asked_for_less_motion() {
+    let style = without_css_comments(COMPONENTS);
+    assert_eq!(
+        given(COMPONENTS, ".dialog", "animation").as_deref(),
+        Some("pop var(--d-slow) var(--ease-out)")
+    );
+    assert_eq!(
+        given(COMPONENTS, ".toast", "animation").as_deref(),
+        Some("pop var(--d-base) var(--ease-out)")
+    );
+    assert!(
+        style.contains("@keyframes pop { from { transform: scale(.98); opacity: 0; } }"),
+        "the pop"
+    );
+    assert!(
+        style.contains("@media (prefers-reduced-motion: reduce) { .dialog, .toast { animation: none; } }"),
+        "less motion"
+    );
+    assert!(!STYLE.contains("--ease-spring"), "a spring overshoots");
+}
+
+/// #1310: a card's radio is drawn by the design system, not by the platform, whose unchecked ring WebKitGTK draws at
+/// 1.57:1 in light and 1.84:1 in dark. Its ring is the edge role, which ROLE_PAIRS holds at 3:1 on the surface
+/// (WCAG 2.2 SC 1.4.11); checked, the accent's ring and dot.
+#[test]
+fn a_cards_radio_is_ringed_in_the_edge_role() {
+    for one in [".engine-card input", ".option-card input"] {
+        assert_eq!(given(COMPONENTS, one, "appearance").as_deref(), Some("none"), "{one}");
+        assert_eq!(given(COMPONENTS, one, "-webkit-appearance").as_deref(), Some("none"), "{one}");
+        let border = given(COMPONENTS, one, "border").unwrap_or_default();
+        assert!(border.ends_with("solid var(--color-edge)"), "{one}: {border}");
+        let checked = format!("{one}:checked");
+        assert_eq!(
+            given(COMPONENTS, &checked, "border-color").as_deref(),
+            Some("var(--color-accent)"),
+            "{checked}"
+        );
+        let dot = given(COMPONENTS, &checked, "background").unwrap_or_default();
+        assert!(dot.contains("var(--color-accent)"), "{checked}: {dot}");
+    }
+    assert!(ROLE_PAIRS.contains(&("--color-edge", "--color-surface", 3.0)));
+}
+
+/// #1312's audit against mock-up v5: a component's class may share a name with one of window.css's global rules —
+/// the window's own, until its screens come over — only if the component sets again each property that rule sets:
+/// `.progress .label` took window.css's `.label` capitals and letter-spacing. The chip's icon at 16 px, as v5's
+/// `.ico`; the toast 72 px above the window's foot, as v5 sets it, clear of a bar of actions there; a card's radio
+/// centred on its name's line; a neutral chip on a chosen card edged in the edge role.
+#[test]
+fn a_component_takes_no_global_class_and_sits_as_v5_sets_it() {
+    let names = |body: &str| -> Vec<String> {
+        body.split(';')
+            .filter_map(|part| part.split_once(':'))
+            .map(|(key, _)| key.trim().to_string())
+            .collect()
+    };
+    let component = rules(COMPONENTS);
+    let mut leaks = vec![];
+    for (selectors, body) in rules(OUTSIDE) {
+        for one in selectors.split(',').map(str::trim) {
+            if !(one.starts_with('.') && one[1..].chars().all(|c| c.is_ascii_alphanumeric() || c == '-')) {
+                continue;
+            }
+            let wearing: Vec<&(String, String)> = component
+                .iter()
+                .filter(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .any(|part| part.split('.').skip(1).any(|class| format!(".{class}") == one))
+                })
+                .collect();
+            if wearing.is_empty() {
+                continue;
+            }
+            // The classes it is worn with in one compound (`.button.primary`): their rules apply to it too.
+            let with: Vec<String> = wearing
+                .iter()
+                .flat_map(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .filter(|compound| compound.split('.').skip(1).any(|class| format!(".{class}") == one))
+                        .flat_map(|compound| compound.split('.').skip(1).map(|class| format!(".{class}")).collect::<Vec<_>>())
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let set: Vec<String> = component
+                .iter()
+                .filter(|(theirs, _)| {
+                    theirs
+                        .split(|c: char| !(c.is_ascii_alphanumeric() || c == '-' || c == '.'))
+                        .any(|compound| {
+                            let classes: Vec<String> = compound.split('.').skip(1).map(|class| format!(".{class}")).collect();
+                            !classes.is_empty() && classes.iter().all(|class| with.contains(class))
+                        })
+                })
+                .flat_map(|(_, theirs)| names(theirs))
+                .collect();
+            let set_again = |name: &String| {
+                set.contains(name)
+                    || (name.starts_with("font-") && set.iter().any(|s| s == "font"))
+                    || (name.starts_with("padding") && set.iter().any(|s| s == "padding"))
+                    || (name.starts_with("margin") && set.iter().any(|s| s == "margin"))
+                    || (name == "min-height" && set.iter().any(|s| s == "height"))
+            };
+            leaks.extend(
+                names(&body)
+                    .into_iter()
+                    .filter(|name| !set_again(name))
+                    .map(|name| format!("{one} {name}")),
+            );
+        }
+    }
+    assert_eq!(leaks, Vec::<String>::new());
+    assert_eq!(given(COMPONENTS, ".chip.warning > svg", "width").as_deref(), Some("16px"));
+    assert_eq!(given(COMPONENTS, ".chip.warning > svg", "height").as_deref(), Some("16px"));
+    assert_eq!(
+        given(COMPONENTS, ".toast", "bottom").as_deref(),
+        Some("calc(var(--sp-8) * 2 + var(--sp-2))")
+    );
+    assert_eq!(given(COMPONENTS, ".engine-card input", "align-self").as_deref(), Some("center"));
+    // Read by its selector as written: `bodies_of` unfolds `:is()`, which would cut `:has()`.
+    let edged = rules(COMPONENTS)
+        .into_iter()
+        .find(|(selector, _)| selector == ".engine-card:has(input:checked) .chip.neutral")
+        .and_then(|(_, body)| {
+            body.split(';')
+                .filter_map(|part| part.split_once(':'))
+                .find(|(key, _)| key.trim() == "outline")
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .unwrap_or_default();
+    assert!(edged.ends_with("solid var(--color-edge)"), "{edged}");
 }

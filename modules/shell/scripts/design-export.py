@@ -17,6 +17,7 @@ named is the one the export is made from (`HEAD`), its date the date written: th
 """
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -46,6 +47,7 @@ USAGE = {
     "color-accent-hover": "The primary action under the pointer.",
     "color-on-accent": "Words on the accent.",
     "color-success": "Ready, sent, saved: success alone, never a voice.",
+    "color-success-ground": "A success chip's ground, opaque: its words keep 4.5:1 on any page.",
     "color-warning": "A warning's icon and words.",
     "color-warning-ground": "A warning's ground.",
     "color-record": "A recording: its live dot. Red says a recording or a deletion, nothing else.",
@@ -146,7 +148,7 @@ def tokens(css: str) -> dict:
                             "usage": USAGE[name]})
         elif re.fullmatch(r"e\d", name):
             shadows.append({"name": name, "value": {"light": shadow_of(value), "dark": shadow_of(dark[name])},
-                            "usage": "An elevation: e1 a card, e3 a dialog."})
+                            "usage": "An elevation: e1 a card, e2 a toast, e3 a dialog."})
         elif name.startswith("font-"):
             families[name[len("font-"):]] = expand(value, light)
         elif family := next((family for start, family in prefix.items() if name.startswith(start)), None):
@@ -237,6 +239,20 @@ The window's older names (`--ground`, `--ink`, `--soft`…), which no component 
 over to the components (cycle 12, D121 to D125).
 """
 
+# Lucide's icons the previews draw (ISC, `ui/LUCIDE-LICENSE`), as the page draws them: no file fetched.
+def svg(*shapes: str) -> str:
+    return ('<svg viewBox="0 0 24 24" aria-hidden="true">' + "".join(
+        shape if shape.startswith("<") else f'<path d="{shape}"/>' for shape in shapes) + "</svg>")
+
+
+INFO = svg('<circle cx="12" cy="12" r="10"/>', "M12 16v-4", "M12 8h.01")
+LOCK = svg('<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>', "M7 11V7a5 5 0 0 1 10 0v4")
+ALERT = svg("m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3", "M12 9v4", "M12 17h.01")
+CHECK = svg("M20 6 9 17l-5-5")
+DRIVE = svg("M10 16h.01", "M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z", "M21.946 12.013H2.054", "M6 16h.01")
+GLOBE = svg('<circle cx="12" cy="12" r="10"/>', "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", "M2 12h20")
+FILE = svg("M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8")
+
 COMPONENTS = {
     "Button": ("Buttons", 150, """A button does one thing, said in its words. Primary for the one action a view is for; secondary on
 the surface; ghost, words alone; icon, a square whose name is in `aria-label` and its tooltip; destructive for a
@@ -251,9 +267,9 @@ deletion, red (`color-destructive`), always confirmed in a dialog whose « Annul
     "Banner": ("Feedback", 210, """A banner says what holds for the whole page, with its icon: information (`color-tint`), « Confidentielle »
 (`color-private-ground`, the lock), a warning (`color-warning-ground`). Never red. It always carries its tone class.
 """, """<div style="display:grid;gap:12px;padding:16px;background:var(--color-canvas)">
-  <div class="banner info"><p>Vous pourrez la restaurer depuis la corbeille de votre système.</p></div>
-  <div class="banner private"><p>Rien ne quitte cet ordinateur</p></div>
-  <div class="banner warning"><p>Rédigé par une IA : relisez-le avant de le partager.</p></div>
+  <div class="banner info">""" + INFO + """<p>Vous pourrez la restaurer depuis la corbeille de votre système.</p></div>
+  <div class="banner private">""" + LOCK + """<p>Rien ne quitte cet ordinateur</p></div>
+  <div class="banner warning">""" + ALERT + """<p>Rédigé par une IA : relisez-le avant de le partager.</p></div>
 </div>"""),
     "Dialog": ("Overlays", 250, """A dialog asks one question: the platform's modal `<dialog>`, its title in the titles' face, the safe
 answer first and focused, Escape answering no, the focus back where it was. A deletion's answer is destructive.
@@ -269,10 +285,42 @@ state (ready, to download, to install, a key missing), its details folded. A gro
 legend names the job. A state that asks something stays selectable.
 """, """<div style="padding:16px;background:var(--color-canvas)">
   <fieldset class="engine-cards"><legend>Moteur de rédaction</legend>
-    <div class="engine-card" data-state="ready" data-where="here"><label><input type="radio" name="w" checked><span class="name">Auto</span><span class="default">Par défaut</span><span class="where">Aujourd’hui Qwen3 8b</span><span class="state">Prêt</span></label><details><summary>Détails</summary><p class="detail">qwen3:8b</p></details></div>
-    <div class="engine-card" data-state="download" data-where="here"><label><input type="radio" name="w"><span class="name">Sur cet ordinateur</span><span class="where">Sur cet ordinateur</span><span class="state">À télécharger · 5,2 Go</span></label><details><summary>Détails</summary><p class="detail">qwen3:8b</p></details></div>
-    <div class="engine-card" data-state="key" data-where="online"><label><input type="radio" name="w"><span class="name">Service en ligne</span><span class="where">En ligne</span><span class="state">Clé manquante</span></label><details><summary>Détails</summary></details></div>
+    <div class="engine-card" data-state="ready" data-where="here"><label><input type="radio" name="w" checked><span class="name">Auto</span><span class="default chip accent">Par défaut</span><span class="where">Aujourd’hui Qwen3 8b</span><span class="state chip success">Prêt</span></label><details><summary>Détails</summary><p class="detail">qwen3:8b</p></details></div>
+    <div class="engine-card" data-state="download" data-where="here"><label><input type="radio" name="w"><span class="name">Sur cet ordinateur</span><span class="where">Sur cet ordinateur</span><span class="state chip neutral">À télécharger · 5,2 Go</span></label><details><summary>Détails</summary><p class="detail">qwen3:8b</p></details></div>
+    <div class="engine-card" data-state="key" data-where="online"><label><input type="radio" name="w"><span class="name">Service en ligne</span><span class="where">En ligne</span><span class="state chip warning">Clé manquante</span></label><details><summary>Détails</summary></details></div>
   </fieldset>
+</div>"""),
+    "Chip": ("Feedback", 90, """A chip says a short fact on an item, in one of five tones: neutral; accent, « Par défaut »; success, ready
+or sent (`color-success-ground`, opaque); private, « Confidentielle » with the lock; warning, what is missing. Always
+with its tone class. 24 px high.
+""", """<div style="display:flex;flex-wrap:wrap;gap:12px;padding:16px;background:var(--color-canvas)">
+  <span class="chip neutral">Transcription</span>
+  <span class="chip accent">Par défaut</span>
+  <span class="chip success">""" + CHECK + """Prêt</span>
+  <span class="chip private">""" + LOCK + """Confidentielle</span>
+  <span class="chip warning">""" + ALERT + """Clé manquante</span>
+</div>"""),
+    "OptionCard": ("Choices", 230, """An option card is one choice among a few: a native radio in its label, its icon on a tile, its title and
+a sentence. Chosen, it is edged in the accent on the tint. The radios give the group and the arrow keys.
+""", """<div style="padding:16px;background:var(--color-canvas)">
+  <div class="option-cards" role="radiogroup" aria-label="Où il tourne">
+    <label class="option-card"><input type="radio" name="o" checked><span class="tile">""" + DRIVE + """</span><span><span class="title">Sur cet ordinateur</span><span class="says">Privé et gratuit. Un peu plus lent.</span></span></label>
+    <label class="option-card"><input type="radio" name="o"><span class="tile">""" + GLOBE + """</span><span><span class="title">En ligne</span><span class="says">Plus rapide. Seul le texte part, jamais le son.</span></span></label>
+  </div>
+</div>"""),
+    "Progress": ("Feedback", 130, """A progress says what is being made and how long is left, with its cancel. A bar per step, each a
+progress bar (`role=progressbar`) named and at its value.
+""", """<div style="padding:16px;background:var(--color-canvas)">
+  <div class="progress">
+    <div class="label">""" + FILE + """<b>Rédaction du compte rendu</b><span class="left">environ 3 min</span><button type="button" class="button ghost">Annuler</button></div>
+    <div class="bars"><div class="bar" role="progressbar" aria-label="Transcription" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i style="width:100%"></i></div><div class="bar" role="progressbar" aria-label="Rédaction du compte rendu" aria-valuemin="0" aria-valuemax="100" aria-valuenow="38"><i style="width:38%"></i></div></div>
+  </div>
+</div>"""),
+    "Toast": ("Feedback", 90, """A toast says an action's outcome once, at the window's foot, and is gone after 5 s (`role=status`): the
+text's colour on the surface's, so that it stands out in both themes. It pops in, unless the system asks for less
+motion.
+""", """<div style="padding:16px;background:var(--color-canvas)">
+  <div class="toast" role="status" style="position:static">""" + CHECK + """<span>Copié</span></div>
 </div>"""),
 }
 
@@ -288,6 +336,15 @@ COVER = """<!-- @dsCard group="Kitokey" height=220 -->
   </div>
 </div>
 """
+
+
+def change(sha: str, date: str) -> dict:
+    """Who made the export: in CI, the run and who started it; on a workstation, the commit alone and nobody — a
+    published file names no person."""
+    note = "Exported from ui/tokens.css and ui/components.css by scripts/design-export.py."
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        return {"by": os.environ["GITHUB_ACTOR"], "at": date, "via": f"CI · NapkinStack/kitokey@{sha}", "note": note}
+    return {"at": date, "via": f"local · {sha}", "note": note}
 
 
 def write(path: Path, text: str) -> None:
@@ -323,8 +380,7 @@ def main() -> None:
         "v": 3, "layout": "files", "editing": "code", "createdOnFiles": {"v": 1, "at": date},
         "title": "Kitokey", "namespace": "Kitokey", "libraries": [], "sections": {}, "groups": [], "assetGroups": {},
         "blobs": {}, "docs": {"readme": "project/README.md", "sections": []},
-        "lastChange": {"by": "kitokey-lina[bot]", "at": date, "via": f"CI · NapkinStack/kitokey@{sha}",
-                       "note": "Exported from ui/tokens.css and ui/components.css by scripts/design-export.py."},
+        "lastChange": change(sha, date),
     }
     write(PROJECT / "design-system.json", json.dumps(index, indent=2, ensure_ascii=False) + "\n")
 
