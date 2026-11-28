@@ -6477,6 +6477,10 @@ async function draw(mine, again) {
   // dropped as soon as another page is asked, before anything is awaited — a drawing the next one
   // overtakes stops at its first answer, and would leave it to be said again.
   if (location.hash !== "#/settings") notSaved = null;
+  // A refused language is said until its meeting's own page is left (#841): dropped by the same rule, before anything
+  // is awaited, or a drawing overtaken there would leave it said on the page come back to (#1306).
+  const pageAsked = location.hash.match(/^#\/meeting\/(.+)$/);
+  if (languageRefused && !(pageAsked && decodeURIComponent(pageAsked[1]) === languageRefused.name)) languageRefused = null;
   const listing = await window.__TAURI__.core.invoke("listed");
   if (mine !== drawing) return;
   words = listing.words;
@@ -6490,8 +6494,6 @@ async function draw(mine, again) {
   const name = wanted ? decodeURIComponent(wanted[1]) : beside ? nameOf(listing.sessions[0]) : null;
   // Its page opened: the bar no longer says the meeting last stopped (D92).
   if (wanted && !document.hidden) window.__TAURI__.core.invoke("meeting_seen", { name }).catch(() => {});
-  // A refused language is said until its meeting's own page is left (#841).
-  if (languageRefused && !(wanted && decodeURIComponent(wanted[1]) === languageRefused.name)) languageRefused = null;
   // Another meeting shown, or none: its models are read again when it is (D93).
   if (pageOffered && pageOffered.name !== name) pageOffered = null;
   // Another page, or another meeting: what was played stops — and the list alone under 840 px.
