@@ -9891,6 +9891,11 @@ def keys_taught(now: dt.datetime) -> None:
         chord(browser, "k")
         back = wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3)
         check("J: the next meeting of the list; K: the one before", moved and back, browser.execute_script(hash_))
+        # Caps lock on, J says « J »: the next meeting all the same (lina's reading of #1317).
+        browser.execute_script("document.activeElement?.blur(); document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'J', code: 'KeyJ', bubbles: true}))")
+        capped = wait_for(browser, lambda b: b.execute_script(hash_) == rows[1], 3)
+        browser.execute_script("document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'K', code: 'KeyK', bubbles: true}))")
+        check("caps lock on: J and K move all the same", capped and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3), browser.execute_script(hash_))
         # Ctrl+Maj+C: the summary copied, « Copié » said where the button says it.
         browser.execute_script(stand_in)
         to_body(browser)
@@ -9940,6 +9945,19 @@ def keys_taught(now: dt.datetime) -> None:
               shown and got.get("modal") and got.get("title") == "Raccourcis clavier" and all(any(w in r for r in got["rows"]) for w in wanted) and got["kbd"] >= len(wanted), got)
         violations = axe_violations(browser)
         check("the sheet: no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+        # A table of data has its headers (WCAG 2.2 SC 1.3.1; lina's reading of #1317): « Touche » and « Action ».
+        heads = browser.execute_script("return [...document.querySelectorAll('#keys-sheet thead th[scope=col]')].map((t) => t.textContent)")
+        check("the sheet's table: its two columns headed « Touche » and « Action »", heads == ["Touche", "Action"], heads)
+        # WAI-ARIA APG's modal dialog: Tab and Shift+Tab stay on its controls, never on the <dialog> itself (#1312's roundTheDialog).
+        inside = ("const e = document.activeElement, d = document.getElementById('keys-sheet');"
+                  " return [e.tagName, !!d && d.contains(e) && e !== d]")
+        went = []
+        for back in (False,) * 3 + (True,) * 3:
+            keys = ActionChains(browser)
+            (keys.key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT) if back else keys.send_keys(Keys.TAB)).perform()
+            went.append(browser.execute_script(inside))
+        check("the sheet: Tab and Shift+Tab stay on its button, never on the dialog itself (APG)",
+              all(tag == "BUTTON" and held for tag, held in went), went)
         for theme in ("light", "dark"):
             shot_themed(browser, f"cx-sheet-fr-{theme}", theme)
         chord(browser, Keys.ESCAPE)
