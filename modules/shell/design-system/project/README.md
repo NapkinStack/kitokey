@@ -1,6 +1,6 @@
 # Kitokey — design system
 
-Exported from the code by `modules/shell/scripts/design-export.py`, from commit `eac5e1092376953a61d56a5f7e44bc21cd353ab3` (2026-11-28T04:17:13+01:00). The code is the
+Exported from the code by `modules/shell/scripts/design-export.py`, from commit `0ba3fe4ee463e6627d374fc6341895db26facf40` (2026-11-28T04:45:40+01:00). The code is the
 source: `modules/shell/ui/tokens.css` and `ui/components.css`. A design explored here comes back as a pull request on
 those two files, never as an edit of this export.
 
