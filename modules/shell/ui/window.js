@@ -2716,10 +2716,11 @@ function datesPanel(mentioned, session, transcript, words, back) {
   };
   // A confidential meeting (PDR-0007 §4, #1319): asked again, each time, in one sentence saying what leaves and where;
   // « Annuler » focused, the safe one (PDR-0008). The switch is read at the press: it may have changed since.
-  const askDone = (back) => {
+  // Either answer gives the focus back to the button that asked (WAI-ARIA APG, dialog: the invoking control).
+  const askDone = () => {
     asking.hidden = true;
     asking.replaceChildren();
-    if (back) google.focus();
+    google.focus();
   };
   google.addEventListener("click", () => {
     if (document.getElementById("confidential-switch")?.checked !== true) return toGoogle(false);
@@ -2730,13 +2731,13 @@ function datesPanel(mentioned, session, transcript, words, back) {
     yes.id = "dates-confirm";
     yes.setAttribute("aria-describedby", ask.id);
     yes.addEventListener("click", () => {
-      askDone(false);
+      askDone();
       toGoogle(true);
     });
     const no = element("button", "", words.send_cancel);
     no.type = "button";
     no.id = "dates-cancel";
-    no.addEventListener("click", () => askDone(true));
+    no.addEventListener("click", () => askDone());
     const choices = element("div", "send-choices");
     choices.append(yes, no);
     asking.replaceChildren(ask, choices);
