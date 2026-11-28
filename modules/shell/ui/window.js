@@ -159,6 +159,118 @@ function icon(name) {
   return svg;
 }
 
+// A destination's form (D110, D121): its kind a tile each, its name, its address, « Ajouter »; Settings' own and the
+// meeting page's sheet's, each its own ids from `prefix`. `added(name)` runs once it is kept, and says it.
+function destinationForm(words, locked, prefix, added) {
+  const kinds = { webhook: 0, discord: 1, slack: 2 };
+  const adding = element("div", "fields adding");
+  adding.id = `${prefix}-adding`;
+  // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
+  // the arrows move in, its first chosen at first, as the list's first was.
+  // On a whole line, as the address: the three tiles side by side.
+  const kindField = element("div", "field kinds whole");
+  const kindName = element("span", "name", words.destination_fields[0]);
+  kindName.id = `${prefix}-kind-name`;
+  const tiles = element("div", "tiles");
+  tiles.setAttribute("role", "radiogroup");
+  tiles.setAttribute("aria-labelledby", kindName.id);
+  for (const [value, index] of Object.entries(kinds)) {
+    const tile = element("label", "tile");
+    const input = element("input");
+    input.type = "radio";
+    input.name = `${prefix}-kind`;
+    input.value = value;
+    input.id = `${prefix}-kind-${value}`;
+    input.checked = index === 0;
+    input.disabled = locked;
+    tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
+    tiles.append(tile);
+  }
+  kindField.append(kindName, tiles);
+  const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
+  const [namedField, named] = guidedField(`${prefix}-name`, words.destination_fields[1], "text", "", locked);
+  named.maxLength = 40;
+  named.autocomplete = "off";
+  const [addressField, address] = guidedField(`${prefix}-address`, words.destination_fields[2], "url", "", locked);
+  addressField.classList.add("whole");
+  address.autocomplete = "off";
+  address.spellcheck = false;
+  address.setAttribute("aria-describedby", `${prefix}-address-said`);
+  const addressSaid = element("p", "says", words.destination_address_said);
+  addressSaid.id = `${prefix}-address-said`;
+  const add = element("button", "open", words.destination_add);
+  add.type = "button";
+  add.id = `${prefix}-add`;
+  add.disabled = locked;
+  const result = element("p", "says");
+  result.id = `${prefix}-said`;
+  result.setAttribute("role", "status");
+  add.addEventListener("click", () => {
+    add.disabled = true;
+    window.__TAURI__.core
+      .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
+      .then(
+        () => {
+          // Kept: the address leaves the page at once; whoever opened the form says it.
+          const name = named.value.trim();
+          address.value = "";
+          return added(name);
+        },
+        (why) => {
+          result.textContent = fill(words.destination_not_added, why);
+          add.disabled = locked;
+        },
+      );
+  });
+  adding.append(
+    kindField,
+    namedField,
+    addressField,
+    addressSaid,
+    add,
+    result,
+  );
+  return { adding, kind, result };
+}
+
+// « Ajouter un canal » (D121, criterion 2): Settings' channel form in a sheet of the meeting's page, the platform's modal
+// `<dialog>` (D120) — titled, the rest inert, Escape or « Annuler » closing it, nothing kept —, the focus on its first
+// field and back where it was. A channel added closes it; the page, drawn again, sends to it, and says it once.
+function channelSheet(words) {
+  const back = document.activeElement;
+  const dialog = element("dialog", "dialog sheet");
+  const heading = element("h2", "", words.channel_add);
+  heading.id = "channel-sheet-title";
+  dialog.setAttribute("aria-labelledby", heading.id);
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus();
+  };
+  const { adding, kind } = destinationForm(words, false, "channel", (name) => {
+    close();
+    return refresh().then(() => {
+      const said = document.getElementById("share-said");
+      if (said) said.textContent = fill(words.destination_added, name);
+      document.getElementById("share-open")?.focus();
+    });
+  });
+  const cancel = element("button", "button secondary", words.send_cancel);
+  cancel.type = "button";
+  cancel.addEventListener("click", close);
+  const actions = element("div", "actions");
+  actions.append(cancel);
+  dialog.append(heading, element("p", "says", words.destinations_said), adding, actions);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  document.body.append(dialog);
+  roundTheDialog(dialog);
+  dialog.showModal();
+  kind.focus();
+}
+
 // A question the platform asks (D120, PDR-0008): its own modal `<dialog>` — the rest of the window inert, Escape
 // answering no —, its title, what it says, its safe answer first and focused, the other destructive when the
 // action deletes. The focus back where it was. True if the user said yes.
@@ -4212,74 +4324,11 @@ function showSettings(shown, minutes, words) {
     });
     // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
     // address on a whole line, long enough to read back what was pasted.
-    const adding = element("div", "fields adding");
-    adding.id = "destination-adding";
-    // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
-    // the arrows move in, its first chosen at first, as the list's first was.
-    // On a whole line, as the address: the three tiles side by side.
-    const kindField = element("div", "field kinds whole");
-    const kindName = element("span", "name", words.destination_fields[0]);
-    kindName.id = "destination-kind-name";
-    const tiles = element("div", "tiles");
-    tiles.setAttribute("role", "radiogroup");
-    tiles.setAttribute("aria-labelledby", "destination-kind-name");
-    for (const [value, index] of Object.entries(kinds)) {
-      const tile = element("label", "tile");
-      const input = element("input");
-      input.type = "radio";
-      input.name = "destination-kind";
-      input.value = value;
-      input.id = `destination-kind-${value}`;
-      input.checked = index === 0;
-      input.disabled = locked;
-      tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
-      tiles.append(tile);
-    }
-    kindField.append(kindName, tiles);
-    const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
-    const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
-    named.maxLength = 40;
-    named.autocomplete = "off";
-    const [addressField, address] = guidedField("destination-address", words.destination_fields[2], "url", "", locked);
-    addressField.classList.add("whole");
-    address.autocomplete = "off";
-    address.spellcheck = false;
-    address.setAttribute("aria-describedby", "destination-address-said");
-    const addressSaid = element("p", "says", words.destination_address_said);
-    addressSaid.id = "destination-address-said";
-    const add = element("button", "open", words.destination_add);
-    add.type = "button";
-    add.id = "destination-add";
-    add.disabled = locked;
-    const result = element("p", "says");
-    result.id = "destination-said";
-    result.setAttribute("role", "status");
-    add.addEventListener("click", () => {
-      add.disabled = true;
-      window.__TAURI__.core
-        .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
-        .then(
-          () => {
-            // Kept: the address leaves the page at once; the list, drawn again, names it.
-            address.value = "";
-            return refresh().then(() => {
-              const said = document.getElementById("destination-said");
-              if (said) said.textContent = fill(words.destination_added, named.value.trim());
-            });
-          },
-          (why) => {
-            result.textContent = fill(words.destination_not_added, why);
-            add.disabled = locked;
-          },
-        );
-    });
-    adding.append(
-      kindField,
-      namedField,
-      addressField,
-      addressSaid,
-      add,
-      result,
+    const { adding, kind } = destinationForm(words, locked, "destination", (name) =>
+      refresh().then(() => {
+        const said = document.getElementById("destination-said");
+        if (said) said.textContent = fill(words.destination_added, name);
+      }),
     );
     // Folded at first: a disclosure (ARIA APG), as « Avancé »; unfolded by a click, the focus goes to
     // its first field. Escape does not fold it: a half-filled form is not lost by a key.

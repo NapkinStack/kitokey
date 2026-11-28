@@ -634,6 +634,10 @@ pub struct Window {
     /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
     /// characters. Placeholders: none.
     pub meeting_share: &'static str,
+    /// D121, criterion 2: « Partager » with no channel set up, and the title of the sheet that adds one, Settings' form
+    /// in it. Shows: a meeting's page, « Partager »'s menu, an item; the sheet's title. When: no channel is set up.
+    /// At most: about 24 characters. Placeholders: none.
+    pub channel_add: &'static str,
     /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
     /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
     pub meeting_dates: &'static str,
@@ -2171,6 +2175,7 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "More actions",
             meeting_share: "Share",
+            channel_add: "Add a channel",
             meeting_dates: "Calendar",
             meeting_redo: "Redo",
             meeting_more: "More",
@@ -2728,6 +2733,7 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",
+            channel_add: "Ajouter un canal",
             meeting_dates: "Agenda",
             meeting_redo: "Refaire",
             meeting_more: "Plus",
