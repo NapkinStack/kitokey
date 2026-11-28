@@ -634,6 +634,20 @@ pub struct Window {
     /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
     /// characters. Placeholders: none.
     pub meeting_share: &'static str,
+    /// D121, « Partager »'s export of the summary alone as a PDF, written where the user chooses in the system's
+    /// dialog. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most: about 24 characters.
+    /// Placeholders: none.
+    pub export_pdf: &'static str,
+    /// D121, the same export as Markdown. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most:
+    /// about 24 characters. Placeholders: none.
+    pub export_md: &'static str,
+    /// D121, an export written, said once under the bar. Shows: a meeting's page, under its bar of actions. When: the
+    /// file is written. At most: one line. Placeholders: {} the file's name, never its folder.
+    pub export_done: &'static str,
+    /// PDR-0007, amended 2026-11-24: how a confidential meeting is shared, a send asked again, an export kept here.
+    /// Shows: a meeting's page, atop « Partager »'s menu, and its description for a screen reader. When: the meeting
+    /// is confidential. At most: two short lines. Placeholders: none.
+    pub share_confidential: &'static str,
     /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
     /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
     pub meeting_dates: &'static str,
@@ -2191,6 +2205,10 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "More actions",
             meeting_share: "Share",
+            export_pdf: "Export to PDF",
+            export_md: "Export to Markdown",
+            export_done: "Exported: “{}”.",
+            share_confidential: "Confidential: a send asks you first, an export stays on this computer.",
             meeting_dates: "Calendar",
             meeting_redo: "Redo",
             meeting_more: "More",
@@ -2767,6 +2785,10 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",
+            export_pdf: "Exporter en PDF",
+            export_md: "Exporter en Markdown",
+            export_done: "Exporté\u{a0}: «\u{a0}{}\u{a0}».",
+            share_confidential: "Confidentielle\u{a0}: un envoi vous est redemandé, un export reste sur cet ordinateur.",
             meeting_dates: "Agenda",
             meeting_redo: "Refaire",
             meeting_more: "Plus",
@@ -3354,6 +3376,8 @@ pub enum Failure {
     FolderNotOpened,
     LinkNotOpened,
     DatesNotSaved,
+    /// A meeting exported (D121): the file not written where the user chose.
+    ExportNotWritten,
     KeyboardSettings,
     Keyring,
     ProgramNotStarted,
@@ -3442,6 +3466,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
         (Failure::DatesNotSaved, English) => "the calendar file wasn’t written. Choose another folder, then try again.",
         (Failure::DatesNotSaved, French) => "le fichier d’agenda n’a pas pu être écrit. Choisissez un autre dossier, puis réessayez.",
+        (Failure::ExportNotWritten, English) => "the file couldn’t be written. Choose another folder, or free some space, then try again.",
+        (Failure::ExportNotWritten, French) => "le fichier n’a pas pu être écrit. Choisissez un autre dossier, ou libérez de la place, puis réessayez.",
         (Failure::LinkNotOpened, English) => "Couldn’t open your browser. Save the dates as a calendar file instead.",
         (Failure::LinkNotOpened, French) => "Impossible d’ouvrir le navigateur. Enregistrez plutôt les dates dans un fichier d’agenda.",
         (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",

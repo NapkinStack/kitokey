@@ -71,6 +71,35 @@ pub fn markdown(program: &Path, folder: &Path, language: &str, input: &Input) ->
     )
 }
 
+/// A meeting's summary exported where the user chose (D121): a PDF or Markdown, the summary alone, as a send carries
+/// it (PDR-0007 sends never the transcript); done or why, as `markdown`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Format {
+    Pdf,
+    Md,
+}
+
+impl Format {
+    /// The format as `exporting/v1` names it, and the file's extension.
+    pub fn name(self) -> &'static str {
+        match self {
+            Format::Pdf => "pdf",
+            Format::Md => "md",
+        }
+    }
+}
+
+/// Writes `folder`'s summary at `input.to` in `format` (D121).
+pub fn file(program: &Path, folder: &Path, format: Format, language: &str, input: &Input) -> Result<(), String> {
+    exported(
+        program,
+        folder,
+        &["--format", format.name(), "--lang", language, "--without-transcript"],
+        input,
+    )
+}
+
 /// Writes `input.dates` as an `.ics` at `input.to` (D115): done or why, as `markdown`.
 pub fn ics(program: &Path, folder: &Path, language: &str, input: &Input) -> Result<(), String> {
     // As the page sends them, each date made what the contract wants: `what` and `who` on one line.

@@ -9,7 +9,7 @@ import { root, dist, pages } from "./helpers.mjs";
 import { ICONS } from "../src/lib/icons.mjs";
 
 const listed = async () =>
-  [...(await readFile(join(root, "BRANDS.md"), "utf8")).matchAll(/^\| `([^`]+)` \| (.+?) \| `([0-9a-f]{64})` \|$/gm)].map(
+  [...(await readFile(join(root, "BRANDS.md"), "utf8")).matchAll(/^\| `([^`]+)` \| (.+?) \| `([0-9a-f]{64})` \|(?: .+? \|)?$/gm)].map(
     ([, file, source, sha]) => ({ file, source, sha }));
 
 test("each brand file is BRANDS.md's, byte for byte, with its source, and BRANDS.md lists every one", async () => {
