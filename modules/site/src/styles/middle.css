@@ -21,6 +21,8 @@
 .mid .box.here { background: var(--bg-tint); outline-color: color-mix(in srgb, var(--accent) 22%, transparent); }
 .mid .box-h { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .mid .box:not(.here) .tile { background: var(--bg-sunken); color: var(--text-secondary); box-shadow: none; }
+/* The lock before « Reste sur votre ordinateur », apart from its words (lina's note on #1338). */
+.mid .box-h h3 > .ico { margin-right: 8px; }
 .mid .box-h p { color: var(--text-secondary); font-size: 15px; margin-top: 2px; }
 .mid .items { display: grid; gap: 10px; }
 .mid .item { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; align-items: center; background: var(--bg-surface); border-radius: var(--r-md); padding: 14px 16px; outline: 1px solid var(--border-subtle); }
