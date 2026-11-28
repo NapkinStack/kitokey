@@ -234,8 +234,8 @@ test("the privacy policy says what the form keeps, who sends, for how long, on w
     // nora's reading against GDPR art. 13: the right to complain to the CNIL, how long an unconfirmed address and the
     // list are kept, every right that applies under consent. The CNIL's complaint page is in French alone (a complaint is
     // written in French), so both halves link it.
-    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "30 days", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"'] ],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "30 jours", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"'] ],
+    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "30 days", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "never write to it again"] ],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "30 jours", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "ne plus jamais lui écrire"] ],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);

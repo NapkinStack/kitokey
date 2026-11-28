@@ -70,7 +70,10 @@ export async function onRequestPost({ request, env }) {
     const answer = await fetch(BREVO, {
       method: "POST",
       headers: { "api-key": env.BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ email, includeListIds: [list], templateId: template, redirectionUrl: `${SITE}/${lang}/notify/confirmed/` }),
+      // NOTIFY_SINCE, the day it asked: the mark scripts/brevo-cleanup.mjs counts the policy's bounds from, and the
+      // only contacts it touches.
+      body: JSON.stringify({ email, includeListIds: [list], templateId: template, redirectionUrl: `${SITE}/${lang}/notify/confirmed/`,
+        attributes: { NOTIFY_SINCE: new Date().toISOString().slice(0, 10) } }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     status = answer.status;

@@ -111,8 +111,14 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   documentation does not say what it keeps of an address created through the API and never confirmed, nor does it
   delete a list's contacts after a time. So a job holds both bounds, never a person (the coordinator, 2026-11-28: a
   forgotten month would break the promise): `modules/site/scripts/brevo-cleanup.mjs`, run each day by
-  `.github/workflows/site-brevo-cleanup.yml`, deletes the list's contacts added more than 12 months ago and the
-  contacts in no list older than 30 days, by id, and says only counts; a contact of another list is never touched.
+  `.github/workflows/site-brevo-cleanup.yml`, keeps both bounds for this form's sign-ups alone. `/notify` marks the
+  contact `NOTIFY_SINCE`, a text attribute, the day it asked; the bounds count from it, never from the contact's
+  creation in the account, and a contact without it is never touched (nora's reading of #1343). On the 365th day a
+  confirmed sign-up is deleted when the release's list is its only one, else taken out of it and its mark cleared; on
+  the 30th an unconfirmed one is deleted when it is in no list, else its mark cleared. A blocklisted contact is never
+  written to: its record not to be written to again is the person's choice, which the policy says. By id, counts only.
+  Clearing a text attribute with an empty value is what Brevo's update accepts as a string; that it unsets it is not
+  stated in its reference, and is seen on the account once (step 7).
   Its key is a second Brevo key, a repository secret, revoked apart from the site's; a failed run notifies the
   maintainers and the next day's retries ([Brevo's contacts API](https://developers.brevo.com/reference/get-contacts):
   `createdAt` and `listIds` on each contact; [deletion](https://developers.brevo.com/reference/delete-contact) by id).
@@ -160,13 +166,13 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 
 1. A Brevo account for the company, free plan; accept its data processing agreement.
 2. kitokey.com authenticated as a sender: Brevo's DKIM and DMARC records in Cloudflare's DNS.
-3. The list « Kitokey — sortie » and a double opt-in template (sender support@kitokey.com), with the words written
-   in the pull request.
+3. The list « Kitokey — sortie », the contact attribute `NOTIFY_SINCE` (text), and a double opt-in template
+   (sender support@kitokey.com), with the words written in the pull request.
 4. An API key, set as the secret `BREVO_API_KEY` on the Pages project, production only.
 5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
    Pages project, production only.
 6. A rate limiting rule on the path `/notify` in Cloudflare's WAF.
-7. A second API key, `kitokey-cleanup`, set as the repository secret `BREVO_API_KEY`, and the list's id as the
+7. Before the form goes live, since until then the bounds are promised but not held: a second API key, `kitokey-cleanup`, set as the repository secret `BREVO_API_KEY`, and the list's id as the
    repository variable `BREVO_LIST_ID`, for the daily job; then one run by hand, unticked, to see its dry run's
    counts.
 

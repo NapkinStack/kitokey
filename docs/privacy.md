@@ -100,7 +100,8 @@ then we delete it. You confirm it first, by a link we send you; until then it jo
 confirmed within 30 days is deleted. If Kitokey is not out, your address is deleted at the latest 12 months after you
 signed up. The site passes it to Brevo (Sendinblue SAS, France), which keeps it in the European Union and sends these
 two messages on our behalf, under a data processing agreement. The basis is your consent (GDPR art. 6(1)(a)): you may
-withdraw it at any time, by the link in each message or by writing to support@kitokey.com. You may also ask to access
+withdraw it at any time, by the link in each message or by writing to support@kitokey.com; if you use the link,
+Brevo keeps your address only on its list of addresses not to write to, so as to never write to it again. You may also ask to access
 your address, to have it rectified or erased, to restrict or object to its use, and to receive it in a portable form.
 If you think we do not respect these rights, you may lodge a complaint with the CNIL, France's data protection
 authority ([its complaint page](https://www.cnil.fr/fr/adresser-une-plainte), in French).
@@ -201,7 +202,8 @@ elle n'entre dans aucune liste, et une adresse non confirmée sous 30 jours est 
 adresse est effacée au plus tard 12 mois après votre demande. Le site la transmet à Brevo (Sendinblue SAS, France),
 qui la conserve dans l'Union européenne et envoie ces deux messages pour nous, sous un contrat de sous-traitance. La
 base en est votre consentement (RGPD art. 6.1.a) : vous pouvez le retirer à tout moment, par le lien de chaque message
-ou en écrivant à support@kitokey.com. Vous pouvez aussi demander à accéder à votre adresse, à la faire rectifier ou
+ou en écrivant à support@kitokey.com ; si vous utilisez le lien, Brevo garde votre adresse sur sa seule liste des
+adresses auxquelles ne pas écrire, pour ne plus jamais lui écrire. Vous pouvez aussi demander à accéder à votre adresse, à la faire rectifier ou
 effacer, à limiter son usage ou à vous y opposer, et à la recevoir dans un format portable. Si vous estimez que nous ne
 respectons pas ces droits, vous pouvez adresser une plainte à la CNIL
 ([sa page de plainte](https://www.cnil.fr/fr/adresser-une-plainte)).

@@ -6,6 +6,7 @@
 // deleted when that list is its only one, else taken out of it and its mark cleared. Thirty days after, an unconfirmed
 // one (not in the list) is deleted when it is in no list, else its mark cleared (nora's reading of #1343). Without
 // --apply it changes nothing and says what it would. It never says an address, and stops on Brevo's first error.
+// The bounds in whole days, the run's day in UTC: gone on the 365th and on the 30th day after the mark.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { cleanup } from "../scripts/brevo-cleanup.mjs";
@@ -41,10 +42,10 @@ const contact = (id, since, listIds, { blocked = false, created = ago(2000) } = 
 
 const PEOPLE = [
   contact(1, ago(10), [LIST]), // confirmed lately: kept
-  contact(2, ago(364), [LIST]), // confirmed, under 12 months: kept, though the account has known it for years
-  contact(3, ago(366), [LIST]), // confirmed, over 12 months, the list its only one: deleted
-  contact(4, ago(29), []), // unconfirmed, under 30 days: kept
-  contact(5, ago(31), []), // unconfirmed, over 30 days, in no list: deleted
+  contact(2, ago(364), [LIST]), // confirmed 364 days ago: kept, though the account has known it for years
+  contact(3, ago(365), [LIST]), // confirmed 365 days ago, the list its only one: deleted
+  contact(4, ago(29), []), // unconfirmed 29 days ago: kept
+  contact(5, ago(30), []), // unconfirmed 30 days ago, in no list: deleted
   contact(6, undefined, [], { created: ago(900) }), // the account's other use, no mark: never touched
   contact(7, ago(366), [99, LIST]), // confirmed, over 12 months, also in another list: out of ours, mark cleared
   contact(8, ago(31), [99]), // unconfirmed, over 30 days, in another list: mark cleared, not deleted
@@ -62,7 +63,7 @@ function run(people, options = {}) {
 const deleted = (calls) => calls.filter(([m]) => m === "DELETE").map(([, path]) => Number(path.split("/").pop())).sort((a, b) => a - b);
 const updated = (calls) => calls.filter(([m]) => m === "PUT").map(([, path, , , body]) => [Number(path.split("/").pop()), body]).sort((a, b) => a[0] - b[0]);
 
-const SUMMARY = { seen: 10, marked: 7, blocked: 2, deleted: 2, unlisted: 1, cleared: 1 };
+const SUMMARY = { seen: 10, marked: 9, blocked: 2, deleted: 2, unlisted: 1, cleared: 1 };
 
 test("with --apply: this form's sign-ups past their bound go, by the sign-up's day; nothing of anyone else's", async () => {
   const { done, calls } = run(PEOPLE, { apply: true });
