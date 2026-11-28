@@ -55,9 +55,11 @@ const source = "https://github.com/NapkinStack/kitokey";
         <nav aria-label={say("footer", lang)}>
           <a href={source}>{say("source", lang)}</a>
           <a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a>
+          <a href={`/${lang}/legal/`}>{say("legal", lang)}</a>
           <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
         </nav>
         <span class="credit">{say("credit", lang)}</span>
+        <p class="marks" lang="en">{say("marks", lang).map((said) => <span>{said}</span>)}</p>
       </div>
     </footer>
   </body>

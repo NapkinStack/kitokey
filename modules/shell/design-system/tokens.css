@@ -27,7 +27,7 @@
   --slate-990: #0F1115;
   --blue-50: #EEF2FB; --blue-200: #A9C4FF; --blue-300: #8AB0FF; --blue-700: #2253CF; --blue-800: #1A44AD;
   --blue-950: #1B2540; --blue-975: #0B1530;
-  --green-300: #63D49C; --green-700: #16794A;
+  --green-50: #E8F2ED; --green-300: #63D49C; --green-700: #16794A; --green-950: #223432;
   --teal-700: #0F766E; --gold-300: #F2C14E;
   --amber-50: #FFF4DC; --amber-300: #F5B54A; --amber-400: #FBBF24; --amber-800: #8A5300; --amber-950: #2A2214;
   --red-300: #FF7A72; --red-700: #C2352D;
@@ -40,7 +40,7 @@
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
   --r-xs: 4px; --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-pill: 999px;
   --fs-caption: 12px; --fs-small: 13px; --fs-body: 15px; --fs-title-sm: 17px; --fs-title: 20px; --fs-title-lg: 24px;
-  --d-instant: 90ms; --d-fast: 140ms; --d-slow: 320ms;
+  --d-instant: 90ms; --d-fast: 140ms; --d-base: 200ms; --d-slow: 320ms;
   --ease-out: cubic-bezier(.2, .8, .2, 1);
   --font-text: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif;
   --font-display: "Bricolage Grotesque", var(--font-text);
@@ -64,8 +64,9 @@
   --color-accent: var(--blue-700);
   --color-accent-hover: var(--blue-800);
   --color-on-accent: var(--white);
-  /* Success alone: ready, sent, saved (PDR-0008). */
+  /* Success alone: ready, sent, saved (PDR-0008); its chip's ground opaque, so that its words keep 4.5:1 on any page. */
   --color-success: var(--green-700);
+  --color-success-ground: var(--green-50);
   --color-warning: var(--amber-800);
   --color-warning-ground: var(--amber-50);
   /* Red says two things: a recording, its live dot; a deletion, its button (PDR-0008). */
@@ -79,8 +80,11 @@
   --color-voice-you: var(--blue-700);
   --color-voice-others: var(--teal-700);
   --e1: 0 1px 2px rgb(17 19 24 / .05), 0 4px 12px -8px rgb(30 50 100 / .12);
+  --e2: 0 1px 2px rgb(20 30 55 / .06), 0 10px 24px -12px rgb(30 50 100 / .18);
   --e3: 0 1px 2px rgb(0 0 0 / .08), 0 24px 56px -20px rgb(30 50 100 / .30);
   --color-scrim: rgb(15 17 21 / .36);
+  /* The first run's two halos behind its card (D126, mock-up v5): dimmer in the dark. */
+  --halo-opacity: .25;
 }
 
 /* The window's older names, each the primitive it was on main (tests/look.rs pins them). */
@@ -99,13 +103,15 @@
     --color-tint: var(--blue-950); --color-divider: var(--slate-850); --color-edge: var(--slate-500);
     --color-text: var(--gray-75); --color-text-soft: var(--gray-300); --color-text-faint: var(--slate-400);
     --color-accent: var(--blue-300); --color-accent-hover: var(--blue-200); --color-on-accent: var(--blue-975);
-    --color-success: var(--green-300); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
+    --color-success: var(--green-300); --color-success-ground: var(--green-950); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
     --color-record: var(--red-300); --color-destructive: var(--red-300); --color-on-destructive: var(--slate-990);
     --color-private: var(--violet-300); --color-private-ground: var(--violet-950);
     --color-voice-you: var(--blue-300); --color-voice-others: var(--gold-300);
     --e1: 0 1px 2px rgb(0 0 0 / .12), 0 4px 12px -8px rgb(0 0 0 / .3), inset 0 0 0 1px rgb(255 255 255 / .06);
+    --e2: 0 1px 2px rgb(0 0 0 / .15), 0 10px 24px -12px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .06);
     --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
     --color-scrim: rgb(0 0 0 / .55);
+    --halo-opacity: .12;
     --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
     --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
     --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);
@@ -120,13 +126,15 @@
   --color-tint: var(--blue-950); --color-divider: var(--slate-850); --color-edge: var(--slate-500);
   --color-text: var(--gray-75); --color-text-soft: var(--gray-300); --color-text-faint: var(--slate-400);
   --color-accent: var(--blue-300); --color-accent-hover: var(--blue-200); --color-on-accent: var(--blue-975);
-  --color-success: var(--green-300); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
+  --color-success: var(--green-300); --color-success-ground: var(--green-950); --color-warning: var(--amber-300); --color-warning-ground: var(--amber-950);
   --color-record: var(--red-300); --color-destructive: var(--red-300); --color-on-destructive: var(--slate-990);
   --color-private: var(--violet-300); --color-private-ground: var(--violet-950);
   --color-voice-you: var(--blue-300); --color-voice-others: var(--gold-300);
   --e1: 0 1px 2px rgb(0 0 0 / .12), 0 4px 12px -8px rgb(0 0 0 / .3), inset 0 0 0 1px rgb(255 255 255 / .06);
+  --e2: 0 1px 2px rgb(0 0 0 / .15), 0 10px 24px -12px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .06);
   --e3: 0 1px 2px rgb(0 0 0 / .2), 0 24px 56px -20px rgb(0 0 0 / .75), inset 0 0 0 1px rgb(255 255 255 / .06);
   --color-scrim: rgb(0 0 0 / .55);
+  --halo-opacity: .12;
   --ground: var(--gray-950); --surface: var(--gray-900); --raised: var(--gray-850); --line: var(--gray-800);
   --ink: var(--gray-75); --soft: var(--gray-300); --accent: var(--blue-300); --ok: var(--green-300);
   --red: var(--red-300); --edge: var(--gray-500); --hover: var(--gray-825); --pressed: var(--gray-750);
