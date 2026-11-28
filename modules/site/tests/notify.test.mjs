@@ -59,7 +59,10 @@ test("a well-formed request: Brevo's double opt-in is asked once, with the key, 
   assert.equal(new Headers(init.headers).get("api-key"), KEY);
   assert.equal(new Headers(init.headers).get("content-type"), "application/json");
   assert.ok(init.signal instanceof AbortSignal, "no timeout on the call to Brevo");
-  assert.deepEqual(JSON.parse(init.body), { email: EMAIL, includeListIds: [7], templateId: 3, redirectionUrl: "https://kitokey.com/fr/notify/confirmed/" });
+  // The form's mark, the day it asked (UTC): what the daily clean-up counts its bounds from, and the only contacts it
+  // touches (scripts/brevo-cleanup.mjs, nora's reading of #1343).
+  const today = new Date().toISOString().slice(0, 10);
+  assert.deepEqual(JSON.parse(init.body), { email: EMAIL, includeListIds: [7], templateId: 3, redirectionUrl: "https://kitokey.com/fr/notify/confirmed/", attributes: { NOTIFY_SINCE: today } });
   await nothingLeaks(response);
 });
 
