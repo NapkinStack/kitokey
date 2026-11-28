@@ -4195,6 +4195,9 @@ def minutes_copied(now: dt.datetime) -> None:
         browser.execute_script(TOAST_WATCH)
         press(browser, "copy-minutes")
         said = wait_for(browser, lambda b: toast_now(b) == ["status", "Copié", True, True], 3)
+        if said:
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d120-toast-copied-{theme}", theme)
         copied = browser.execute_script("return window.__copied")
         check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said by the window's toast, nothing in place (D120)",
               said and len(copied) == 1 and copied[0].get("text/plain") == expected and said_in_place(browser, "Copié") == [],
@@ -4277,6 +4280,8 @@ def announced(now: dt.datetime) -> None:
             browser.execute_script(TOAST_WATCH)
             browser.find_element(By.ID, "small-announce-copy").click()
             copied = wait_for(browser, lambda b: toast_now(b) == ["status", "Copié", True, True], 3)
+            if copied:
+                shot(browser, f"d120-toast-bar-{theme}")
             text = browser.execute_script("return window.copied_for_test")
             room = browser.execute_script(
                 "const h = document.getElementById('toast'), e = document.scrollingElement; if (!h) return [e.scrollHeight <= e.clientHeight, null];"
@@ -4320,6 +4325,9 @@ def announced(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('small-announce-copy').click()")
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "Non copiée.", 3)
         check("a clipboard refused: said of the announcement, Arrêter where it was", refused and browser.execute_script(place) == before, browser.find_element(By.ID, "small-announce-copied").text)
+        # Said a moment, then gone: the line does not keep it (sam's mutant on #1329).
+        cleared = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "", 4)
+        check("the refusal said, then gone", refused and cleared, browser.find_element(By.ID, "small-announce-copied").text)
         stop_from_small(browser)
     quiet = WORK / "announcing-off"
     quiet.mkdir()
@@ -8030,7 +8038,10 @@ def focus_kept(now: dt.datetime) -> None:
             clear = ("const t = document.getElementById('toast'); if (!t || !t.textContent.trim()) return null; const r = document.getElementById('reminder').closest('.saying');"
                      " const box = (e) => e && e.getBoundingClientRect(); const meet = (a, b) => !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;"
                      " const said = box(t); return {words: t.textContent.trim(), overName: meet(said, box(r?.querySelector('.name'))), overControl: meet(said, box(document.getElementById('reminder'))),"
-                     " inside: said.left >= 0 && said.top >= 0 && said.right <= innerWidth && said.bottom <= innerHeight}")
+                     " inside: said.left >= 0 && said.top >= 0 && said.right <= innerWidth && said.bottom <= innerHeight,"
+                     # No control of the page hidden under it for its five seconds (#1329's audit): it goes up instead.
+                     " under: [...document.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex=\"-1\"])')]"
+                     ".filter((c) => !t.contains(c) && c.getClientRects().length && getComputedStyle(c).visibility !== 'hidden' && meet(said, box(c))).map((c) => c.id || c.tagName.toLowerCase())}")
             for size, name in (((1100, 700), "d101-saved-1100"), ((420, 400), "d101-saved-420")):
                 browser.set_window_size(*size)
                 wait_for(browser, lambda b: b.execute_script(clear) is None, 8)
@@ -8041,10 +8052,14 @@ def focus_kept(now: dt.datetime) -> None:
                 shown = wait_for(browser, lambda b: b.execute_script(clear) is not None, 5)
                 got = browser.execute_script(clear)
                 shot(browser, name)
+                # The toast in the other theme too, as #1329's audit asked to see it (D120).
+                shot_themed(browser, f"d120-toast-saved-{size[0]}-dark", "dark")
                 after = browser.execute_script(where)
                 check(f"{size[0]}×{size[1]}: « Enregistré » said by the toast, over neither the reminder's name nor its switch, the page not moved (D101, D120)",
-                      shown and got == {"words": "Enregistré", "overName": False, "overControl": False, "inside": True} and after[:2] == before[:2],
-                      {"said": got, "before": before, "after": after})
+                      shown and got is not None and {k: got[k] for k in ("words", "overName", "overControl", "inside")} == {"words": "Enregistré", "overName": False, "overControl": False, "inside": True}
+                      and after[:2] == before[:2], {"said": got, "before": before, "after": after})
+                check(f"{size[0]}×{size[1]}: no control of the page under the toast, which goes up instead (#1329's audit, D120)",
+                      shown and got is not None and got["under"] == [], got)
             browser.set_window_size(1100, 700)
             # #906: a drawing already under way when the user moves the focus — its page read, then held —
             # gives it back, once it ends, to the control the user went to, never to the one left. `listed`,
