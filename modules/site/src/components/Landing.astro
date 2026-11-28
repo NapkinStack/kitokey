@@ -4,6 +4,7 @@
 // bar, the minutes) over the two voices' spectrogram (public/hero.js); the real capture comes after D121.
 import Page from "../layouts/Page.astro";
 import Icons from "./Icons.astro";
+import Scene from "./Scene.astro";
 import { channels, landing as w } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
 import "../styles/walk.css";
@@ -192,7 +193,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
   <section class="mid" id={readyId} aria-labelledby={`${readyId}-h`}>
     <div class="wrap">
       <div class="sh rise"><p class="kicker">{rd.kicker}</p><h2 id={`${readyId}-h`}>{rd.h}</h2><p>{rd.lead}</p></div>
-      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><span class="tile" set:html={ico(icon)} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
+      <div class="feats rise">{rd.feats.map(([icon, title, said, soon]) => <article class="ft"><Scene kind={icon} /><h3>{title}{soon && <span class="chip">{rd.soon}</span>}</h3><p>{said}</p></article>)}</div>
     </div>
   </section>
 

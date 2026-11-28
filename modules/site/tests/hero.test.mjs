@@ -6,10 +6,10 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import vm from "node:vm";
-import { dist } from "./helpers.mjs";
+import { dist, unwrapped } from "./helpers.mjs";
 import { landing } from "../src/lib/landing.mjs";
 
-const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
+const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8").then(unwrapped);
 const hero = async (lang) => (await page(lang)).match(/<section class="hero"[\s\S]*?<\/section>/)?.[0] ?? "";
 const PROMISE = {
   fr: ["Vos rendez-vous clients ont leur compte rendu.", "Rien ne quitte votre ordinateur."],

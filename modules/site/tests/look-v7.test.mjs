@@ -131,3 +131,91 @@ test("the first step's track is seen against its tab, in both themes", async () 
     }
   });
 });
+
+test("in the dark theme, the install block stands out of the canvas: its edge at 3:1 at least", async () => {
+  await look(async (browser, origin) => {
+    const page = await open(browser, origin, "fr", "dark");
+    const ratio = await page.evaluate(() => {
+      const lum = (c) => {
+        const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      };
+      const code = getComputedStyle(document.querySelector(".get .code"));
+      // An edge that is drawn: an outline or a border at least 1 px wide. With neither, a border's colour is the text's
+      // (currentColor) and measures nothing: no edge, 1:1.
+      const edge = code.outlineStyle !== "none" && parseFloat(code.outlineWidth) >= 1 ? code.outlineColor
+        : code.borderTopStyle !== "none" && parseFloat(code.borderTopWidth) >= 1 ? code.borderTopColor : getComputedStyle(document.body).backgroundColor;
+      const [a, b] = [lum(edge), lum(getComputedStyle(document.body).backgroundColor)].sort((x, y) => y - x);
+      return (a + 0.05) / (b + 0.05);
+    });
+    assert.ok(ratio >= 3, `the install block's edge at ${ratio.toFixed(2)}:1 against the canvas`);
+    await page.close();
+  });
+});
+
+test("the formats' scene: its switches edged at 3:1 at least against their ground, in both themes", async () => {
+  await look(async (browser, origin) => {
+    for (const scheme of ["light", "dark"]) {
+      const page = await open(browser, origin, "fr", scheme);
+      const ratio = await page.evaluate(() => {
+        const lum = (c) => {
+          const [r, g, b] = c.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+          return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        };
+        const sw = document.querySelector(".v-format .sw");
+        const ground = getComputedStyle(sw.closest("svg")).backgroundColor;
+        const [a, b] = [lum(getComputedStyle(sw).stroke), lum(ground)].sort((x, y) => y - x);
+        return (a + 0.05) / (b + 0.05);
+      });
+      assert.ok(ratio >= 3, `${scheme}: the switches' edge at ${ratio.toFixed(2)}:1`);
+      await page.close();
+    }
+  });
+});
+
+test("no compound word breaks between two lines, at 1440 and 420 px, in both languages", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const width of [1440, 420]) {
+        const page = await browser.newPage({ colorScheme: "light", viewport: { width, height: 900 } });
+        await page.goto(`${origin}/${lang}/#still`, { waitUntil: "networkidle" });
+        await page.evaluate(() => document.fonts.ready);
+        const split = await page.evaluate(() => [...document.querySelectorAll(".nb")]
+          .filter((w) => w.getClientRects().length > 1).map((w) => w.textContent));
+        const count = await page.evaluate(() => document.querySelectorAll(".nb").length);
+        if (count === 0) found.push([lang, width, "no .nb at all"]);
+        for (const word of split) found.push([lang, width, word]);
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
+
+test("each « Bientôt » pill follows its card's title, as planche v4 draws it: on the title's line, clear of the scene, the accent on its tint", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const scheme of ["light", "dark"]) {
+        const page = await open(browser, origin, lang, scheme);
+        const pills = await page.evaluate(() => {
+          const probe = (value) => { const i = document.createElement("i"); i.style.color = value; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; };
+          const accent = probe("var(--accent)"), tint = probe("var(--bg-tint)");
+          return [...document.querySelectorAll(".ft h3 .chip")].map((chip) => {
+            const c = chip.getBoundingClientRect(), h = chip.closest("h3"), v = chip.closest(".ft").querySelector("svg.v")?.getBoundingClientRect();
+            const s = getComputedStyle(chip);
+            const lines = [...h.getClientRects()];
+            const onLine = lines.some((l) => c.top < l.bottom && c.bottom > l.top) && c.left >= h.getBoundingClientRect().left - 0.5;
+            const clear = !v || c.bottom <= v.top || c.top >= v.bottom || c.right <= v.left || c.left >= v.right;
+            return [h.firstChild?.textContent?.trim() ?? "", onLine && s.position !== "absolute", clear, s.color === accent, s.backgroundColor === tint, s.fontWeight === "700", s.fontSize === "12px"];
+          });
+        });
+        if (pills.length !== 3) found.push([lang, scheme, `${pills.length} pills`]);
+        for (const pill of pills) if (pill.slice(1).some((ok) => !ok)) found.push([lang, scheme, ...pill]);
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
