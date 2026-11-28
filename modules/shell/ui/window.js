@@ -6725,6 +6725,16 @@ function keysSheet() {
   title.id = "keys-sheet-title";
   sheet.setAttribute("aria-labelledby", title.id);
   const table = element("table", "keys-table");
+  // Its two columns named (WCAG 2.2 SC 1.3.1): what a screen reader says before each cell.
+  const head = element("thead");
+  const headRow = element("tr");
+  for (const said of words.keys_heads) {
+    const th = element("th", "", said);
+    th.setAttribute("scope", "col");
+    headRow.append(th);
+  }
+  head.append(headRow);
+  table.append(head);
   for (const [at, keys] of keysHeld().entries()) {
     const does = words.keys_does[at];
     const row = element("tr");
@@ -6745,6 +6755,8 @@ function keysSheet() {
   };
   close.addEventListener("click", () => sheet.close());
   sheet.addEventListener("close", gone);
+  // Tab and Shift+Tab round its controls, never onto the <dialog> itself (#1312).
+  roundTheDialog(sheet);
   sheet.showModal();
   close.focus();
 }
@@ -6779,10 +6791,10 @@ document.addEventListener("keydown", (event) => {
           ? undefined
           : event.key === "?"
             ? keysSheet
-            : { j: 1, k: -1 }[event.key] && (() => {
+            : { j: 1, k: -1 }[event.key.toLowerCase()] && (() => {
                 const rows = [...document.querySelectorAll("#groups li:not([hidden]) .session")];
                 const at = rows.findIndex((row) => row.getAttribute("href") === location.hash);
-                const next = rows[at < 0 ? 0 : at + { j: 1, k: -1 }[event.key]];
+                const next = rows[at < 0 ? 0 : at + { j: 1, k: -1 }[event.key.toLowerCase()]];
                 if (!next) return;
                 next.focus();
                 location.hash = next.getAttribute("href");

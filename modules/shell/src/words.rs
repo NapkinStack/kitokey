@@ -931,6 +931,9 @@ pub struct Window {
     /// Closes the sheet (D128). Shows: the sheet, as its button. When: asked. At most: 12
     /// characters. Placeholders: none.
     pub keys_close: &'static str,
+    /// The sheet's two column headers: the keys, then what they do (D128, WCAG 2.2 SC 1.3.1). Shows: the
+    /// sheet, atop its table. When: asked. At most: about 10 characters each. Placeholders: none.
+    pub keys_heads: [&'static str; 2],
     /// When an application takes the microphone (D30): its name and line, as board 4 has them.
     /// Shows: Settings, « Général », a list: its name, then its line under it (D30). When: always.
     /// At most: one line for the name, the line wraps. Placeholders: none.
@@ -2294,6 +2297,7 @@ pub fn window(language: Language) -> Window {
             ],
             keys_named: ["Shift", "Esc"],
             keys_close: "Close",
+            keys_heads: ["Key", "Action"],
             offer: [
                 "When an app uses the microphone",
                 "Usually a call starting. Kitokey never records without you knowing.",
@@ -2872,6 +2876,7 @@ pub fn window(language: Language) -> Window {
             ],
             keys_named: ["Maj", "Échap"],
             keys_close: "Fermer",
+            keys_heads: ["Touche", "Action"],
             offer: [
                 "Quand une application utilise le micro",
                 "Le plus souvent, un appel qui commence. Kitokey n’enregistre jamais à votre insu.",
