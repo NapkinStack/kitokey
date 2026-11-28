@@ -6517,8 +6517,11 @@ function placeOf() {
   const control = focused ?? changed;
   if (!control) return place;
   place.id = control.id;
-  // Its boxes with an id, nearest first: where a control the change removed was.
-  for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings"; up = up.parentElement) if (up.id) place.near.push(up.id);
+  // Its boxes with an id, nearest first: where a control the change removed was. A tab's panel is a page of its own
+  // (D123): its first control is no neighbour, the control before it is (« Garder … jours » gone, its list).
+  for (let up = control.parentElement; up && up.id !== "meeting" && up.id !== "settings" && up.getAttribute("role") !== "tabpanel"; up = up.parentElement) {
+    if (up.id) place.near.push(up.id);
+  }
   // The controls with an id before it in the page, nearest first: where the focus goes when it is gone and no
   // box of its own is found (WAI-ARIA APG: content removed, the focus to its logical predecessor; #944).
   const page = control.closest("#meeting, #settings");
