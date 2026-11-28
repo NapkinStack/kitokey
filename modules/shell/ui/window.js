@@ -198,7 +198,8 @@ async function redoDialog(session, words, step) {
   const go = element("button", "button primary", title);
   go.type = "button";
   go.addEventListener("click", async () => {
-    go.disabled = true;
+    // Asked, the dialog stays until the shell answers: a refusal is said in it, never in a dialog gone.
+    go.disabled = cancel.disabled = true;
     try {
       const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
       const value = cards.value();
@@ -215,7 +216,8 @@ async function redoDialog(session, words, step) {
     } catch (why) {
       wrong.textContent = fill(words.redo_not_done, why);
       wrong.hidden = false;
-      go.disabled = false;
+      go.disabled = cancel.disabled = false;
+      go.focus();
     }
   });
   const actions = element("div", "actions");
@@ -223,7 +225,7 @@ async function redoDialog(session, words, step) {
   dialog.append(heading, cards.box, ...notes, wrong, actions);
   dialog.addEventListener("cancel", (event) => {
     event.preventDefault();
-    close();
+    if (!go.disabled) close();
   });
   document.body.append(dialog);
   roundTheDialog(dialog);
@@ -1192,7 +1194,8 @@ async function readMakings() {
   // The minutes or the transcript of the meeting shown written since its page was drawn, however
   // quickly: drawn again, to show them — unless the user has a panel open there, or is typing in
   // it, which a redraw would take from under them; then once that is done.
-  const busy = document.querySelector("#meeting .redo, #meeting input:focus, #meeting textarea:focus");
+  // « Refaire ▾ »'s dialog (D121) is the page's too, though outside #meeting: its « Refaire » to come back to.
+  const busy = document.querySelector("#meeting .redo, #meeting input:focus, #meeting textarea:focus, dialog.redo-dialog[open]");
   const drawn = (id) => document.getElementById(id)?.dataset.made;
   const moved = opened && makings
     && ((String(makings.made[opened] ?? 0) !== drawn("minutes-state") && minutesState(opened)?.kind !== "making")
