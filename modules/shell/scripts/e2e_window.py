@@ -14689,8 +14689,13 @@ def formats_redone(now: dt.datetime) -> None:
         check("Général chosen: no structure, as before (minutes/v4)", "--structure" not in given and "--format" not in given, given)
         # lina's points 1 and 2 on #1340: no list when the formats cannot be read — the making then in the default —,
         # and no line for minutes written in a format the person deleted since, never its id.
-        browser.execute_script("const c = window.__TAURI__.core, real = c.invoke;"
-                               " c.invoke = (command, args) => command === 'formats_offered' ? Promise.reject('read') : real(command, args)")
+        # Tauri freezes `core` (its bundle.global.js): the whole object replaced, the page reading it at each call.
+        took = browser.execute_script(
+            "const t = window.__TAURI__, real = t.core.invoke;"
+            " window.__TAURI__ = { ...t, core: { ...t.core, invoke: (command, args) =>"
+            "   command === 'formats_offered' ? Promise.reject('read') : real(command, args) } };"
+            " return window.__TAURI__.core.invoke !== real")
+        check("the formats made unreadable for this check", took is True, took)
         press(browser, "redo-minutes")
         time.sleep(1)
         row = browser.execute_script("const p = document.getElementById('redo-format'); return p && p.closest('label').getClientRects().length > 0")
