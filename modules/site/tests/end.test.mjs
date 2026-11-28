@@ -94,7 +94,8 @@ test("the end takes no style of the old page by a class they share, but the ones
 test("« Bientôt dans le Microsoft Store » is text: no ground, no edge, no button's height", async () => {
   const { readFile } = await import("node:fs/promises");
   const css = (await readFile(new URL("../src/styles/end.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
-  const rules = [...css.matchAll(/([^{}]*\.soon-line[^{}]*)\{([^}]*)\}/g)].map((m) => m[2]).join(";");
+  // The line's own rules (the selector ends on it), not its mark's, whose ground is the text's colour through a mask.
+  const rules = [...css.matchAll(/([^{}]*)\{([^}]*)\}/g)].filter((m) => /\.soon-line\s*$/.test(m[1])).map((m) => m[2]).join(";");
   assert.ok(rules, "no rule for .soon-line");
   assert.doesNotMatch(rules, /background|outline|border(?!-radius)|min-height/, "soon-line has no ground, no edge");
 });

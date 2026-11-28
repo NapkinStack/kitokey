@@ -55,8 +55,11 @@ html[data-site="dark"] .end .strip .mark-debian { background: #FFFFFF; border-ra
 .end .checks .ico { color: var(--accent); margin-top: 4px; width: 16px; height: 16px; }
 .end .mac { color: var(--text-secondary); font-size: 14px; padding: 12px 14px; background: var(--bg-sunken); border-radius: var(--r-md); }
 .end .row-b { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: auto; min-height: 52px; }
-/* Until the Store's listing exists, the words where its badge will be, not a button. */
-.end .store-soon.is-soon { background: var(--bg-sunken); color: var(--text-secondary); outline: 1px solid var(--border-subtle); }
+/* Until the Store's listing exists, the words where its badge will be: a line of text, the Windows mark before it, never
+   a grey pill that reads as a disabled button (the coordinator, 2026-11-28). */
+.end .soon-line { margin: 0; color: var(--text-secondary); font-size: 15px; font-weight: 600; }
+.end .soon-line .mark { display: inline-block; width: 1cap; height: 1cap; margin-right: 8px; background: currentColor;
+  -webkit-mask: url(/img/brands/windows-logo-2021.svg) center / contain no-repeat; mask: url(/img/brands/windows-logo-2021.svg) center / contain no-repeat; }
 /* « Me prévenir de la sortie » (ADR-0021): one field and its button on one line, the sentence under them. The trap
    is out of sight and out of reach for everyone (aria-hidden, tabindex -1), not display: none, which robots skip. */
 .end .notify { display: grid; gap: var(--sp-2); scroll-margin-top: var(--sp-8); }

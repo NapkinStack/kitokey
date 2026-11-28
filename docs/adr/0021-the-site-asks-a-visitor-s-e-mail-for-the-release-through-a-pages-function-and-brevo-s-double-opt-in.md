@@ -159,7 +159,8 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 
 ## What the decider does (no agent's: an account, a contract, a secret)
 
-1. A Brevo account for the company, free plan; accept its data processing agreement.
+1. A Brevo account for the company, free plan; accept its data processing agreement, appendix 3 of
+   [its terms of service](https://www.brevo.com/legal/termsofuse/), version of 1 October 2025 (read 2026-11-28).
 2. kitokey.com authenticated as a sender: Brevo's DKIM and DMARC records in Cloudflare's DNS.
 3. The list « Kitokey — sortie », the contact attribute `NOTIFY_SINCE` (text), and a double opt-in template
    (sender support@kitokey.com), with the words written in the pull request.

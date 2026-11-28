@@ -214,7 +214,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           <div class="strip" role="group" aria-label={pr.main[4]}>{pr.main[5].map(([big, small]) => <span><b class="num">{big}</b>{small}</span>)}</div>
           <div class="incl"><p class="incl-h">{pr.main[6]}</p><ul class="checks">{pr.main[7].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
           <p class="mac">{pr.main[8]}</p>
-          <div class="row-b"><span class="store-soon is-soon"><span><span class="mark" aria-hidden="true"></span>{pr.main[9]}</span></span></div>
+          <div class="row-b"><p class="soon-line"><span class="mark" aria-hidden="true"></span>{pr.main[9]}</p></div>
           {/* « Me prévenir de la sortie » (ADR-0021): posted to the site's own /notify, no script needed. The trap is a
               field no person sees nor reaches; a robot that fills it is told it worked. */}
           <form class="notify" id="notify" method="post" action="/notify">
