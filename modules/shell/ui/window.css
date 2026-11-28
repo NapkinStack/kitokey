@@ -436,10 +436,12 @@ body.small-window .frame { display: none; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
 #small .bar-lines .small-said { margin: 0; }
-/* D92: the meeting last stopped, one line under the row at rest — cut by an ellipsis, the whole its tooltip —,
+/* D92: the meeting last stopped, one line under the row at rest — cut by an ellipsis, the whole its tooltip; a failure two (D125) —,
    « Ouvrir » beside it; its live region unseen, at the window's top, never past its edge. */
 #small .small-last { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 12px; line-height: 1.3; }
 #small #small-last-said { flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A failure in two lines, then « Ouvrir » (D125): the rest its tooltip and its live region's. */
+#small .small-last.failed #small-last-said { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
 #small .small-last .link { flex: none; font-size: 12px; line-height: 1.3; }
 #small-last-live { top: 0; left: 0; }
 .small-rest, .small-live { display: flex; flex-direction: column; gap: 12px; }
