@@ -148,14 +148,15 @@
 /* Tabs (D123, the design system's): v5's segments — the list a sunken band, each tab its words in the soft text, the
    chosen one raised on the surface in the text's colour; WAI-ARIA APG's keys (window.js, `tabsOf`). */
 /* Inline: as wide as its tabs, never wider than its column — its tabs wrap there, and the column never grows to it. */
-.tabs { display: inline-flex; flex-wrap: wrap; gap: var(--sp-1); box-sizing: border-box; max-width: 100%; padding: 2px; border-radius: var(--r-sm); background: var(--color-sunken); }
+.tabs { display: inline-flex; flex-wrap: nowrap; overflow-x: auto; gap: var(--sp-1); box-sizing: border-box; max-width: 100%; padding: 2px; border-radius: var(--r-sm); background: var(--color-sunken); }
 .tab {
   height: 32px; padding: 0 var(--sp-3); border: 1px solid transparent; border-radius: var(--r-xs); background: transparent;
   color: var(--color-text-soft); font: 600 var(--fs-body) var(--font-text); white-space: nowrap; cursor: pointer;
 }
 /* The chosen one edged too: its surface alone is a shade on the band (1.12:1), under WCAG 1.4.11's 3:1. */
 .tab[aria-selected="true"] { border-color: var(--color-edge); background: var(--color-surface); color: var(--color-text); box-shadow: var(--e1); }
-.tab:focus-visible, [data-keys] .tab:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+/* One row, never two (D123: GNOME's view switcher, Fluent's pivot); scrolled when narrower, so its ring inside the tab, never cut. */
+.tab:focus-visible, [data-keys] .tab:focus { outline: 2px solid var(--color-accent); outline-offset: -2px; }
 .tab-panel { padding-top: var(--sp-4); }
 .tab-panel[hidden] { display: none; }
 

@@ -4042,7 +4042,7 @@ def models_advanced(now: dt.datetime) -> None:
 
 def settings_tabbed(now: dt.datetime) -> None:
     """DA. D123, criterion 1: Settings in five tabs, WAI-ARIA's tabs pattern (the design system's, #1334) — « Enregistrement »,
-    « Écoute et rédaction », « Partage », « Stockage et confidentialité », « Général » —; each setting of today in its tab,
+    « Écoute et rédaction », « Partage », « Confidentialité », « Général » —; each setting of today in its tab,
     the channels in « Partage »; a tab its own address (`#/settings/<tab>`), followed without a step in the history;
     « Général » ending on « À propos »: the version, the licence and its source, the components' licences, the privacy
     policy — each a closed address the shell opens —, and how the updates come on this system."""
@@ -13375,7 +13375,7 @@ def window_looks(now: dt.datetime) -> None:
         # #1094, on Settings — the page holding a list, a field and secondary buttons at once (the meeting's page here
         # has no list of its own nor a secondary shown): fields rest on the line, their bottom edged at 3:1 (Fluent 2's
         # fields); a secondary button rests on the line, its bottom edged as Windows 11's controls — on --raised, or on the
-        # surface inside a step — and answers the pointer. At « Stockage et confidentialité », the tab holding a list, a
+        # surface inside a step — and answers the pointer. At « Confidentialité », the tab holding a list, a
         # field and a secondary button at once (D123).
         browser.execute_script("location.hash = '#/settings/storage'")
         wait_for(browser, lambda b: b.find_element(By.ID, "settings").is_displayed() and b.find_elements(By.CSS_SELECTOR, "#settings select"), 10)
@@ -13535,7 +13535,7 @@ def pages_seen(now: dt.datetime) -> None:
                     wait_for(browser, lambda b: b.execute_script("return innerWidth") == width, 5)
                 got = browser.execute_script("return innerWidth")
                 check(f"{theme}: the page {width} CSS px wide", got == width, got)
-                # Settings at « Stockage et confidentialité », the tab holding the meetings' folder (D123).
+                # Settings at « Confidentialité », the tab holding the meetings' folder (D123).
                 for page, address in (("list", "#/"), ("meeting", f"#/meeting/{names[-1]}"), ("settings", "#/settings/storage")):
                     browser.execute_script("location.hash = arguments[0]", address)
                     shown = {"list": "#sidebar", "meeting": "#meeting", "settings": "#settings"}[page]

@@ -627,10 +627,13 @@ pub struct Window {
     /// cards, its progress, its toasts (D120), its tabs (D123). When: the gallery shown. At most: one line each.
     /// Placeholders: none.
     pub gallery_parts: [&'static str; 9],
-    /// Shows: Settings' tabs, in their order — recording, listening and writing, sharing, storage and privacy,
-    /// general (D123, ux-ia §2) —, and the gallery's tabs. When: Settings or the gallery shown. At most: about 28
-    /// characters each. Placeholders: none.
+    /// Shows: Settings' tabs, in their order — recording, listening and writing, sharing, privacy, general (D123,
+    /// ux-ia §2) —, and the gallery's tabs. When: Settings or the gallery shown. At most: about 20 characters each,
+    /// the five on one row at 1100 px in French. Placeholders: none.
     pub settings_tabs: [&'static str; 5],
+    /// Shows: the heading of the privacy tab's section, its full name (D123). When: Settings' privacy tab shown.
+    /// At most: about 30 characters. Placeholders: none.
+    pub storage_title: &'static str,
     /// Shows: « Général »'s last part, its heading (D123). When: Settings' « Général » shown. At most: one word.
     /// Placeholders: none.
     pub about_title: &'static str,
@@ -2188,7 +2191,8 @@ pub fn window(language: Language) -> Window {
                 "Toasts",
                 "Tabs",
             ],
-            settings_tabs: ["Recording", "Listening and writing", "Sharing", "Storage and privacy", "General"],
+            settings_tabs: ["Recording", "Listening and writing", "Sharing", "Privacy", "General"],
+            storage_title: "Storage and privacy",
             about_title: "About",
             about_licence: "Free software under GPL v3",
             about_links: ["Source code", "Components’ licences", "Privacy policy"],
@@ -2754,13 +2758,8 @@ pub fn window(language: Language) -> Window {
                 "Messages brefs",
                 "Onglets",
             ],
-            settings_tabs: [
-                "Enregistrement",
-                "Écoute et rédaction",
-                "Partage",
-                "Stockage et confidentialité",
-                "Général",
-            ],
+            settings_tabs: ["Enregistrement", "Écoute et rédaction", "Partage", "Confidentialité", "Général"],
+            storage_title: "Stockage et confidentialité",
             about_title: "À propos",
             about_licence: "Logiciel libre sous GPL v3",
             about_links: ["Code source", "Licences des composants", "Politique de confidentialité"],

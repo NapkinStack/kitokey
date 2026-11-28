@@ -5139,7 +5139,7 @@ function showSettings(shown, minutes, words) {
       ["recording", recordingName, card(recordingName, remind, check, offer, keys)],
       ["listening", listeningName, [after, models]],
       ["sharing", sharingName, card(sharingName, sending, exporting)],
-      ["storage", storageName, card(storageName, where, keep)],
+      ["storage", storageName, card(words.storage_title, where, keep)],
       ["general", generalName, more],
     ],
     settingsTab(),
