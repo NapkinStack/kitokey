@@ -634,6 +634,10 @@ pub struct Window {
     /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
     /// characters. Placeholders: none.
     pub meeting_share: &'static str,
+    /// D121, criterion 2: « Partager » with no channel set up, and the title of the sheet that adds one, Settings' form
+    /// in it. Shows: a meeting's page, « Partager »'s menu, an item; the sheet's title. When: no channel is set up.
+    /// At most: about 24 characters. Placeholders: none.
+    pub channel_add: &'static str,
     /// D121, « Partager »'s export of the summary alone as a PDF, written where the user chooses in the system's
     /// dialog. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most: about 24 characters.
     /// Placeholders: none.
@@ -2185,6 +2189,7 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "More actions",
             meeting_share: "Share",
+            channel_add: "Add a channel",
             export_pdf: "Export to PDF",
             export_md: "Export to Markdown",
             export_done: "Exported: “{}”.",
@@ -2746,6 +2751,7 @@ pub fn window(language: Language) -> Window {
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",
+            channel_add: "Ajouter un canal",
             export_pdf: "Exporter en PDF",
             export_md: "Exporter en Markdown",
             export_done: "Exporté\u{a0}: «\u{a0}{}\u{a0}».",

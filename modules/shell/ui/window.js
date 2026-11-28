@@ -96,6 +96,7 @@ function lock() {
 const ICONS = {
   calendar: ["M8 2v4", "M16 2v4", ["rect", { width: 18, height: 18, x: 3, y: 4, rx: 2 }], "M3 10h18"],
   check: ["M20 6 9 17l-5-5"],
+  plus: ["M5 12h14", "M12 5v14"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
   "chevron-up": ["m18 15-6-6-6 6"],
@@ -157,6 +158,120 @@ function icon(name) {
     svg.append(shape);
   }
   return svg;
+}
+
+// A destination's form (D110, D121): its kind a tile each, its name, its address, « Ajouter »; Settings' own and the
+// meeting page's sheet's, each its own ids from `prefix`. `added(name)` runs once it is kept, and says it.
+function destinationForm(words, locked, prefix, added) {
+  const kinds = { webhook: 0, discord: 1, slack: 2 };
+  const adding = element("div", "fields adding");
+  adding.id = `${prefix}-adding`;
+  // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
+  // the arrows move in, its first chosen at first, as the list's first was.
+  // On a whole line, as the address: the three tiles side by side.
+  const kindField = element("div", "field kinds whole");
+  const kindName = element("span", "name", words.destination_fields[0]);
+  kindName.id = `${prefix}-kind-name`;
+  const tiles = element("div", "tiles");
+  tiles.setAttribute("role", "radiogroup");
+  tiles.setAttribute("aria-labelledby", kindName.id);
+  for (const [value, index] of Object.entries(kinds)) {
+    const tile = element("label", "tile");
+    const input = element("input");
+    input.type = "radio";
+    input.name = `${prefix}-kind`;
+    input.value = value;
+    input.id = `${prefix}-kind-${value}`;
+    input.checked = index === 0;
+    input.disabled = locked;
+    tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
+    tiles.append(tile);
+  }
+  kindField.append(kindName, tiles);
+  const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
+  const [namedField, named] = guidedField(`${prefix}-name`, words.destination_fields[1], "text", "", locked);
+  named.maxLength = 40;
+  named.autocomplete = "off";
+  const [addressField, address] = guidedField(`${prefix}-address`, words.destination_fields[2], "url", "", locked);
+  addressField.classList.add("whole");
+  address.autocomplete = "off";
+  address.spellcheck = false;
+  address.setAttribute("aria-describedby", `${prefix}-address-said`);
+  const addressSaid = element("p", "says", words.destination_address_said);
+  addressSaid.id = `${prefix}-address-said`;
+  const add = element("button", "open", words.destination_add);
+  add.type = "button";
+  add.id = `${prefix}-add`;
+  add.disabled = locked;
+  const result = element("p", "says");
+  result.id = `${prefix}-said`;
+  result.setAttribute("role", "status");
+  add.addEventListener("click", () => {
+    add.disabled = true;
+    window.__TAURI__.core
+      .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
+      .then(
+        () => {
+          // Kept: the address leaves the page at once; whoever opened the form says it.
+          const name = named.value.trim();
+          address.value = "";
+          return added(name);
+        },
+        (why) => {
+          result.textContent = fill(words.destination_not_added, why);
+          add.disabled = locked;
+        },
+      );
+  });
+  adding.append(
+    kindField,
+    namedField,
+    addressField,
+    addressSaid,
+    add,
+    result,
+  );
+  return { adding, kind, result, add };
+}
+
+// « Ajouter un canal » (D121, criterion 2): Settings' channel form in a sheet of the meeting's page, the platform's modal
+// `<dialog>` (D120) — titled, the rest inert, Escape or « Annuler » closing it, nothing kept —, the focus on its first
+// field and back where it was. A channel added closes it; the page, drawn again, sends to it, and says it once.
+function channelSheet(words) {
+  const back = document.activeElement;
+  const dialog = element("dialog", "dialog sheet");
+  const heading = element("h2", "", words.channel_add);
+  heading.id = "channel-sheet-title";
+  dialog.setAttribute("aria-labelledby", heading.id);
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus();
+  };
+  const { adding, kind, add } = destinationForm(words, false, "channel", (name) => {
+    close();
+    return refresh().then(() => {
+      const said = document.getElementById("share-said");
+      if (said) said.textContent = fill(words.destination_added, name);
+      document.getElementById("share-open")?.focus();
+    });
+  });
+  const cancel = element("button", "button secondary", words.send_cancel);
+  cancel.type = "button";
+  cancel.addEventListener("click", close);
+  // Its answers together, as the platform's dialogs and `ask()` put them: the safe one first, « Ajouter » the primary.
+  add.className = "button primary";
+  const actions = element("div", "actions");
+  actions.append(cancel, add);
+  dialog.append(heading, element("p", "says", words.destinations_said), adding, actions);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  document.body.append(dialog);
+  roundTheDialog(dialog);
+  dialog.showModal();
+  kind.focus();
 }
 
 // A question the platform asks (D120, PDR-0008): its own modal `<dialog>` — the rest of the window inert, Escape
@@ -649,6 +764,8 @@ function confidentialCard(session, confidential, words) {
 // A session's folder name: what the window calls it, and the only date it says when its start
 // cannot be read.
 const nameOf = (session) => session.folder.split(/[\\/]/).pop();
+// Whether the meeting shown has no channel to send to (D121): « Partager »'s send then adds one.
+let shareAddsChannel = false;
 // A sentence the shell told, begun with its capital where the page says it alone (« le fichier… » → « Le fichier… »).
 const sentenceOf = (told) => told.charAt(0).toUpperCase() + told.slice(1);
 
@@ -2333,6 +2450,13 @@ function sendPart(card, top, actions, session, words) {
     if (!shown) return;
     listSends(shown);
     sayFailed(shown);
+    // No channel set up (D121): « Partager »'s send becomes « Ajouter un canal ».
+    shareAddsChannel = shown.destinations.length === 0;
+    if (shareAddsChannel) {
+      const item = document.getElementById("share-send");
+      // Its « + » before its words, as v5 draws it (l. 728).
+      if (item) item.replaceChildren(icon("plus"), element("span", "", words.channel_add));
+    }
     if (!shown.offered) return;
     let offered = shown.destinations;
     let secret = shown.confidential;
@@ -3469,7 +3593,11 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
       shared.textContent = sentenceOf(String(why));
     }
   };
-  const share = moreActions([["share-send", words.send_open, press("send-open")], ["share-copy", words.copy_minutes, press("copy-minutes")],
+  // « Envoyer… » sends where a channel is set up; with none, the summary's card says so (`sending_of`) and the item
+  // becomes « Ajouter un canal », Settings' form in a sheet of the page (D121, criterion 2).
+  shareAddsChannel = false;
+  const shareSend = () => (document.getElementById("send-open") ? press("send-open")() : shareAddsChannel && channelSheet(words));
+  const share = moreActions([["share-send", words.send_open, shareSend], ["share-copy", words.copy_minutes, press("copy-minutes")],
     ["share-pdf", words.export_pdf, exportTo("pdf")], ["share-md", words.export_md, exportTo("md")]], words,
     { id: "share-open", menuId: "share-menu", glyph: "share-2", label: words.meeting_share, name: words.meeting_share, chevron: true });
   // A confidential meeting is shared explicitly, and the menu says how (PDR-0007, amended 2026-11-24): its line heard
@@ -4245,74 +4373,11 @@ function showSettings(shown, minutes, words) {
     });
     // The add form apart from the list, its fields the Settings' own (guidedField, guidedList); the
     // address on a whole line, long enough to read back what was pasted.
-    const adding = element("div", "fields adding");
-    adding.id = "destination-adding";
-    // Its kind a tile each (#1238), as a desktop offers a few kinds: its mark or the page's icon, its name; a radio group
-    // the arrows move in, its first chosen at first, as the list's first was.
-    // On a whole line, as the address: the three tiles side by side.
-    const kindField = element("div", "field kinds whole");
-    const kindName = element("span", "name", words.destination_fields[0]);
-    kindName.id = "destination-kind-name";
-    const tiles = element("div", "tiles");
-    tiles.setAttribute("role", "radiogroup");
-    tiles.setAttribute("aria-labelledby", "destination-kind-name");
-    for (const [value, index] of Object.entries(kinds)) {
-      const tile = element("label", "tile");
-      const input = element("input");
-      input.type = "radio";
-      input.name = "destination-kind";
-      input.value = value;
-      input.id = `destination-kind-${value}`;
-      input.checked = index === 0;
-      input.disabled = locked;
-      tile.append(input, kindMark(value), element("span", "", words.destination_kinds[index]));
-      tiles.append(tile);
-    }
-    kindField.append(kindName, tiles);
-    const kind = { get value() { return tiles.querySelector("input:checked")?.value ?? "webhook"; }, focus: () => tiles.querySelector("input:checked")?.focus() };
-    const [namedField, named] = guidedField("destination-name", words.destination_fields[1], "text", "", locked);
-    named.maxLength = 40;
-    named.autocomplete = "off";
-    const [addressField, address] = guidedField("destination-address", words.destination_fields[2], "url", "", locked);
-    addressField.classList.add("whole");
-    address.autocomplete = "off";
-    address.spellcheck = false;
-    address.setAttribute("aria-describedby", "destination-address-said");
-    const addressSaid = element("p", "says", words.destination_address_said);
-    addressSaid.id = "destination-address-said";
-    const add = element("button", "open", words.destination_add);
-    add.type = "button";
-    add.id = "destination-add";
-    add.disabled = locked;
-    const result = element("p", "says");
-    result.id = "destination-said";
-    result.setAttribute("role", "status");
-    add.addEventListener("click", () => {
-      add.disabled = true;
-      window.__TAURI__.core
-        .invoke("destination_added", { kind: kind.value, name: named.value, address: address.value })
-        .then(
-          () => {
-            // Kept: the address leaves the page at once; the list, drawn again, names it.
-            address.value = "";
-            return refresh().then(() => {
-              const said = document.getElementById("destination-said");
-              if (said) said.textContent = fill(words.destination_added, named.value.trim());
-            });
-          },
-          (why) => {
-            result.textContent = fill(words.destination_not_added, why);
-            add.disabled = locked;
-          },
-        );
-    });
-    adding.append(
-      kindField,
-      namedField,
-      addressField,
-      addressSaid,
-      add,
-      result,
+    const { adding, kind } = destinationForm(words, locked, "destination", (name) =>
+      refresh().then(() => {
+        const said = document.getElementById("destination-said");
+        if (said) said.textContent = fill(words.destination_added, name);
+      }),
     );
     // Folded at first: a disclosure (ARIA APG), as « Avancé »; unfolded by a click, the focus goes to
     // its first field. Escape does not fold it: a half-filled form is not lost by a key.

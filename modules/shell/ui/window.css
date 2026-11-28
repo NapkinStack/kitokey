@@ -774,3 +774,6 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .with-mark select { flex: 1 1 auto; min-width: 0; }
 /* A summary's section with nothing in it (#1234): said, in the soft colour. */
 .minutes .body .empty-section { color: var(--soft); }
+/* « Ajouter un canal »'s sheet (D121, #1333): room under its lead before the form; a menu item's icon before its words. */
+.dialog.sheet > .says { margin-bottom: var(--sp-3); }
+.menu-item > .glyph { flex: none; width: var(--sp-4); height: var(--sp-4); margin-right: var(--sp-2); }
