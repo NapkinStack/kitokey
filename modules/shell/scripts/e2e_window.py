@@ -4066,11 +4066,12 @@ def toasts_said(now: dt.datetime) -> None:
     with Window(meetings, "fr_FR.UTF-8", "reminder = false\ndeveloper = true\n") as browser:
         # A meeting's diagnostic, copied: here a meeting with no logs, said so by the toast.
         browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "more-actions"), 10)
+        wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
         browser.execute_script("window.__diagnostic = null; Object.defineProperty(navigator, 'clipboard', {configurable: true,"
                                " value: {writeText: async (t) => { window.__diagnostic = t; }}})")
         browser.execute_script(TOAST_WATCH)
-        press(browser, "more-actions")
+        # « Plus », the meeting page's menu since D121 (#1301).
+        press(browser, "more-open")
         wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 3)
         # Clicked once the menu has opened: shown, and nothing over its centre (the menu still opening covered it).
         wait_for(browser, lambda b: b.execute_script(
