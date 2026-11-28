@@ -45,9 +45,12 @@ fn a_format_made_is_kept_under_a_name_of_its_own_offered_after_the_built_in() {
     // A second of the same name is refused, whatever its case or spaces; one whose structure would
     // be taken gets one of its own.
     assert_eq!(formats.made(" point CLIENT hebdo ", weekly(), None), Err(Refused::NameTaken));
-    assert_eq!(formats.made("Point client hébdo", weekly(), None).unwrap(), "point_client_hebdo_2");
+    assert_eq!(
+        formats.made("Point client hebdo !", weekly(), None).unwrap(),
+        "point_client_hebdo_2"
+    );
     // A name that would be a built-in's structure never takes it.
-    assert_eq!(formats.made("General", weekly(), None).unwrap(), "general_2");
+    assert_eq!(formats.made("General.", weekly(), None).unwrap(), "general_2");
     // A name with no letter of [a-z0-9] still gets one.
     assert_eq!(formats.made("週報", weekly(), None).unwrap(), "format");
 }
@@ -240,6 +243,11 @@ name = "Capitales"
 sections = [{ title = "A", about = "x" }]
 
 [[formats]]
+structure = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+name = "Quarante et un"
+sections = [{ title = "A", about = "x" }]
+
+[[formats]]
 structure = "vide"
 name = "Vide"
 sections = []
@@ -260,6 +268,80 @@ sections = [{ title = "A", about = "x" }]
     assert_eq!(formats.default, "general");
 }
 
+/// lina's remark on #1324, the coordinator's decision of 2026-11-28: a name is taken by a built-in format's
+/// name in either language Kitokey speaks, or by the person's own, whatever its case and its accents.
+#[test]
+fn a_name_a_built_in_format_or_another_has_is_taken_whatever_its_case_and_accents() {
+    let mut formats = Formats::default();
+    for taken in [
+        "Général",
+        "general",
+        "GÉNÉRAL",
+        "Entretien",
+        "entretien",
+        "Interview",
+        "One-to-one",
+        "revue de projet",
+        "Project review",
+    ] {
+        assert_eq!(formats.made(taken, weekly(), None), Err(Refused::NameTaken), "{taken}");
+    }
+    // The same name typed with a straight apostrophe, or a no-break space (the coordinator, 2026-11-28).
+    for taken in ["Point d'equipe", "Point\u{a0}d’équipe"] {
+        assert_eq!(formats.made(taken, weekly(), None), Err(Refused::NameTaken), "{taken}");
+    }
+    let made = formats.made("Pôint client", weekly(), None).unwrap();
+    assert_eq!(formats.made("point CLIENT", weekly(), None), Err(Refused::NameTaken));
+    assert_eq!(formats.renamed(&made, "Appel client"), Err(Refused::NameTaken));
+    assert_eq!(formats.own(&made).unwrap().name, "Pôint client");
+    // Written by hand under a built-in's name: left aside, as any other out of bounds.
+    let kept = Formats::kept(
+        vec![Format {
+            structure: "pris".into(),
+            name: "Point d’équipe".into(),
+            sections: weekly(),
+            actions: None,
+        }],
+        vec![],
+        None,
+    );
+    assert!(kept.own.is_empty(), "{kept:?}");
+}
+
+/// lina's survivors on #1324 (2026-11-28): the bounds as `format.schema.json` writes them, each pinned.
+#[test]
+fn a_carriage_return_is_refused_in_a_name_a_title_and_what_goes_in_a_section() {
+    let mut formats = Formats::default();
+    assert_eq!(formats.made("Point\rclient", weekly(), None), Err(Refused::Name));
+    assert_eq!(
+        formats.made("Point", vec![section("Con\rtexte", "x")], None),
+        Err(Refused::Section(0))
+    );
+    assert_eq!(
+        formats.made("Point", vec![section("Contexte", "Où en est\rle client")], None),
+        Err(Refused::Section(0))
+    );
+    assert!(formats.own.is_empty());
+}
+
+#[test]
+fn the_actions_are_the_section_chosen_wherever_it_stands() {
+    let mut formats = Formats::default();
+    for (at, id) in [(0, "contexte"), (1, "demandes")] {
+        let made = formats.made(&format!("Point {at}"), weekly(), Some(at)).unwrap();
+        assert_eq!(formats::file(formats.own(&made).unwrap())["actions"], id, "actions at {at}");
+    }
+}
+
+#[test]
+fn a_structure_taken_at_forty_characters_gets_one_of_forty_with_its_number() {
+    let mut formats = Formats::default();
+    let first = formats.made("Réunion hebdomadaire de l’équipe produit", weekly(), None).unwrap();
+    assert_eq!(first, "reunion_hebdomadaire_de_l_equipe_produit");
+    let second = formats.made("Reunion hebdomadaire de l equipe produit", weekly(), None).unwrap();
+    assert_eq!(second, "reunion_hebdomadaire_de_l_equipe_produ_2");
+    assert_eq!(second.chars().count(), 40);
+}
 #[test]
 fn kitokey_summary_is_given_the_format_chosen_as_summarising_v1_says() {
     let folder = tempfile::tempdir().unwrap();

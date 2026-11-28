@@ -5,20 +5,20 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dist } from "./helpers.mjs";
+import { dist, unwrapped } from "./helpers.mjs";
 import { landing } from "../src/lib/landing.mjs";
 import { words } from "../src/lib/words.mjs";
 
-const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8");
+const page = (lang) => readFile(join(dist, lang, "index.html"), "utf8").then(unwrapped);
 const section = async (lang, id) => (await page(lang)).match(new RegExp(`<section class="end[^"]*"[^>]* id="${id}"[\\s\\S]*?</section>`))?.[0] ?? "";
 const text = (html) => html.replace(/<svg[\s\S]*?<\/svg>/g, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 const ids = { fr: ["prix", "besoins", "faq"], en: ["price", "needs", "faq"] };
 
 for (const lang of ["fr", "en"]) {
-  test(`/${lang}/: the price is 69 € once, the trial 14 days and 10 meetings at least, no account, no subscription`, async () => {
+  test(`/${lang}/: the price is 69 € once, 69 $ in English (PDR-0009, #1311), the trial 14 days and 10 meetings at least, no account, no subscription`, async () => {
     const html = await section(lang, ids[lang][0]);
     const said = text(html);
-    assert.match(said, lang === "fr" ? /69 € une fois/ : /€69 once/);
+    assert.match(said, lang === "fr" ? /69 € une fois/ : /\$69 once/);
     assert.match(said, lang === "fr" ? /14 jours d’essai au moins/ : /14 days of trial at least/);
     assert.match(said, lang === "fr" ? /10 réunions au moins/ : /10 meetings at least/);
     assert.match(said, lang === "fr" ? /Pas d’abonnement/ : /No subscription/);
@@ -59,7 +59,7 @@ for (const lang of ["fr", "en"]) {
   test(`/${lang}/: the last call, its price PDR-0009's, its words for the Store, Linux free`, async () => {
     const html = (await page(lang)).match(/<section class="end end-band final"[\s\S]*?<\/section>/)?.[0] ?? "";
     assert.ok(html.includes(`<h2 id="final-h">${landing.final[lang][0]}</h2>`));
-    assert.match(text(html), lang === "fr" ? /69 € une fois/ : /€69 once/);
+    assert.match(text(html), lang === "fr" ? /69 € une fois/ : /\$69 once/);
     assert.doesNotMatch(html, /ms-store|get\.microsoft\.com/);
     assert.match(html, /<svg class="illus" viewBox="0 0 320 128" aria-hidden="true">/);
   });

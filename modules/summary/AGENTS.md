@@ -23,7 +23,7 @@ Writes the minutes of a transcript.
   program. `tests/program.rs` plays a provider on this machine: no test calls a real one.
 - The request is written in English and asks for the meeting's language.
 - The answer may open on one title of first level: the meeting's name, written as `title` when `minutes/v3` lets it, never judged as a section.
-- An answer is minutes when it holds exactly three sections of second level (`minutes/v4`), or as many as its structure has (`minutes/v5`, `--structure`), none empty, once the times it may not keep are gone. A structure's ids are the contract's (`tests/structure.rs` reads its page).
+- An answer is minutes when it holds exactly three sections of second level (`minutes/v4`), or as many as its structure has (`minutes/v5`, `--structure` or `--format`), none empty, once the times it may not keep are gone. A structure's ids are the contract's (`tests/structure.rs` reads its page).
 - A cost is read from `openrouter.ai` alone, the one host whose documentation names a currency. Its test puts that name on a stand-in in a namespace of its own (`tests/program.rs`), never the real host.
 
 ## Business invariants

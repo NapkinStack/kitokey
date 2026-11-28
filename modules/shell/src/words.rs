@@ -623,9 +623,9 @@ pub struct Window {
     /// Shows: the design system's gallery (D120, `#/gallery`, linked from nowhere): its title. When: the
     /// gallery shown. At most: one line. Placeholders: none.
     pub gallery_title: &'static str,
-    /// Shows: the gallery's sections: its buttons, its banners, its dialogs, its engine cards (D120). When: the gallery shown.
-    /// At most: one line each. Placeholders: none.
-    pub gallery_parts: [&'static str; 4],
+    /// Shows: the gallery's sections: its buttons, its banners, its dialogs, its engine cards, its chips, its option
+    /// cards, its progress, its toasts (D120). When: the gallery shown. At most: one line each. Placeholders: none.
+    pub gallery_parts: [&'static str; 8],
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
@@ -634,6 +634,20 @@ pub struct Window {
     /// and its files. Shows: a meeting's page, the bar of actions, a button. When: always. At most: about 12
     /// characters. Placeholders: none.
     pub meeting_share: &'static str,
+    /// D121, « Partager »'s export of the summary alone as a PDF, written where the user chooses in the system's
+    /// dialog. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most: about 24 characters.
+    /// Placeholders: none.
+    pub export_pdf: &'static str,
+    /// D121, the same export as Markdown. Shows: a meeting's page, « Partager »'s menu, an item. When: always. At most:
+    /// about 24 characters. Placeholders: none.
+    pub export_md: &'static str,
+    /// D121, an export written, said once under the bar. Shows: a meeting's page, under its bar of actions. When: the
+    /// file is written. At most: one line. Placeholders: {} the file's name, never its folder.
+    pub export_done: &'static str,
+    /// PDR-0007, amended 2026-11-24: how a confidential meeting is shared, a send asked again, an export kept here.
+    /// Shows: a meeting's page, atop « Partager »'s menu, and its description for a screen reader. When: the meeting
+    /// is confidential. At most: two short lines. Placeholders: none.
+    pub share_confidential: &'static str,
     /// The dates the summary's actions name, its count beside it. Shows: a meeting's page, the bar of actions, a
     /// button. When: a date is found in the summary's actions. At most: about 12 characters. Placeholders: none.
     pub meeting_dates: &'static str,
@@ -1356,6 +1370,22 @@ pub struct Window {
     /// The disclosure that holds an engine's id, address and size (D122). Shows: an engine card, as a
     /// disclosure. When: always, folded. At most: 12 characters. Placeholders: none.
     pub engine_details: &'static str,
+    /// The first run's first screen, its title (D126, mock-up v5's screen 1). Shows: the first run,
+    /// as its heading. When: Kitokey's first start. At most: about 40 characters. Placeholders: none.
+    pub first_title: &'static str,
+    /// Under the first run's title: what is asked, and that it is not final (D126). Shows: the first
+    /// run, under its heading. When: Kitokey's first start. At most: two lines. Placeholders: none.
+    pub first_lead: &'static str,
+    /// Leaves the choice to « Auto » and goes on (D126). Shows: the first run, as a button. When:
+    /// Kitokey's first start. At most: about 25 characters. Placeholders: none.
+    pub first_later: &'static str,
+    /// Goes on with the engine chosen (D126). Shows: the first run, as its primary button. When:
+    /// Kitokey's first start. At most: 12 characters. Placeholders: none.
+    pub first_next: &'static str,
+    /// Where the user is among the first run's screens, read by a screen reader on its three marks
+    /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
+    /// start. At most: about 20 characters. Placeholders: {} the screen's number.
+    pub first_step: &'static str,
     /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
     /// Settings. At most: no limit. Placeholders: none.
     pub models_own_note: &'static str,
@@ -2156,9 +2186,22 @@ pub fn window(language: Language) -> Window {
             trash_confirm: "Move to trash",
             trash_refused: "Not moved to the trash: {}",
             gallery_title: "Components",
-            gallery_parts: ["Buttons", "Banners", "Dialogs", "Engines"],
+            gallery_parts: [
+                "Buttons",
+                "Banners",
+                "Dialogs",
+                "Engines",
+                "Chips",
+                "Option cards",
+                "Progress",
+                "Toasts",
+            ],
             more_actions: "More actions",
             meeting_share: "Share",
+            export_pdf: "Export to PDF",
+            export_md: "Export to Markdown",
+            export_done: "Exported: “{}”.",
+            share_confidential: "Confidential: a send asks you first, an export stays on this computer.",
             meeting_dates: "Calendar",
             meeting_redo: "Redo",
             meeting_more: "More",
@@ -2404,6 +2447,11 @@ pub fn window(language: Language) -> Window {
             engine_install: "To install",
             engine_key: "Key missing",
             engine_details: "Details",
+            first_title: "Two questions, and you’re ready.",
+            first_lead: "Who writes your summaries? You can change it later, meeting by meeting.",
+            first_later: "I’ll choose later",
+            first_next: "Continue",
+            first_step: "Step {} of 3",
             models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
@@ -2703,9 +2751,22 @@ pub fn window(language: Language) -> Window {
             trash_confirm: "Mettre à la corbeille",
             trash_refused: "Pas mise à la corbeille\u{a0}: {}",
             gallery_title: "Composants",
-            gallery_parts: ["Boutons", "Bandeaux", "Dialogues", "Moteurs"],
+            gallery_parts: [
+                "Boutons",
+                "Bandeaux",
+                "Dialogues",
+                "Moteurs",
+                "Pastilles",
+                "Cartes d’option",
+                "Progression",
+                "Messages brefs",
+            ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",
+            export_pdf: "Exporter en PDF",
+            export_md: "Exporter en Markdown",
+            export_done: "Exporté\u{a0}: «\u{a0}{}\u{a0}».",
+            share_confidential: "Confidentielle\u{a0}: un envoi vous est redemandé, un export reste sur cet ordinateur.",
             meeting_dates: "Agenda",
             meeting_redo: "Refaire",
             meeting_more: "Plus",
@@ -2957,6 +3018,11 @@ pub fn window(language: Language) -> Window {
             engine_install: "À installer",
             engine_key: "Clé manquante",
             engine_details: "Détails",
+            first_title: "Deux questions, et c’est prêt.",
+            first_lead: "Qui écrit vos comptes rendus\u{202f}? Vous pourrez changer plus tard, réunion par réunion.",
+            first_later: "Je choisirai plus tard",
+            first_next: "Continuer",
+            first_step: "Étape {} sur 3",
             models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",
@@ -3280,6 +3346,8 @@ pub enum Failure {
     FolderNotOpened,
     LinkNotOpened,
     DatesNotSaved,
+    /// A meeting exported (D121): the file not written where the user chose.
+    ExportNotWritten,
     KeyboardSettings,
     Keyring,
     ProgramNotStarted,
@@ -3368,6 +3436,8 @@ pub fn failure(failure: Failure, language: Language) -> String {
         (Failure::FolderNotOpened, French) => "Impossible d’ouvrir le dossier. Ouvrez-le depuis votre gestionnaire de fichiers.",
         (Failure::DatesNotSaved, English) => "the calendar file wasn’t written. Choose another folder, then try again.",
         (Failure::DatesNotSaved, French) => "le fichier d’agenda n’a pas pu être écrit. Choisissez un autre dossier, puis réessayez.",
+        (Failure::ExportNotWritten, English) => "the file couldn’t be written. Choose another folder, or free some space, then try again.",
+        (Failure::ExportNotWritten, French) => "le fichier n’a pas pu être écrit. Choisissez un autre dossier, ou libérez de la place, puis réessayez.",
         (Failure::LinkNotOpened, English) => "Couldn’t open your browser. Save the dates as a calendar file instead.",
         (Failure::LinkNotOpened, French) => "Impossible d’ouvrir le navigateur. Enregistrez plutôt les dates dans un fichier d’agenda.",
         (Failure::KeyboardSettings, English) => "Can’t open keyboard settings from here. Open them from your system settings.",

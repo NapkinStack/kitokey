@@ -55,12 +55,18 @@ p { text-wrap: pretty; }
 .skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
 .skip:focus { top: 10px; color: var(--on-accent); }
 .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+/* A compound word kept whole (src/lib/nb.mjs): it never breaks at its hyphen. */
+.nb { white-space: nowrap; }
 @media (min-width: 700px) { .wrap { padding: 0 32px; } }
 
 /* ---- A page of text: the privacy policy ---- */
 .prose { max-width: 50rem; padding-top: clamp(2.5rem, 1.5rem + 4vw, 5rem); padding-bottom: clamp(3rem, 2rem + 4vw, 6rem); }
 .prose h1 { font-size: clamp(2.4rem, 1.5rem + 3.6vw, 4rem); font-weight: 800; letter-spacing: -.04em; }
 .prose h2 { font-size: clamp(1.5rem, 1.2rem + 1.2vw, 2rem); font-weight: 740; margin: 2.6rem 0 .8rem; }
+/* The legal notice: each field and its value on a line, the field in the secondary text. */
+.legal { display: grid; grid-template-columns: minmax(10rem, max-content) 1fr; gap: .5rem 1.5rem; margin: 0; }
+.legal dt { color: var(--text-secondary); }
+.legal dd { margin: 0; }
 .prose .changed { color: var(--text-secondary); margin: 1rem 0 2rem; }
 .prose table { border-collapse: collapse; width: 100%; background: var(--bg-surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--border-subtle); }
 .prose th, .prose td { border-bottom: 1px solid var(--border-subtle); padding: .7rem .8rem; text-align: left; vertical-align: top; }
@@ -73,7 +79,10 @@ p { text-wrap: pretty; }
 .ico { width: 1.5rem; height: 1.5rem; flex: none; }
 
 /* Install: the commands on a dark block, one tab per system. */
-.get { max-width: 860px; margin: 0 auto; }
+/* On the grid of every other section (v7): its heading at the wrap's left, its commands no wider than 860 px. */
+.get .code { max-width: 860px; }
+/* In the dark theme, the commands' block is edged in the control's ink, so it stands out of the canvas (nora, #1318). */
+html[data-site="dark"] .code { outline: 1px solid var(--border-control); }
 .code { position: relative; background: #0F1218; color: #E6EAF2; border-radius: 20px; padding: 1.4rem; margin-top: 2rem; }
 .code pre { margin: 0; overflow-x: auto; font: .95rem/1.8 ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace; }
 .code pre .p { color: #8AB0FF; user-select: none; }
@@ -98,9 +107,10 @@ p { text-wrap: pretty; }
 html[data-site="dark"] .theme-toggle .i-sun { display: block; }
 html[data-site="dark"] {
   color-scheme: dark;
-  --bg-canvas: #15171C; --bg-surface: #1E2129; --bg-sunken: #12141A; --bg-raised: #1E222B;
-  --bg-hover: #313644; --bg-pressed: #3A4050; --bg-tint: #1B2540;
-  --border-subtle: #343946; --border-control: #737B8C;
+  /* v7's dark grounds and lines (l. 48-50), validated by the decider on 2026-11-26. */
+  --bg-canvas: #0F1115; --bg-surface: #171A21; --bg-sunken: #12141A; --bg-raised: #1E222B;
+  --bg-hover: #252A35; --bg-pressed: #2E3441; --bg-tint: #1B2540;
+  --border-subtle: #2A2F3A; --border-control: #717A8C;
   --text-primary: #EEF0F4; --text-secondary: #AAB1BF; --text-tertiary: #8A92A3;
   --accent: #8AB0FF; --accent-hover: #A9C4FF; --on-accent: #0B1530;
   --success: #63D49C; --warning: #F5B54A; --warning-bg: #2A2214;
@@ -114,3 +124,10 @@ html[data-site="dark"] {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* /404.html: two short blocks on the site's ground, French then English, each its way home. */
+.lost-page { display: grid; gap: 2.5rem; padding-top: clamp(4rem, 3rem + 6vw, 8rem); padding-bottom: clamp(4rem, 3rem + 6vw, 8rem); }
+.lost h1, .lost .lost-h { font-family: var(--display); font-size: clamp(2rem, 1.4rem + 2.6vw, 3.2rem); font-weight: 800; letter-spacing: -.03em; margin: 0 0 .5rem; color: var(--text-primary); }
+.lost p { margin: 0 0 1rem; font-size: 1.15rem; color: var(--text-secondary); }
+.lost .home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.1rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 650; text-decoration: none; }
+.lost .home:hover { background: var(--accent-hover); }

@@ -8,7 +8,7 @@ import "../styles/hero.css";
 import { open } from "../../site.config.mjs";
 import { say } from "../lib/words.mjs";
 
-const { lang, title, description, path, kind, nav = [] } = Astro.props;
+const { lang, title, description, path, kind, nav = [], indexed = true } = Astro.props;
 const other = lang === "en" ? "fr" : "en";
 const site = Astro.site;
 const url = (l) => new URL(`/${l}/${path}`, site).href;
@@ -21,7 +21,7 @@ const source = "https://github.com/NapkinStack/kitokey";
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {!open && <meta name="robots" content="noindex" />}
+    {(!open || !indexed) && <meta name="robots" content="noindex" />}
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#F2F4F7" />
     <link rel="canonical" href={url(lang)} />
@@ -55,9 +55,11 @@ const source = "https://github.com/NapkinStack/kitokey";
         <nav aria-label={say("footer", lang)}>
           <a href={source}>{say("source", lang)}</a>
           <a href={`/${lang}/privacy/`}>{say("privacy", lang)}</a>
+          <a href={`/${lang}/legal/`}>{say("legal", lang)}</a>
           <a href={`/${other}/${path}`} hreflang={other} lang={other}>{say("other", lang)}</a>
         </nav>
         <span class="credit">{say("credit", lang)}</span>
+        <p class="marks" lang="en">{say("marks", lang).map((said) => <span>{said}</span>)}</p>
       </div>
     </footer>
   </body>
