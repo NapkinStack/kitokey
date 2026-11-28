@@ -2652,6 +2652,8 @@ function datesPanel(mentioned, session, transcript, words, back) {
   said.id = "dates-said";
   said.setAttribute("role", "status");
   said.hidden = true;
+  const asking = element("div", "send-panel");
+  asking.hidden = true;
   const goes = element("div", "dates-goes");
   goes.append(ics, google);
   dayLabel.append(day);
@@ -2714,8 +2716,6 @@ function datesPanel(mentioned, session, transcript, words, back) {
   };
   // A confidential meeting (PDR-0007 §4, #1319): asked again, each time, in one sentence saying what leaves and where;
   // « Annuler » focused, the safe one (PDR-0008). The switch is read at the press: it may have changed since.
-  const asking = element("div", "send-panel");
-  asking.hidden = true;
   const askDone = (back) => {
     asking.hidden = true;
     asking.replaceChildren();
