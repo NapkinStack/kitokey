@@ -436,6 +436,8 @@ body.small-window .frame { display: none; }
 #small .small-announce .link, #small .small-announce .says { font-size: 12px; line-height: 1.3; }
 #small #small-note { font-size: 12px; line-height: 1.25; }
 #small .bar-lines .small-said { margin: 0; }
+/* The toast in the bar (D120, criterion 4): a line of it, the bar growing to hold it, as its other lines. */
+#small .bar-lines .toast { position: static; margin: 0; width: auto; max-width: none; }
 /* D92: the meeting last stopped, one line under the row at rest — cut by an ellipsis, the whole its tooltip; a failure two (D125) —,
    « Ouvrir » beside it; its live region unseen, at the window's top, never past its edge. */
 #small .small-last { display: flex; align-items: baseline; gap: 8px; margin: 0; font-size: 12px; line-height: 1.3; }
@@ -669,9 +671,6 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .pane { flex: 1; min-width: 0; container: pane / inline-size; }
 /* « Enregistré » laid over its own line, never in its flow (D101): over the description it hides the
    while, right-aligned at its end — or on the name's line —, the line's box holding it. */
-.saying { position: relative; }
-.saved-said { position: absolute; margin: 0; color: var(--ok); font-size: 13px; line-height: 1.35; text-align: right; white-space: nowrap; pointer-events: none; }
-.saved-under { visibility: hidden; }
 .redo-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 /* The button that starts names its model (D96): a long name wraps inside the panel, never past it. */
 .redo-actions .primary { max-width: 100%; padding-block: 6px; overflow-wrap: anywhere; text-align: start; }

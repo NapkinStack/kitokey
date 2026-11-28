@@ -457,6 +457,39 @@ def real_keys(*keysyms: str) -> bool:
     """Each X keysym (hex: ff53 is →, ff51 ←, ff09 Tab) pressed and released as a keyboard does; True once sent."""
     # The system's Python, where PyGObject is (headless.sh's own reason).
     return subprocess.run(["/usr/bin/python3", "-c", REAL_KEYS, *keysyms], capture_output=True, text=True, timeout=20).returncode == 0
+# D120, criterion 4: a success is said by the window's one toast, `#toast` (a status), for 5 s, never in place.
+# What it says and for how long is timed by the page itself, from the words shown to the words gone (#634).
+TOAST_WATCH = """
+window.toasted = [];
+window.toastWatch?.disconnect();
+window.toastWatch = new MutationObserver(() => {
+  const t = document.getElementById('toast');
+  const said = t && t.getClientRects().length && getComputedStyle(t).visibility !== 'hidden' ? t.textContent.trim() : '';
+  const last = window.toasted[window.toasted.length - 1];
+  if (said && (!last || last.gone !== undefined || last.said !== said)) window.toasted.push({ said, shown: performance.now() });
+  else if (!said && last && last.gone === undefined) last.gone = performance.now();
+});
+window.toastWatch.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true });"""
+
+
+def toast_now(browser) -> list:
+    """The toast as it is: its role, its words, shown or not, and inside the window or not (no toast: none of them)."""
+    return browser.execute_script(
+        "const t = document.getElementById('toast'); if (!t) return [null, '', false, false]; const r = t.getBoundingClientRect();"
+        " const shown = !!t.getClientRects().length && getComputedStyle(t).visibility !== 'hidden';"
+        " return [t.getAttribute('role'), t.textContent.trim(), shown, shown && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight]")
+
+
+def toast_said(browser) -> list:
+    """Each thing the toast said since TOAST_WATCH, with how long it was shown in ms (None while shown)."""
+    return browser.execute_script("return (window.toasted ?? []).map((t) => [t.said, t.gone === undefined ? null : Math.round(t.gone - t.shown)])")
+
+
+def said_in_place(browser, words: str) -> list:
+    """Where else than the toast the page says these words: an inline note, which criterion 4 removes."""
+    return browser.execute_script(
+        "return [...document.querySelectorAll('body *')].filter((e) => !e.closest('#toast, .gallery') && e.children.length === 0"
+        " && e.textContent.trim() === arguments[0] && e.getClientRects().length).map((e) => e.id || e.className)", words)
 
 
 def free(browser, element_id: str, case: str) -> None:
@@ -4157,6 +4190,123 @@ def models_advanced(now: dt.datetime) -> None:
         tags.shutdown()
 
 
+
+def toasts_said(now: dt.datetime) -> None:
+    """CY. D120, criterion 4: a setting written and a meeting's diagnostic copied are said by the window's one toast
+    (`#toast`, a status) for five seconds, never in place; in view, over neither the control pressed nor the focus
+    (WCAG 2.2 SC 2.4.11), the page not moved. A failure is still said in place, beside its cause."""
+    print("CY. the toasts: a setting written, a diagnostic copied — said by the window's toast for 5 s, never in place (D120)")
+    meetings = WORK / "toasts"
+    meeting = meetings / "2026-10-18_12-00"
+    session(meeting, now - dt.timedelta(hours=1), 40 / 60, {})
+    with Window(meetings, "fr_FR.UTF-8", "reminder = false\ndeveloper = true\n") as browser:
+        # A meeting's diagnostic, copied: here a meeting with no logs, said so by the toast.
+        browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "more-open"), 10)
+        browser.execute_script("window.__diagnostic = null; Object.defineProperty(navigator, 'clipboard', {configurable: true,"
+                               " value: {writeText: async (t) => { window.__diagnostic = t; }}})")
+        browser.execute_script(TOAST_WATCH)
+        # « Plus », the meeting page's menu since D121 (#1301).
+        press(browser, "more-open")
+        wait_for(browser, lambda b: b.find_element(By.ID, "more-menu").is_displayed(), 3)
+        # Clicked once the menu has opened: shown, and nothing over its centre (the menu still opening covered it).
+        wait_for(browser, lambda b: b.execute_script(
+            "const e = document.getElementById('copy-diagnostic'); if (!e || !e.getClientRects().length) return false;"
+            " const r = e.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('#copy-diagnostic') === e"), 5)
+        press(browser, "copy-diagnostic")
+        # What it copies holds each track's level even with no log (main.rs, `diagnostic`): « Diagnostic copié »
+        # then, « Aucun journal pour cette réunion » only when it copied nothing.
+        wait_for(browser, lambda b: toast_said(b)[:1], 5)
+        copied = browser.execute_script("return window.__diagnostic")
+        expected = "Diagnostic copié" if copied else "Aucun journal pour cette réunion"
+        said = toast_said(browser)
+        check("« Copier le diagnostic »: said by the window's toast, as what it copied says, nothing in place (D120)",
+              copied is not None and said[:1] and said[0][0] == expected and said_in_place(browser, expected) == [],
+              (said, (copied or "")[:80], said_in_place(browser, expected)))
+        browser.execute_script("delete navigator.clipboard")
+        wait_for(browser, lambda b: toast_now(b)[1] == "", 8)
+        # The setting's word: said by the window's toast for five seconds, never in place (D120, criterion 4;
+        # it was said in the setting's line since D101).
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"), 10)
+        time.sleep(0.5)
+        browser.execute_script(TOAST_WATCH)
+        place_now = "return [Math.round(scrollY), document.activeElement.id]"
+        before = browser.execute_script(place_now)
+        browser.execute_script("document.getElementById('reminder').click()")
+        told = wait_for(browser, lambda b: toast_now(b) == ["status", "Enregistré", True, True], 3)
+        check("a setting written says Enregistré by the window's toast, the page not moved, nothing in place (D120)",
+              told and said_in_place(browser, "Enregistré") == [] and browser.execute_script(place_now)[0] == before[0],
+              (toast_now(browser), said_in_place(browser, "Enregistré"), before, browser.execute_script(place_now)))
+        wait_for(browser, lambda b: toast_said(b)[:1] and toast_said(b)[0][1] is not None, 8)
+        said_for = toast_said(browser)[0][1] if toast_said(browser)[:1] else None
+        check("said for five seconds, then gone (D120)", said_for is not None and 4500 <= said_for <= 6000, toast_said(browser))
+        refuse = "const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'settings_saved' ? Promise.reject('REFUS') : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };"
+        browser.execute_script(refuse)
+        browser.execute_script("document.getElementById('reminder').click()")
+        refused = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
+        check("a write refused: said in place, no « Enregistré » said by the toast", refused and toast_now(browser)[1] != "Enregistré",
+              (browser.find_element(By.ID, "not-saved").text, toast_now(browser)))
+        # The page drawn again, by whatever draws it (#655): the refusal still said; Settings left and
+        # opened again, it is no longer.
+        drawn = browser.execute_async_script("const done = arguments[0]; refresh().then(() => done(true), () => done(false))")
+        refusal = lambda b: b.find_element(By.ID, "not-saved")
+        check("drawn again after it, the refusal is still said (#655)",
+              drawn and refusal(browser).is_displayed() and "REFUS" in refusal(browser).text, (drawn, refusal(browser).text))
+        browser.execute_script("location.hash = '#/'")
+        wait_for(browser, lambda b: not b.find_elements(By.ID, "not-saved") or not refusal(b).is_displayed(), 5)
+        browser.execute_script("location.hash = '#/settings'")
+        back = wait_for(browser, lambda b: b.find_elements(By.ID, "reminder") and b.find_element(By.ID, "reminder").is_displayed(), 5)
+        check("Settings left and opened again: the refusal is no longer said (#655)",
+              back and not refusal(browser).is_displayed(), refusal(browser).text if back else "Settings not drawn again")
+        browser.execute_script("window.restore()")
+        # A radio far down at the smallest size, and the minutes' Enregistrer: said by the toast, in view, over neither
+        # the control pressed nor the focus (WCAG 2.2 SC 2.4.11), the page not moved.
+        clear_of = ("const e = document.getElementById('toast'); if (!e) return [false, false, Math.round(scrollY)]; const t = e.getBoundingClientRect(), c = arguments[0] ? document.getElementById(arguments[0]) : arguments[1] ? document.querySelector(arguments[1]) : null;"
+                    " const meet = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;"
+                    " const f = document.activeElement; return [!!c && !meet(t, c.getBoundingClientRect()), !f || f === document.body || !meet(t, f.getBoundingClientRect()), Math.round(scrollY)]")
+        time.sleep(0.5)
+        browser.set_window_size(420, 400)
+        # A radio not chosen yet: one already chosen writes nothing, and says nothing.
+        browser.execute_script("document.querySelector('input[name=after][value=nothing]').scrollIntoView(); [...document.querySelectorAll('input[name=after]')].find((r) => !r.checked).click()")
+        at = browser.execute_script("return Math.round(scrollY)")
+        told = wait_for(browser, lambda b: toast_now(b) == ["status", "Enregistré", True, True], 3)
+        got = browser.execute_script(clear_of, None, "input[name=after]:checked")
+        check("at 420 px, a radio far down: « Enregistré » by the toast, in view, over neither the radio nor the focus, the page not moved (D120)",
+              told and got == [True, True, at], (toast_now(browser), got, at))
+        wait_for(browser, lambda b: toast_now(b)[1] == "", 8)
+        browser.execute_script("const p = document.getElementById('minutes-online'); p.scrollIntoView({block: 'center'}); p.click();"
+                               " const a = document.getElementById('minutes-advanced'); if (a.getAttribute('aria-expanded') !== 'true') a.click()")
+        wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 5)
+        browser.find_element(By.ID, "minutes-address").send_keys("http://127.0.0.1:9/v1")
+        browser.find_element(By.ID, "minutes-model").send_keys("mistral")
+        wait_for(browser, lambda b: toast_now(b)[1] == "", 8)
+        browser.execute_script("const b = document.getElementById('minutes-own-save'); b.scrollIntoView({block: 'center'}); b.click()")
+        at = browser.execute_script("return Math.round(scrollY)")
+        told = wait_for(browser, lambda b: toast_now(b) == ["status", "Enregistré", True, True], 5)
+        got = browser.execute_script(clear_of, "minutes-own-save", None)
+        check("the minutes' Enregistrer: « Enregistré » by the toast, in view, over neither its button nor the focus, the page not moved (D120)",
+              told and got == [True, True, at], (toast_now(browser), got, at))
+        # A window full of controls, no band free (the coordinator, #1329): the toast keeps the foot, or the top when
+        # the focus is at the foot — never over the focus, never in a band of its own over a control.
+        wait_for(browser, lambda b: toast_now(b)[1] == "", 8)
+        browser.execute_script(
+            "const f = document.createElement('div'); f.id = 'probe-full'; f.style.cssText = 'position:fixed;inset:0;display:grid;grid-template-columns:repeat(4,1fr);z-index:1';"
+            " for (let i = 0; i < 120; i++) { const b = document.createElement('button'); b.textContent = i; b.id = 'probe-' + i; f.append(b); } document.body.append(f);")
+        placed = ("const t = document.getElementById('toast'), r = t.getBoundingClientRect(), f = document.activeElement.getBoundingClientRect();"
+                  " return [t.classList.contains('high'), t.style.top, !t.hidden && r.top >= 0 && r.bottom <= innerHeight,"
+                  " r.left < f.right && f.left < r.right && r.top < f.bottom && f.top < r.bottom]")
+        full = []
+        # The focus in the middle, then on the button where the toast says it at the foot.
+        at_foot = browser.execute_script("const t = document.getElementById('toast'); t.classList.remove('high'); t.style.top = t.style.bottom = ''; t.hidden = false; t.textContent = 'x'; const r = t.getBoundingClientRect();"
+                                         " t.hidden = true; t.textContent = ''; return document.elementFromPoint(innerWidth / 2, r.top + r.height / 2)?.id ?? ''")
+        for where in ("probe-58", at_foot):
+            browser.execute_script("document.getElementById(arguments[0])?.focus(); say('Enregistré')", where)
+            full.append(browser.execute_script(placed))
+        browser.execute_script("document.getElementById('probe-full').remove()")
+        check("a window full of controls: the toast at the foot, at the top when the focus is at the foot, never over the focus (D120)",
+              at_foot.startswith("probe-") and full == [[False, "", True, False], [True, "", True, False]], (at_foot, full))
+
 def minutes_copied(now: dt.datetime) -> None:
     """AJ. A meeting's minutes copied in one click, ready to paste where the user writes (D45)."""
     print("AJ. the minutes copied in one click: their Markdown, titled as the page names them, « Copié » said in place (D45)")
@@ -4197,19 +4347,23 @@ def minutes_copied(now: dt.datetime) -> None:
         check("a meeting with minutes offers « Copier le compte rendu », beside Refaire…",
               offered and beside and browser.find_element(By.ID, "copy-minutes").get_attribute("aria-label") == "Copier le compte rendu", beside)
         browser.execute_script(stand_in, False)
+        browser.execute_script(TOAST_WATCH)
         press(browser, "copy-minutes")
-        said = wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
+        said = wait_for(browser, lambda b: toast_now(b) == ["status", "Copié", True, True], 3)
+        if said:
+            for theme in ("light", "dark"):
+                shot_themed(browser, f"d120-toast-copied-{theme}", theme)
         copied = browser.execute_script("return window.__copied")
-        check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said in place",
-              said and len(copied) == 1 and copied[0].get("text/plain") == expected
-              and browser.find_element(By.ID, "minutes-copied").get_attribute("role") == "status", copied)
+        check("clicked: their Markdown copied, without the front matter, titled as the page names them; « Copié » said by the window's toast, nothing in place (D120)",
+              said and len(copied) == 1 and copied[0].get("text/plain") == expected and said_in_place(browser, "Copié") == [],
+              (copied, toast_now(browser), said_in_place(browser, "Copié")))
         # With it, the same as rich text, its headings and lists kept where it is pasted (D109).
         html = copied[0].get("text/html", "") if len(copied) == 1 else ""
         check("clicked: the same as rich text in one copy, its three headings and its list item, no front matter (D109)",
               html.count("<h2") == 3 and "<li>Envoyer le devis — Inès — vendredi</li>" in html and "Points saillants" in html and "contract:" not in html,
               sorted(copied[0]) if len(copied) == 1 else copied)
-        gone = wait_for(browser, lambda b: b.execute_script(status) == "", 4)
-        check("« Copié » said for a moment", gone, browser.execute_script(status))
+        gone = wait_for(browser, lambda b: toast_said(b)[:1] and toast_said(b)[0][1] is not None, 8)
+        check("« Copié » said for five seconds, then gone (D120)", gone and toast_said(browser)[:1] and 4500 <= toast_said(browser)[0][1] <= 6000, toast_said(browser))
         browser.execute_script(stand_in, True)
         press(browser, "copy-minutes")
         refused = wait_for(browser, lambda b: b.execute_script(status) == "Impossible de copier le compte rendu.", 3)
@@ -4217,11 +4371,13 @@ def minutes_copied(now: dt.datetime) -> None:
               refused and browser.find_elements(By.CSS_SELECTOR, "#meeting .minutes .body h2"), browser.execute_script(status))
         # The transcript copied too, each line with when and who said it, as the page names them (D109).
         browser.execute_script(stand_in, False)
+        browser.execute_script(TOAST_WATCH)
         press(browser, "copy-transcript")
-        told = wait_for(browser, lambda b: b.execute_script("return document.getElementById('transcript-copied')?.textContent") == "Copié", 3)
+        told = wait_for(browser, lambda b: toast_now(b) == ["status", "Copié", True, True], 3)
         lines = browser.execute_script("return window.__copied")
-        check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said in place (D109)",
-              told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}], lines)
+        check("« Copier la transcription »: each line with its time and who said it, as the page names them; « Copié » said by the window's toast, nothing in place (D109, D120)",
+              told and lines == [{"text/plain": "[00:00] Vous\u00a0: Bonjour.\n[01:15] Les autres · voix 2\u00a0: Le devis part vendredi.\n"}]
+              and said_in_place(browser, "Copié") == [], (lines, toast_now(browser), said_in_place(browser, "Copié")))
         browser.execute_script(stand_in, True)
         press(browser, "copy-transcript")
         said_back = "return document.getElementById('transcript-copied')?.textContent"
@@ -4231,7 +4387,7 @@ def minutes_copied(now: dt.datetime) -> None:
         # paste elsewhere reads, its two types (D109, the harness proved to read them).
         browser.execute_script("delete navigator.clipboard")
         press(browser, "copy-minutes")
-        wait_for(browser, lambda b: b.execute_script(status) == "Copié", 3)
+        wait_for(browser, lambda b: toast_now(b)[1] == "Copié", 3)
         # Each read as bytes, said in UTF-8 as an application asks for it: GTK offers the text in UTF-8 under
         # `text/plain;charset=utf-8`, and under the bare `text/plain` in its legacy Latin-1 (s109ok).
         pasted = lambda *how: subprocess.run(["wl-paste", "--no-newline", *how], capture_output=True, timeout=5)
@@ -4276,10 +4432,21 @@ def announced(now: dt.datetime) -> None:
             check("nothing to scroll with it", held, browser.execute_script("const e = document.scrollingElement; return [e.scrollHeight, e.clientHeight]"))
             shot(browser, f"d50-announce-{theme}")
             browser.execute_script("window.copied_for_test = null; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {writeText: async (t) => { window.copied_for_test = t; }}})")
+            browser.execute_script(TOAST_WATCH)
             browser.find_element(By.ID, "small-announce-copy").click()
-            copied = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "Copié", 3)
+            copied = wait_for(browser, lambda b: toast_now(b) == ["status", "Copié", True, True], 3)
+            if copied:
+                shot(browser, f"d120-toast-bar-{theme}")
             text = browser.execute_script("return window.copied_for_test")
-            check("Copier l’annonce: the sentence on the clipboard, « Copié » in place", copied and text == "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas.", text)
+            room = browser.execute_script(
+                "const h = document.getElementById('toast'), e = document.scrollingElement; if (!h) return [e.scrollHeight <= e.clientHeight, null];"
+                " const t = h.getBoundingClientRect();"
+                " const over = [...document.querySelectorAll('button, [role=button], a[href]')].filter((c) => c.getClientRects().length)"
+                ".filter((c) => { const r = c.getBoundingClientRect(); return r.left < t.right && t.left < r.right && r.top < t.bottom && t.top < r.bottom; }).map((c) => c.id);"
+                " return [e.scrollHeight <= e.clientHeight, over]")
+            check("in the bar, « Copié » said by its toast inside the window, over none of its buttons, nothing to scroll, nothing in place (D120)",
+                  copied and room == [True, []] and said_in_place(browser, "Copié") == [], (toast_now(browser), room, said_in_place(browser, "Copié")))
+            check("Copier l’annonce: the sentence on the clipboard", copied and text == "J’enregistre cette réunion pour en faire le compte rendu. Dites-le-moi si vous préférez que je ne le fasse pas.", text)
             before = browser.execute_script(place)
             gone = wait_for(browser, lambda b: not b.execute_script(line)[0], 20)
             check("after fifteen seconds it is gone", gone, browser.execute_script(line))
@@ -4313,6 +4480,9 @@ def announced(now: dt.datetime) -> None:
         browser.execute_script("document.getElementById('small-announce-copy').click()")
         refused = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "Non copiée.", 3)
         check("a clipboard refused: said of the announcement, Arrêter where it was", refused and browser.execute_script(place) == before, browser.find_element(By.ID, "small-announce-copied").text)
+        # Said a moment, then gone: the line does not keep it (sam's mutant on #1329).
+        cleared = wait_for(browser, lambda b: b.find_element(By.ID, "small-announce-copied").text == "", 4)
+        check("the refusal said, then gone", refused and cleared, browser.find_element(By.ID, "small-announce-copied").text)
         stop_from_small(browser)
     quiet = WORK / "announcing-off"
     quiet.mkdir()
@@ -8044,7 +8214,7 @@ def focus_kept(now: dt.datetime) -> None:
     where = ("const a = document.activeElement;"
              " return [!a || a === document.body ? 'body' : a.id || ('no id: ' + a.tagName.toLowerCase() + '.' + a.className), Math.round(scrollY),"
              # What explains a scroll, when one is seen: how far the page can scroll, whether « Enregistré » is said.
-             " Math.round(document.scrollingElement.scrollHeight - innerHeight), !!document.getElementById('saved-said')]")
+             " Math.round(document.scrollingElement.scrollHeight - innerHeight), !!document.getElementById('toast')?.textContent.trim()]")
     # The controls a user reaches on the page shown, and those of them with no id.
     nameless = ("const page = document.getElementById(arguments[0]);"
                 " return [...page.querySelectorAll('button, select, input, textarea, a[href], summary, [tabindex]:not([tabindex=\"-1\"])')]"
@@ -8175,15 +8345,18 @@ def focus_kept(now: dt.datetime) -> None:
                  lambda b: keys(b, Keys.ARROW_DOWN), lambda: "meeting_language =" in settings())
             kept(browser, "Settings, the reminder turned by Space", "reminder",
                  lambda b: keys(b, Keys.SPACE), lambda: "reminder = true" in settings())
-            # « Enregistré » in the line changed, over neither its name nor its control, at full width and
-            # at 420×400 (the coordinator, 2026-11-17, D101).
-            clear = ("const s = document.getElementById('saved-said'); if (!s) return null; const r = s.closest('.saying');"
+            # « Enregistré » said by the window's toast, over neither the reminder's name nor its switch, the focus
+            # kept and seen, the page not moved: at full width and at 420×400 (D101, D120 criterion 4).
+            clear = ("const t = document.getElementById('toast'); if (!t || !t.textContent.trim()) return null; const r = document.getElementById('reminder').closest('.saying');"
                      " const box = (e) => e && e.getBoundingClientRect(); const meet = (a, b) => !!a && !!b && a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;"
-                     " const said = box(s); return {inLine: !!r && r.contains(document.getElementById('reminder')),"
-                     " overName: meet(said, box(r?.querySelector('.name'))), overControl: meet(said, box(document.getElementById('reminder'))),"
-                     " inside: said.left >= box(r).left - 0.5 && said.right <= box(r).right + 0.5}")
+                     " const said = box(t); return {words: t.textContent.trim(), overName: meet(said, box(r?.querySelector('.name'))), overControl: meet(said, box(document.getElementById('reminder'))),"
+                     " inside: said.left >= 0 && said.top >= 0 && said.right <= innerWidth && said.bottom <= innerHeight,"
+                     # No control of the page hidden under it for its five seconds (#1329's audit): it goes up instead.
+                     " under: [...document.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex=\"-1\"])')]"
+                     ".filter((c) => !t.contains(c) && c.getClientRects().length && getComputedStyle(c).visibility !== 'hidden' && meet(said, box(c))).map((c) => c.id || c.tagName.toLowerCase())}")
             for size, name in (((1100, 700), "d101-saved-1100"), ((420, 400), "d101-saved-420")):
                 browser.set_window_size(*size)
+                wait_for(browser, lambda b: b.execute_script(clear) is None, 8)
                 browser.execute_script("const t = document.getElementById('reminder'); t.scrollIntoView({block: 'center'}); t.focus();")
                 time.sleep(0.4)
                 before = browser.execute_script(where)
@@ -8191,11 +8364,14 @@ def focus_kept(now: dt.datetime) -> None:
                 shown = wait_for(browser, lambda b: b.execute_script(clear) is not None, 5)
                 got = browser.execute_script(clear)
                 shot(browser, name)
+                # The toast in the other theme too, as #1329's audit asked to see it (D120).
+                shot_themed(browser, f"d120-toast-saved-{size[0]}-dark", "dark")
                 after = browser.execute_script(where)
-                check(f"{size[0]}×{size[1]}: « Enregistré » in the reminder's line, over neither its name nor its switch, the page not moved (D101)",
-                      shown and got == {"inLine": True, "overName": False, "overControl": False, "inside": True} and after[:2] == before[:2],
-                      {"said": got, "before": before, "after": after})
-                wait_for(browser, lambda b: b.execute_script(clear) is None, 3)
+                check(f"{size[0]}×{size[1]}: « Enregistré » said by the toast, over neither the reminder's name nor its switch, the page not moved (D101, D120)",
+                      shown and got is not None and {k: got[k] for k in ("words", "overName", "overControl", "inside")} == {"words": "Enregistré", "overName": False, "overControl": False, "inside": True}
+                      and after[:2] == before[:2], {"said": got, "before": before, "after": after})
+                check(f"{size[0]}×{size[1]}: no control of the page under the toast, which goes up instead (#1329's audit, D120)",
+                      shown and got is not None and got["under"] == [], got)
             browser.set_window_size(1100, 700)
             # #906: a drawing already under way when the user moves the focus — its page read, then held —
             # gives it back, once it ends, to the control the user went to, never to the one left. `listed`,
@@ -13470,7 +13646,7 @@ def nothing_silent(now: dt.datetime) -> None:
 
 def gestures_answer(now: dt.datetime) -> None:
     """AQ. Each gesture answers at once, its command stood in to take two seconds (D68)."""
-    print("AQ. Démarrer and Arrêter answer before their command, a second click asks nothing; Refaire… closes; a setting says Enregistré (D68)")
+    print("AQ. Démarrer and Arrêter answer before their command, a second click asks nothing; Refaire… closes (D68; « Enregistré » is CY's)")
     meetings = WORK / "answering"
     written = meetings / "2026-10-28_09-00"
     session(written, now - dt.timedelta(days=1), 10, {"local.wav": 1000})
@@ -13511,70 +13687,7 @@ def gestures_answer(now: dt.datetime) -> None:
         browser.switch_to.active_element.send_keys(Keys.ESCAPE)
         check("the transcript's too", wait_for(browser, lambda b: not b.find_elements(By.ID, "redo-transcript-panel"), 3)
               and browser.execute_script("return document.activeElement.id") == "redo-transcript")
-        # The setting's word, a moment.
-        browser.execute_script("location.hash = '#/settings'")
-        wait_for(browser, lambda b: b.find_elements(By.ID, "reminder"), 10)
-        time.sleep(0.5)
-        # How long it is said is timed by the page itself, from the sentence put there to the sentence
-        # gone: a WebDriver round trip on a loaded machine never counts against it (#634).
-        browser.execute_script("""
-            window.said = {};
-            window.saidWatch = new MutationObserver(() => {
-              const sentence = document.getElementById('saved-said');
-              if (sentence && !window.said.node) window.said = { node: sentence, shown: performance.now() };
-              if (window.said.node && !window.said.node.isConnected && window.said.gone === undefined) window.said.gone = performance.now();
-            });
-            window.saidWatch.observe(document.body, { childList: true, subtree: true });""")
-        browser.execute_script("document.getElementById('reminder').click()")
-        here = lambda b: b.find_elements(By.ID, "saved-said")
-        told = wait_for(browser, here, 3)
-        # In its own line, no longer under it: laid over the line, the page never moved (the coordinator, 2026-11-17, D101).
-        check("a setting written says Enregistré, in its own line", told and here(browser)[0].text == "Enregistré"
-              and here(browser)[0].get_attribute("role") == "status"
-              and browser.execute_script("const s = document.getElementById('saved-said'), r = document.getElementById('reminder').closest('label, .row, .field'); return r.contains(s)"))
-        wait_for(browser, lambda b: b.execute_script("return window.said.gone !== undefined"), 4)
-        said_for = browser.execute_script("window.saidWatch.disconnect(); return window.said.gone === undefined ? null : window.said.gone - window.said.shown")
-        check("still said after a second", said_for is not None and said_for >= 1000, said_for)
-        check("gone at a second and a half", said_for is not None and said_for <= 2500, said_for)
-        refuse = "const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'settings_saved' ? Promise.reject('REFUS') : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };"
-        browser.execute_script(refuse)
-        browser.execute_script("document.getElementById('reminder').click()")
-        refused = wait_for(browser, lambda b: b.find_element(By.ID, "not-saved").is_displayed(), 5)
-        check("a write refused: said, no Enregistré", refused and not here(browser), browser.find_element(By.ID, "not-saved").text)
-        # The page drawn again, by whatever draws it (#655): the refusal still said; Settings left and
-        # opened again, it is no longer.
-        drawn = browser.execute_async_script("const done = arguments[0]; refresh().then(() => done(true), () => done(false))")
-        refusal = lambda b: b.find_element(By.ID, "not-saved")
-        check("drawn again after it, the refusal is still said (#655)",
-              drawn and refusal(browser).is_displayed() and "REFUS" in refusal(browser).text, (drawn, refusal(browser).text))
-        browser.execute_script("location.hash = '#/'")
-        wait_for(browser, lambda b: not b.find_elements(By.ID, "not-saved") or not refusal(b).is_displayed(), 5)
-        browser.execute_script("location.hash = '#/settings'")
-        back = wait_for(browser, lambda b: b.find_elements(By.ID, "reminder") and b.find_element(By.ID, "reminder").is_displayed(), 5)
-        check("Settings left and opened again: the refusal is no longer said (#655)",
-              back and not refusal(browser).is_displayed(), refusal(browser).text if back else "Settings not drawn again")
-        browser.execute_script("window.restore()")
-        # A radio far down at the smallest size: said in its line, in view.
-        time.sleep(0.5)
-        browser.set_window_size(420, 400)
-        browser.execute_script("document.querySelector('input[name=after][value=nothing]').scrollIntoView(); document.querySelectorAll('input[name=after]')[1].click()")
-        wait_for(browser, here, 3)
-        check("said in a radio's line, in view", here(browser) and browser.execute_script(
-            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight && s.closest('label, .row, .field')?.querySelector('input[name=after]') !== null"))
-        wait_for(browser, lambda b: not here(b), 3)
-        # A button in no row: said beside it, the page not sent to its top.
-        browser.execute_script("const p = document.getElementById('minutes-online'); p.scrollIntoView({block: 'center'}); p.click();"
-                               " const a = document.getElementById('minutes-advanced'); if (a.getAttribute('aria-expanded') !== 'true') a.click()")
-        wait_for(browser, lambda b: b.find_element(By.ID, "minutes-address").is_displayed(), 5)
-        browser.find_element(By.ID, "minutes-address").send_keys("http://127.0.0.1:9/v1")
-        browser.find_element(By.ID, "minutes-model").send_keys("mistral")
-        # Pressed where the user sees it: « Enregistré » said beside it, the page no longer moved to show it (D101).
-        browser.execute_script("const b = document.getElementById('minutes-own-save'); b.scrollIntoView({block: 'center'}); b.click()")
-        wait_for(browser, here, 5)
-        check("the minutes' Enregistrer: said beside its button, in view", here(browser) and browser.execute_script(
-            "const s = document.getElementById('saved-said'), r = s.getBoundingClientRect(), b = document.getElementById('minutes-own-save');"
-            " return s.parentElement.contains(b) && r.left >= b.getBoundingClientRect().right && r.top >= 0 && r.top + r.height / 2 <= innerHeight"),
-              browser.execute_script("const s = document.getElementById('saved-said'); return [s?.parentElement?.id, s?.getBoundingClientRect().left, s?.getBoundingClientRect().top]"))
+        # The setting's word, said by the window's toast: scenario CY (`toasts_said`).
         browser.set_window_size(1100, 800)
         browser.execute_script("location.hash = '#/'")
         time.sleep(0.5)
@@ -16100,6 +16213,16 @@ def main() -> int:
                   offered and '"shell.minutes_failed"' in lines and str(WORK) not in lines, lines[-600:])
             check("and each track's level, after the logs: one line a track, numbers only",
                   lines.count('"type":"levels"') == 2 and lines.rstrip().endswith("}") and '"track":"remote"' in lines.splitlines()[-1], lines[-400:])
+            # Copied, the window's toast says it, nothing in place (D120, criterion 4).
+            browser.execute_script("window.__diagnostic = null; Object.defineProperty(navigator, 'clipboard', {configurable: true,"
+                                   " value: {writeText: async (t) => { window.__diagnostic = t; }}})")
+            browser.execute_script(TOAST_WATCH)
+            press(browser, "copy-diagnostic")
+            told = wait_for(browser, lambda b: toast_now(b) == ["status", "Diagnostic copié", True, True], 5)
+            check("« Copier le diagnostic »: its lines on the clipboard, « Diagnostic copié » said by the window's toast, nothing in place (D120)",
+                  told and '"shell.minutes_failed"' in (browser.execute_script("return window.__diagnostic") or "")
+                  and said_in_place(browser, "Diagnostic copié") == [], (toast_now(browser), said_in_place(browser, "Diagnostic copié")))
+            browser.execute_script("delete navigator.clipboard")
             to_settings()
             advanced_unfolded(browser)
             press(browser, "developer")
@@ -16759,6 +16882,7 @@ def main() -> int:
     confidential_every_way(now)
     meeting_told_once(now)
     minutes_copied(now)
+    toasts_said(now)
     nothing_silent(now)
     gestures_answer(now)
     window_looks(now)
