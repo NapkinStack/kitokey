@@ -29,7 +29,10 @@ for (const lang of ["fr", "en"]) {
   test(`/${lang}/: no Store badge or link before its listing; Linux free, its three distributions as README.md builds them`, async () => {
     const html = await section(lang, ids[lang][0]);
     assert.doesNotMatch(html, /ms-store|get\.microsoft\.com|apps\.microsoft\.com/);
-    assert.match(html, new RegExp(`<span class="store-soon is-soon"><span><span class="mark" aria-hidden="true"></span>${landing.price[lang].main[9]}</span></span>`));
+    // Said as plain text, the Windows mark before it, not a grey pill that reads as a disabled button (the coordinator,
+    // 2026-11-28, after #1343): the form under it is what can be done.
+    assert.match(html, new RegExp(`<p class="soon-line"><span class="mark" aria-hidden="true"></span>${landing.price[lang].main[9]}</p>`));
+    assert.doesNotMatch(html, /is-soon/, "the grey pill still drawn");
     // Each distribution after its mark, as the install tabs show it (the audit, 2026-11-28).
     const distros = [...html.matchAll(/<span><b><img class="mark-(fedora|ubuntu|debian)" src="\/img\/brands\/[a-z0-9-]+\.svg" alt=""[^>]*>(Fedora|Ubuntu|Debian)<\/b>([^<]+)<\/span>/g)]
       .map((m) => (m[1] === m[2].toLowerCase() ? [m[2], m[3]] : m));
@@ -86,4 +89,12 @@ test("the end takes no style of the old page by a class they share, but the ones
   const styled = new Set([...css.matchAll(/([^{}]+)\{/g)].flatMap((m) => [...m[1].matchAll(/\.([a-zA-Z][\w-]*)/g)].map((c) => c[1])));
   const shared = [...classes].filter((c) => styled.has(c));
   assert.deepEqual(shared.filter((c) => !(c in SHARED)), [], "the end takes the old page's style by these classes");
+});
+
+test("« Bientôt dans le Microsoft Store » is text: no ground, no edge, no button's height", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const css = (await readFile(new URL("../src/styles/end.css", import.meta.url), "utf8")).replace(/\/\*[\s\S]*?\*\//g, "");
+  const rules = [...css.matchAll(/([^{}]*\.soon-line[^{}]*)\{([^}]*)\}/g)].map((m) => m[2]).join(";");
+  assert.ok(rules, "no rule for .soon-line");
+  assert.doesNotMatch(rules, /background|outline|border(?!-radius)|min-height/, "soon-line has no ground, no edge");
 });
