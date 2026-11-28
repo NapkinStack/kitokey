@@ -7540,6 +7540,9 @@ def meeting_actions_bar(now: dt.datetime) -> None:
               " confirm: [...d.querySelectorAll('button')].map((b) => [b.textContent.trim(), b.classList.contains('destructive')])}")
     meetings = WORK / "actions-bar"
     dated, plain = meetings / "2026-11-24_23-30", meetings / "2026-11-23_10-00"
+    # Its audio alone: neither transcript nor summary to make again.
+    bare = meetings / "2026-11-22_09-00"
+    session(bare, now - dt.timedelta(days=3), 20, {"local.wav": 1000})
     for folder, started, actions in ((dated, now - dt.timedelta(days=1), "- Envoyer le devis — Inès — jeudi [00:04]\n- Rappeler Jiří — Marc — 12 décembre [00:10]\n"),
                                      (plain, now - dt.timedelta(days=2), "- Réserver la salle — Paul — bientôt\n")):
         session(folder, started, 20, {"local.wav": 1000})
@@ -7630,6 +7633,14 @@ def meeting_actions_bar(now: dt.datetime) -> None:
             browser.execute_script(f"location.hash = '#/meeting/{plain.name}'")
             redrawn = wait_for(browser, lambda b: [e["id"] for e in b.execute_script(bar) or []] == ["share-open", "redo-open", "more-open"], 10)
             check(f"{short}: no date found, no « {said['dates']} » in the bar (D121)", redrawn, browser.execute_script(bar))
+            # Nothing to make again — its audio alone —: no « Refaire » at all, never a button that does nothing (D121's
+            # part 3b; part 3a's risk). « Plus » stays: the meeting can still be named, opened, trashed.
+            browser.execute_script(f"location.hash = '#/meeting/{bare.name}'")
+            nothing = wait_for(browser, lambda b: b.execute_script("return document.querySelector('#meeting h1') && location.hash.endsWith('" + bare.name + "')")
+                               and "more-open" in [e["id"] for e in b.execute_script(bar) or []], 10)
+            ids = [e["id"] for e in browser.execute_script(bar) or []]
+            check(f"{short}: its audio alone, nothing to make again: no « {said['redo']} » in the bar, « {said['more']} » still (D121)",
+                  nothing and "redo-open" not in ids and "more-open" in ids and browser.execute_script("return !document.getElementById('redo-open')"), ids)
 
 
 
