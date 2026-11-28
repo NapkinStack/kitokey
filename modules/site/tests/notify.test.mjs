@@ -149,6 +149,24 @@ test("the function's origin is the site's own, as astro.config.mjs names it", as
   assert.equal(fn.match(/const SITE = "([^"]+)"/)?.[1], site);
 });
 
+// Step 8 on kitokey.com (2026-11-28): a 400 with no reason cost twenty minutes. A refusal logs Brevo's error `code`, its
+// enum, never its `message`, which may say the address back; a code that is not one is « unknown ».
+for (const [why, body, code] of [
+  ["Brevo's code, its message saying the address back", JSON.stringify({ code: "invalid_parameter", message: `Contact ${EMAIL} is not valid` }), "invalid_parameter"],
+  ["no body", "", "unknown"],
+  ["not JSON", "<html>Bad gateway</html>", "unknown"],
+  ["a code that is no enum's (the address in it)", JSON.stringify({ code: EMAIL }), "unknown"],
+]) {
+  test(`a refusal logs Brevo's error code alone: ${why}`, async () => {
+    answer = () => new Response(body, { status: 400 });
+    const response = await post(form({}));
+    assert.deepEqual(where(response), [303, "/fr/notify/failed/"]);
+    const failed = logs.map((l) => JSON.parse(l)).find((l) => l.outcome === "failed");
+    assert.deepEqual(failed, { event: "notify", outcome: "failed", status: 400, code });
+    await nothingLeaks(response);
+  });
+}
+
 test("the honeypot filled: Brevo never called, and the robot is told it worked", async () => {
   const response = await post(form({ hp_field: "https://spam.example" }));
   assert.deepEqual(where(response), [303, "/fr/notify/sent/"]);
