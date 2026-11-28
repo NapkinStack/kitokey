@@ -2597,11 +2597,15 @@ struct Ticked {
 }
 
 /// Opens Google Calendar's own screen on a ticked date, the event pre-filled and unsaved (D115): nothing leaves
-/// before this gesture, and never a confidential meeting's words (PDR-0007): its dates go to an `.ics` alone.
+/// before this gesture. A confidential meeting's only once the page asked again and the user confirmed (`confirmed`,
+/// PDR-0007 §4, amended 2026-11-24, #1319): unconfirmed, refused here, whatever the page showed.
 #[tauri::command]
-fn date_google(shell: State<'_, Shell>, name: String, item: Ticked) -> Result<(), Told> {
-    if confidential::marked(&session_folder(&shell, &name)?) {
-        return Err(shell.told(Failure::LinkNotOpened, "a confidential meeting is given no link"));
+fn date_google(shell: State<'_, Shell>, name: String, item: Ticked, confirmed: Option<bool>) -> Result<(), Told> {
+    if confirmed != Some(true) && confidential::marked(&session_folder(&shell, &name)?) {
+        return Err(shell.told(
+            Failure::LinkNotOpened,
+            "a confidential meeting's dates leave only once confirmed again",
+        ));
     }
     let date = chrono::NaiveDate::parse_from_str(&item.date, "%Y-%m-%d").map_err(|error| shell.told(Failure::LinkNotOpened, error))?;
     let event = dates::Event {

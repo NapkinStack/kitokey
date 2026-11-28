@@ -1455,9 +1455,13 @@ pub struct Window {
     /// Shows: the « Dates mentionnées » panel, the label of the day the dates are read against. When: it is
     /// open. At most: about 20 characters. Placeholders: none.
     pub dates_day: &'static str,
-    /// Shows: the « Dates mentionnées » panel, a button. When: a meeting not confidential. At most: about 28
-    /// characters. Placeholders: none.
+    /// Shows: the « Dates mentionnées » panel, a button. When: always, a confidential meeting's asked again first
+    /// (PDR-0007 §4). At most: about 28 characters. Placeholders: none.
     pub dates_google: &'static str,
+    /// Shows: the « Dates mentionnées » panel, the question asked when a confidential meeting's dates are to go to
+    /// Google Calendar, before « Ouvrir » or « Annuler » (PDR-0007 §4, #1319): what leaves, and where. When: a
+    /// confidential meeting, each time. At most: about 140 characters. Placeholders: none.
+    pub dates_confidential_ask: &'static str,
     /// Shows: the « Dates mentionnées » panel, a button. When: always, a confidential meeting's too. At most: about
     /// 40 characters. Placeholders: none.
     pub dates_ics: &'static str,
@@ -2460,6 +2464,7 @@ pub fn window(language: Language) -> Window {
             dates_says: "Tick the ones to put in your calendar. Nothing leaves this computer until you choose where.",
             dates_day: "Meeting day",
             dates_google: "Open in Google Calendar",
+            dates_confidential_ask: "This meeting is confidential: its dates, each with the words it was said in, will leave this computer for Google Calendar.",
             dates_ics: "Save as a calendar file (.ics)",
             dates_saved: "Saved in {}.",
             check_failed: "Kitokey can’t listen to your microphone or the meeting audio right now. Close this panel and open it again.",
@@ -3027,6 +3032,7 @@ pub fn window(language: Language) -> Window {
             dates_says: "Cochez celles à mettre dans votre agenda. Rien ne quitte cet ordinateur avant que vous choisissiez où.",
             dates_day: "Jour de la réunion",
             dates_google: "Ouvrir dans Google Agenda",
+            dates_confidential_ask: "Cette réunion est confidentielle\u{a0}: ses échéances, avec la phrase où chacune a été dite, vont quitter cet ordinateur pour Google Agenda.",
             dates_ics: "Enregistrer un fichier d’agenda (.ics)",
             dates_saved: "Enregistré dans {}.",
             check_failed: "Kitokey ne parvient pas à écouter votre micro ni le son de la réunion. Fermez ce panneau et rouvrez-le.",
