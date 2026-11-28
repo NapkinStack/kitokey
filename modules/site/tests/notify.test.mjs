@@ -31,10 +31,12 @@ afterEach(() => {
   console.error = realError;
 });
 
-const form = (fields) => new URLSearchParams({ email: EMAIL, lang: "fr", website: "", ...fields }).toString();
+const form = (fields) => new URLSearchParams({ email: EMAIL, lang: "fr", hp_field: "", ...fields }).toString();
 // Imported when called, so that each test says what it finds, the page's tests too, before the function exists.
-async function post(body, { env = ENV, type = "application/x-www-form-urlencoded" } = {}) {
-  const request = new Request("https://kitokey.com/notify", { method: "POST", headers: { "content-type": type }, body });
+// A browser's POST from the site's own page says Sec-Fetch-Site: same-origin and its Origin (nora's reading of #1343).
+const SAME = { "sec-fetch-site": "same-origin", origin: "https://kitokey.com" };
+async function post(body, { env = ENV, type = "application/x-www-form-urlencoded", from = SAME, url = "https://kitokey.com/notify" } = {}) {
+  const request = new Request(url, { method: "POST", headers: { "content-type": type, ...from }, body });
   const { onRequestPost } = await import("../functions/notify.js");
   return onRequestPost({ request, env });
 }
@@ -81,6 +83,10 @@ for (const [why, body, type, lang] of [
   ["longer than 254", form({ email: `${"a".repeat(243)}@example.com` })],
   ["a body over 2 KB", form({ pad: "x".repeat(2100) }), undefined, "en"],
   ["not a form", JSON.stringify({ email: EMAIL }), "application/json", "en"],
+  ["plain text", form({}), "text/plain", "en"],
+  ["a space in the domain", form({ email: "someone@exam ple.com" })],
+  // Raw UTF-8, as a client may send it: about 1150 characters, about 2250 bytes.
+  ["over 2 KB in bytes, under it in characters", `${form({})}&pad=${"é".repeat(1100)}`, undefined, "en"],
 ]) {
   test(`refused, Brevo never called: ${why}`, async () => {
     const response = await post(body, type ? { type } : undefined);
@@ -91,8 +97,55 @@ for (const [why, body, type, lang] of [
   });
 }
 
+test("on the bounds: an address of exactly 254 characters and a body of exactly 2048 bytes are taken", async () => {
+  const at254 = `${"a".repeat(242)}@example.com`;
+  assert.equal(at254.length, 254);
+  assert.deepEqual(where(await post(form({ email: at254 }))), [303, "/fr/notify/sent/"]);
+  const base = form({});
+  const at2048 = `${base}&pad=${"x".repeat(2048 - Buffer.byteLength(base) - 5)}`;
+  assert.equal(Buffer.byteLength(at2048), 2048);
+  assert.deepEqual(where(await post(at2048)), [303, "/fr/notify/sent/"]);
+  assert.equal(calls.length, 2);
+});
+
+for (const [why, from] of [
+  ["another site's form (Sec-Fetch-Site: cross-site)", { "sec-fetch-site": "cross-site", origin: "https://evil.example" }],
+  ["a sibling site (same-site is not same-origin)", { "sec-fetch-site": "same-site", origin: "https://preview.kitokey.com" }],
+  ["another Origin, no Sec-Fetch-Site", { origin: "https://evil.example" }],
+  ["neither header", {}],
+]) {
+  test(`refused with a 403, Brevo never called: ${why}`, async () => {
+    const response = await post(form({}), { from });
+    assert.equal(response.status, 403);
+    assert.equal(calls.length, 0);
+    await nothingLeaks(response);
+  });
+}
+
+for (const [why, from] of [
+  ["Sec-Fetch-Site: same-origin alone", { "sec-fetch-site": "same-origin" }],
+  ["the site's Origin alone (a browser without Fetch Metadata)", { origin: "https://kitokey.com" }],
+]) {
+  test(`taken from the site itself: ${why}`, async () => {
+    assert.deepEqual(where(await post(form({}), { from })), [303, "/fr/notify/sent/"]);
+    assert.equal(calls.length, 1);
+  });
+}
+
+test("Brevo's link lands on kitokey.com whatever host the request came by", async () => {
+  await post(form({}), { url: "https://some-preview.kitokey.pages.dev/notify", from: { "sec-fetch-site": "same-origin" } });
+  assert.equal(JSON.parse(calls[0][1].body).redirectionUrl, "https://kitokey.com/fr/notify/confirmed/");
+});
+
+test("the function's origin is the site's own, as astro.config.mjs names it", async () => {
+  const config = await readFile(new URL("../astro.config.mjs", import.meta.url), "utf8");
+  const site = config.match(/site: "([^"]+)"/)?.[1];
+  const fn = await readFile(new URL("../functions/notify.js", import.meta.url), "utf8");
+  assert.equal(fn.match(/const SITE = "([^"]+)"/)?.[1], site);
+});
+
 test("the honeypot filled: Brevo never called, and the robot is told it worked", async () => {
-  const response = await post(form({ website: "https://spam.example" }));
+  const response = await post(form({ hp_field: "https://spam.example" }));
   assert.deepEqual(where(response), [303, "/fr/notify/sent/"]);
   assert.equal(calls.length, 0);
   await nothingLeaks(response);
@@ -108,6 +161,7 @@ test("without the key (the preview), nothing is called and the failure is said",
 for (const [why, brevo] of [
   ["Brevo refuses", () => new Response('{"code":"invalid_parameter"}', { status: 400 })],
   ["Brevo fails", () => new Response("", { status: 503 })],
+  ["Brevo answers a redirect", () => new Response("", { status: 302, headers: { location: "https://example.com/" } })],
   ["Brevo does not answer in time", () => { throw new DOMException("timed out", "TimeoutError"); }],
 ]) {
   test(`${why}: the generic failure, once, no retry, the status in the log`, async () => {
@@ -136,7 +190,8 @@ for (const lang of ["fr", "en"]) {
     assert.match(f, /<input[^>]* name="email"[^>]* maxlength="254"/);
     assert.match(f, new RegExp(`<input type="hidden" name="lang" value="${lang}"`));
     const trap = f.match(/<div class="trap" aria-hidden="true">[\s\S]*?<\/div>/)?.[0] ?? "";
-    assert.match(trap, /<input[^>]* name="website"[^>]* tabindex="-1"[^>]* autocomplete="off"/);
+    assert.match(trap, /<input[^>]* name="hp_field"[^>]* tabindex="-1"[^>]* autocomplete="off"/);
+    assert.doesNotMatch(f, /name="(website|url|homepage|e-?mail2?|name)"/, "a trap autofill would fill");
     assert.match(f, new RegExp(`<a href="/${lang}/privacy/">`), "the form does not say where its words are kept");
   });
 
@@ -173,8 +228,10 @@ test("_headers lets a form post to the site itself, and nowhere else", async () 
 
 test("the privacy policy says what the form keeps, who sends, for how long, on what basis, in both languages", async () => {
   for (const [lang, said] of [
-    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it"]],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons"]],
+    // nora's reading against GDPR art. 13: the right to complain to the CNIL, how long an unconfirmed address and the
+    // list are kept, every right that applies under consent.
+    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "30 days", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/en/'] ],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "30 jours", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/'] ],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);
