@@ -7613,6 +7613,8 @@ def channel_added_from_page(now: dt.datetime) -> None:
                                           " return [r.left >= 0, r.right <= innerWidth + 0.5, d.scrollWidth <= d.clientWidth + 1,"
                                           " [...d.querySelectorAll('.tile')].every((t) => t.getBoundingClientRect().right <= r.right + 0.5)]")
             check(f"{short}: at 420 px, the sheet within the window, its kinds and fields uncut, nothing scrolls sideways", fits == [True, True, True, True], fits)
+            # Shot once the sheet's pop has ended (D120's animation): mid-way, the page shows through it.
+            browser.execute_async_script("const done = arguments[arguments.length - 1]; Promise.all(document.getAnimations().map((a) => a.finished)).then(() => done(true), () => done(false))")
             shot_themed(browser, f"db-sheet-420-{short}-{theme}", theme)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
