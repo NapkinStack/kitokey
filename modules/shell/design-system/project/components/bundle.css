@@ -145,6 +145,18 @@
 }
 .toast > svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
+/* Tabs (D123, the design system's): v5's segments — the list a sunken band, each tab its words in the soft text, the
+   chosen one raised on the surface in the text's colour; WAI-ARIA APG's keys (window.js, `tabsOf`). */
+.tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); width: max-content; max-width: 100%; padding: 2px; border-radius: var(--r-sm); background: var(--color-sunken); }
+.tab {
+  height: 32px; padding: 0 var(--sp-3); border: 0; border-radius: var(--r-xs); background: transparent;
+  color: var(--color-text-soft); font: 600 var(--fs-body) var(--font-text); white-space: nowrap; cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--color-surface); color: var(--color-text); box-shadow: var(--e1); }
+.tab:focus-visible, [data-keys] .tab:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.tab-panel { padding-top: var(--sp-4); }
+.tab-panel[hidden] { display: none; }
+
 @keyframes pop { from { transform: scale(.98); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .dialog, .toast { animation: none; } }
 
