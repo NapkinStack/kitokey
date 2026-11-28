@@ -5,8 +5,8 @@ They say [PDR-0001](../pdr/0001-wholeheard-open-on-linux-paid-on-macos-and-windo
 and claim only what the product does today. The trial's terms are
 [PDR-0005](../pdr/0005-on-windows-the-trial-ends-without-locking-the-meetings.md)'s, said as
 [Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) §10.8.4
-asks. Privacy policy's URL:
-<https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md>. Support page's URL:
+asks. Privacy policy's URL, each listing its language's: <https://kitokey.com/en/privacy/> and
+<https://kitokey.com/fr/privacy/>, the site's own copy of docs/privacy.md (D114, open since 2026-11-28). Support page's URL:
 <https://github.com/NapkinStack/kitokey/blob/main/docs/support.md>.
 
 ## Screenshots
@@ -122,7 +122,7 @@ pages read the same day (ines, D103). Each field is entered in Partner Center, n
 |---|---|---|
 | Listing languages | English (`en-us`), French (`fr-fr`) | The package's languages (`modules/install/windows/AppxManifest.xml.in`): one listing each |
 | Category | Productivity, no subcategory | [Categories](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/categories-and-subcategories): Productivity has none; « Specifying a category is required » |
-| Privacy policy | <https://github.com/NapkinStack/kitokey/blob/main/docs/privacy.md> | Required: a desktop app « inherently ha[s] access to Personal Information », and Kitokey records the microphone ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 10.5.1) |
+| Privacy policy | <https://kitokey.com/en/privacy/> (English), <https://kitokey.com/fr/privacy/> (French): the site's copy of docs/privacy.md (D114) | Required: a desktop app « inherently ha[s] access to Personal Information », and Kitokey records the microphone ([Store Policies](https://learn.microsoft.com/en-us/windows/apps/publish/store-policies) 10.5.1) |
 | Website | <https://github.com/NapkinStack/kitokey> | Optional; « a page on your own website, not your app's web listing in the Store » ([support info](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/support-info)) |
 | Support contact | <https://github.com/NapkinStack/kitokey/blob/main/docs/support.md>, which gives `support@kitokey.com` | The decider: « Une page de support »; the address, « Ok on valide support@kitokey.com » (2026-11-21 ~12:05), the same for support and for data requests (`privacy.md`); the mailbox's reception confirmed before submission |
 | System requirements | None declared yet | Optional ([system requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/system-requirements)). Memory and disk come from D105's measure of the release build, once run; the package already asks Windows 10, version 2004 (10.0.19041) or later |
