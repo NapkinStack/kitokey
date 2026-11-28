@@ -31,12 +31,11 @@ for (const lang of ["fr", "en"]) {
     assert.ok(sovereign.includes(landing.sovereign[lang].leaves[1]), "what leaves is not said off at first");
   });
 
-  test(`/${lang}/: the policy is linked, and the app's capture has its place, labelled, no image yet`, async () => {
+  test(`/${lang}/: the app's own page in the section, in its language, described by its alt; the policy left to the footer`, async () => {
     const [sovereign] = await sections(lang);
-    assert.match(sovereign, new RegExp(`<a href="/${lang}/privacy/">${landing.sovereign[lang].policy}</a>`));
-    const shot = sovereign.match(/<div class="shot-ph" role="note">([\s\S]*?)<\/div><\/div>/)?.[1] ?? "";
-    assert.ok(shot.includes(`<b>${landing.sovereign[lang].shot[0]}</b>`), "the capture's place is not labelled");
-    assert.doesNotMatch(shot, /<img|<video/);
+    assert.doesNotMatch(sovereign, new RegExp(`href="/${lang}/privacy/"`));
+    const alts = [...sovereign.matchAll(/<img class="shot"[^>]*alt="([^"]*)"/g)].map(([, alt]) => alt);
+    assert.deepEqual(alts, [landing.sovereign[lang].shot]);
   });
 
   test(`/${lang}/: three cases, each with its people, its pictogram and a made-up meeting hidden from a screen reader`, async () => {

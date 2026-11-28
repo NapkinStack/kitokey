@@ -27,8 +27,8 @@ const raw = {
   },
   buy: {
     fr: ["Essai gratuit, puis 69 € une fois.", "Bientôt dans le Microsoft Store", "Linux, gratuit", "Bientôt sur Mac, au même prix."],
-    en: ["Free trial, then €69 once.", "Coming soon to the Microsoft Store", "Linux, free", "Coming to the Mac, at the same price."],
-    keeps: "PDR-0009, 69 € once on macOS and Windows after a free trial, the Store's button once its listing exists (until then these words, no badge); PDR-0001, free on Linux",
+    en: ["Free trial, then $69 once.", "Coming soon to the Microsoft Store", "Linux, free", "Coming to the Mac, at the same price."],
+    keeps: "PDR-0009, 69 € once on macOS and Windows after a free trial, 69 $ where the price is said in English (amended in #1311), the Store's button once its listing exists (until then these words, no badge); PDR-0001, free on Linux",
   },
   assure: {
     fr: ["Sans compte.", "Sans abonnement.", "Aucun robot dans l’appel."],
@@ -103,8 +103,7 @@ const raw = {
       leaves: ["Ne sort que si vous le choisissez", "Rien de ceci n’est activé au départ.", "Désactivé"],
       chosen: [["file", "Un service en ligne, si vous le choisissez", "Avec votre clé, pour aller plus vite. Il reçoit le texte pour rédiger, ou le son pour transcrire, selon ce que vous lui confiez."], ["share", "Un compte rendu que vous envoyez", "Vers Slack ou Discord, d’un geste, quand vous le décidez."]],
       proof: [["lock", "Confidentielle, vraiment", "Une réunion confidentielle n’est jamais confiée à un moteur en ligne."], ["download", "Téléchargé une fois", "Les moteurs se téléchargent une fois, au premier usage."], ["code", "Vérifiable", "Le code source est public, sous GPL v3. Chacun peut lire ce que fait Kitokey."], ["eyeoff", "Ni cookie ni traceur", "Ce site ne vous suit pas, et Kitokey non plus."]],
-      policy: "Lire la politique de confidentialité",
-      shot: ["Capture de l’app", "La page d’une réunion, filmée dans l’app après sa refonte."],
+      shot: "La page d’une réunion dans Kitokey : la revue produit de la semaine, sa forme d’onde à deux voix, son compte rendu, ses actions datées et sa transcription.",
     },
     en: {
       kicker: "Privacy", h: "You stay in control.", lead: "No Kitokey server, no account. What stays on your computer, and what leaves it only if you decide so.",
@@ -113,8 +112,7 @@ const raw = {
       leaves: ["Leaves only if you choose", "None of this is on at first.", "Off"],
       chosen: [["file", "An online service, if you choose one", "With your key, to go faster. It receives the text to write, or the sound to transcribe, as you entrust it."], ["share", "Minutes you send", "To Slack or Discord, in one gesture, when you decide."]],
       proof: [["lock", "Confidential, really", "A confidential meeting is never given to an online engine."], ["download", "Downloaded once", "The engines are downloaded once, on first use."], ["code", "Checkable", "The source code is public, under GPL v3. Anyone can read what Kitokey does."], ["eyeoff", "No cookie, no tracker", "This site does not follow you, and neither does Kitokey."]],
-      policy: "Read the privacy policy",
-      shot: ["App capture", "A meeting’s page, filmed in the app after its redesign."],
+      shot: "A meeting’s page in Kitokey: the weekly product review, its two voices’ waveform, its summary, its dated actions and its transcript.",
     },
     keeps: "PDR-0001 and PDR-0003, no server and no account, no telemetry; session-audio, two tracks (modules/capture); the transcription engine (D40) and the summary's « Auto », on this computer by default (D122); D96 and D110, an online service only with the user's key and choice; D116, a send on a gesture; D60 and D118, a confidential meeting never online; registry/models.json, the engines downloaded once; LICENSE, GPL v3; _headers, no third-party request on the site. The capture is a placeholder until D121 is filmed",
   },
@@ -170,14 +168,14 @@ const raw = {
     },
     en: {
       kicker: "Price and systems", h: "Try before you pay.", soon: "Soon",
-      main: ["Windows and macOS", "€69", "once", "One payment, no renewal.", "The free trial", [["14 days", "of trial at least"], ["10 meetings", "at least"], ["No account", "nothing to create"]],
+      main: ["Windows and macOS", "$69", "once", "One payment, no renewal.", "The free trial", [["14 days", "of trial at least"], ["10 meetings", "at least"], ["No account", "nothing to create"]],
         "What is included", ["The transcript and the minutes, on your computer", "Confidential, in one gesture on the lock", "Sharing in one gesture to Slack, Discord or a webhook", "The updates of version 1"],
         "After the trial, your meetings stay readable, even without buying. On macOS soon, at the same price.", "Coming soon to the Microsoft Store"],
       linux: ["Linux", "Free", "The same Kitokey, with no trial and no payment.", "The distributions", [["Fedora", "from a repository"], ["Ubuntu", "from the source code"], ["Debian", "from the source code"]],
         "What is included", ["The transcript and the minutes, on your computer", "Confidential, in one gesture on the lock", "Sharing in one gesture to Slack, Discord or a webhook", "The public source code, under GPL v3"], "Install on Linux"],
       nosub: ["No subscription", ", neither on Windows and macOS nor on Linux."],
     },
-    keeps: "PDR-0009, 69 € once on Windows and macOS after a free trial, the same price on the Mac, the Store's button once its listing exists; PDR-0001 and PDR-0005, a trial of at least 14 days and 10 meetings, no account, minor versions included, the meetings readable after it; PDR-0001, free on Linux; README.md, Fedora from Copr, Ubuntu 24.04 and Debian 13 built from the source; LICENSE, GPL v3",
+    keeps: "PDR-0009, 69 € once on Windows and macOS after a free trial, 69 $ where the price is said in English (amended in #1311), the same price on the Mac, the Store's button once its listing exists; PDR-0001 and PDR-0005, a trial of at least 14 days and 10 meetings, no account, minor versions included, the meetings readable after it; PDR-0001, free on Linux; README.md, Fedora from Copr, Ubuntu 24.04 and Debian 13 built from the source; LICENSE, GPL v3",
   },
   need: {
     fr: ["Ce qu’il faut à l’ordinateur", "Un ordinateur récent avec 16 Go de mémoire."],
@@ -209,7 +207,7 @@ const raw = {
   },
   final: {
     fr: ["Essayez-le sur votre prochain rendez-vous client.", "Installez-le avant l’appel, cliquez sur Enregistrer, et lisez le compte rendu quand vous raccrochez. Essai gratuit, puis 69\u00a0€ une fois."],
-    en: ["Try it on your next client call.", "Install it before the call, click Record, and read the minutes when you hang up. Free trial, then €69 once."],
+    en: ["Try it on your next client call.", "Install it before the call, click Record, and read the minutes when you hang up. Free trial, then $69 once."],
     keeps: "the app's record button; PDR-0009, the price after a free trial",
   },
   install: {
@@ -218,9 +216,9 @@ const raw = {
     keeps: "README.md, « Install it », the commands below",
   },
   channelNotes: {
-    en: { debian: "On Debian 13, the package built for Ubuntu 24.04 installs and starts. Debian 12 is not supported yet.", ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
-    fr: { debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
-    keeps: "README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; README.md, « Install it »: the Ubuntu package installs and starts on Debian 13, not on 12 (#1214)",
+    en: { fedora: "On Fedora®, the package comes from Copr, the Fedora Project’s build service. The project: <a href=\"https://fedoraproject.org/\">fedoraproject.org</a>.", debian: "On Debian 13, the package built for Ubuntu 24.04 installs and starts. Debian 12 is not supported yet. The project: <a href=\"https://www.debian.org/\">debian.org</a>.", ubuntu: "On Ubuntu 24.04, build the package. It needs <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> and <code>podman</code>. If <code>nstack</code> is then not found, <code>uv tool update-shell</code> puts it on your path. The build takes a while." },
+    fr: { fedora: "Sur Fedora®, le paquet vient de Copr, le service de construction du projet Fedora. Le projet : <a href=\"https://fedoraproject.org/\">fedoraproject.org</a>.", debian: "Sur Debian 13, le paquet construit pour Ubuntu 24.04 s’installe et démarre. Debian 12 n’est pas encore pris en charge. Le projet : <a href=\"https://www.debian.org/\">debian.org</a>.", ubuntu: "Sur Ubuntu 24.04, compilez le paquet. Il faut <code>git</code>, <a href=\"https://docs.astral.sh/uv/\">uv</a> et <code>podman</code>. Si <code>nstack</code> est ensuite introuvable, <code>uv tool update-shell</code> le met dans votre chemin. La construction prend un moment." },
+    keeps: "README.md, Fedora from Copr; Fedora's trademark guidelines, Business websites: a prominent link to the Fedora Project's website where the logo cannot be one (in a tab), « Fedora® » at its first mention; Debian's logo page, the image a link to debian.org « appreciated »; README.md: « Needs git, uv and podman », and uv tool update-shell when nstack is not found; README.md, « Install it »: the Ubuntu package installs and starts on Debian 13, not on 12 (#1214)",
   },
   hardware: {
     fr: [["chip", "Tout sur votre ordinateur", "Le choix par défaut.", ["16 Go de mémoire au moins, 24 à 32 Go pour être à l’aise", "Une carte graphique Vulkan, même intégrée", "10 Go libres pour les deux moteurs", "Environ 2 Go libres par heure enregistrée, puis 0,2 Go gardés par heure", "Ollama, gratuit, installé à part pour rédiger le compte rendu"]],

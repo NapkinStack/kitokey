@@ -22,10 +22,10 @@ for (const lang of ["fr", "en"]) {
     assert.deepEqual([...h1.matchAll(/<span class="l[^"]*">([^<]+)<\/span>/g)].map((m) => m[1]), PROMISE[lang]);
   });
 
-  test(`/${lang}/: the price is PDR-0009's, 69 € once after a free trial; no Store badge before its listing; Linux free`, async () => {
+  test(`/${lang}/: the price is PDR-0009's, 69 € once after a free trial, 69 $ in English (#1311); no Store badge before its listing; Linux free`, async () => {
     const html = await hero(lang);
     const [line, store, linux, mac] = landing.buy[lang];
-    assert.equal(line, lang === "fr" ? "Essai gratuit, puis 69 € une fois." : "Free trial, then €69 once.");
+    assert.equal(line, lang === "fr" ? "Essai gratuit, puis 69 € une fois." : "Free trial, then $69 once.");
     assert.ok(html.includes(`<p class="buy-line">${line}</p>`));
     assert.match(html, new RegExp(`<a class="store-soon" href="#[a-z]+">${store}</a>`));
     assert.doesNotMatch(html, /ms-store|get\.microsoft\.com/, "a Store badge before the listing exists");

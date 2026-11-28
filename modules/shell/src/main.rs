@@ -871,7 +871,7 @@ fn show_welcome(app: &AppHandle) {
 /// at its row's height, the smallest it is, as tall as it holds after that. Without the system's
 /// title bar (board 8): on GNOME, GTK counts its own title bar and shadows inside the size asked —
 /// 440 × 44 asked left a web view of 388 × 1.
-const BAR: (f64, f64) = (440.0, 44.0);
+const BAR: (f64, f64) = (440.0, 48.0);
 /// As tall as the bar may grow: what it holds beyond that scrolls.
 const BAR_TALLEST: f64 = 720.0;
 
