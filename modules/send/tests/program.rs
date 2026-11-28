@@ -197,3 +197,34 @@ fn a_confidential_meeting_goes_on_only_when_its_input_says_confirmed_confidentia
         assert!(ran.said.contains("confirmed_confidential"), "{}", ran.said);
     }
 }
+
+#[test]
+fn the_parts_on_its_input_are_what_it_sends_and_a_wrong_list_is_refused() {
+    // A summary beyond Slack's bound and a short action: sent whole it does not fit, its actions alone do and
+    // go on to the network (a host that does not exist).
+    let folder = tempfile::tempdir().unwrap();
+    let minutes = format!(
+        "---\ncontract: minutes/v4\n---\n\n## Résumé\n\n{}\n\n## Actions\n\n- a — b — c\n",
+        "x".repeat(40_001)
+    );
+    fs::write(folder.path().join("minutes.md"), minutes).unwrap();
+    let path = folder.path().to_str().unwrap();
+    let address = format!("https://kitokey-test.invalid/api/webhooks/1/{SECRET}");
+    let with = |extra: serde_json::Value| {
+        let mut object: serde_json::Value = serde_json::from_str(&input(&address)).unwrap();
+        object.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        run(&[path, "--kind", "slack"], &object.to_string())
+    };
+    let code = |ran: Ran| serde_json::from_str::<serde_json::Value>(&ran.line).unwrap()["code"].clone();
+    assert_eq!(code(with(serde_json::json!({}))), "summary.too_large");
+    assert_eq!(code(with(serde_json::json!({"parts": ["actions"]}))), "network.unreachable");
+    for wrong in [
+        serde_json::json!({"parts": []}),
+        serde_json::json!({"parts": ["title"]}),
+        serde_json::json!({"parts": ["dates"], "dates": [{"id": "a1", "date": "2026-11-27", "what": "x"}]}),
+    ] {
+        let ran = with(wrong.clone());
+        assert_eq!((ran.code, ran.line.as_str()), (Some(2), ""), "{wrong}");
+        assert!(ran.said.contains("the input is not posting/v1's"), "{wrong}: {}", ran.said);
+    }
+}

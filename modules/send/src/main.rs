@@ -8,7 +8,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use kitokey_send::{Kind, Meeting, Outcome, Policy, Unsent, body, judged, notion, post};
+use kitokey_send::{Chosen, Kind, Meeting, Outcome, Policy, Unsent, body, judged, notion, post};
 use serde_json::{Value, json};
 
 /// The version this program says (`--version`): the package's, named when it is built (`KITOKEY_VERSION`,
@@ -107,9 +107,13 @@ fn asked() -> Result<Asked, Refused> {
     Ok(Asked::Send(folder, kind))
 }
 
+/// The address, the meeting's name, notion's key, the confirmation and the parts chosen.
+type Input = (String, String, Option<String>, bool, Option<Chosen>);
+
 /// The input: the address, the meeting's name and, for Notion, the integration's key, each on one line; and
-/// whether a confidential meeting is confirmed for this send, a boolean, `false` when absent (`input.schema.json`).
-fn input(notion: bool) -> Result<(String, String, Option<String>, bool), Refused> {
+/// whether a confidential meeting is confirmed for this send, a boolean, `false` when absent; the parts chosen,
+/// none when absent (`input.schema.json`).
+fn input(notion: bool) -> Result<Input, Refused> {
     let wrong = |why: &str| Refused(format!("the input is not posting/v1's: {why}"), None);
     let mut text = String::new();
     io::stdin().read_to_string(&mut text).map_err(|_| wrong("it could not be read"))?;
@@ -124,13 +128,14 @@ fn input(notion: bool) -> Result<(String, String, Option<String>, bool), Refused
         Some(Value::Bool(confirmed)) => *confirmed,
         Some(_) => return Err(wrong("« confirmed_confidential » is no boolean")),
     };
-    Ok((field("address")?, field("name")?, key, confirmed))
+    let chosen = Chosen::read(&object).map_err(|name| wrong(&format!("{name} is not as its schema says")))?;
+    Ok((field("address")?, field("name")?, key, confirmed, chosen))
 }
 
 fn run() -> Result<Value, Refused> {
     let asked = asked()?;
     let notion = matches!(asked, Asked::Check(Some(To::Notion)) | Asked::Send(_, To::Notion));
-    let (address, name, key, confirmed) = input(notion)?;
+    let (address, name, key, confirmed, chosen) = input(notion)?;
     let api = || url::Url::parse(notion::API).expect("Notion's API is a URL");
     let database = || notion::database(&address).ok_or_else(|| failed("the link is not https: or names no database", "address.refused"));
     let (folder, to) = match asked {
@@ -155,6 +160,10 @@ fn run() -> Result<Value, Refused> {
         Unsent::NoSummary => failed("the meeting has no summary to send", "meeting.no_summary"),
         Unsent::Unreadable => failed("the session's folder could not be read", "meeting.unreadable"),
     })?;
+    let meeting = match &chosen {
+        Some(chosen) => meeting.only(chosen),
+        None => meeting,
+    };
     let title = meeting.title.clone().unwrap_or(name);
     let outcome = match to {
         To::Notion => {
