@@ -108,8 +108,14 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   confirmed within 30 days is deleted; if there is no release, an address is deleted at the latest 12 months after
   it was given (`docs/privacy.md`, *This website*, which also names every right under consent and the CNIL). Brevo's
   confirmation link expires after 30 days ([its help](https://help.brevo.com/hc/en-us/articles/208733449)), but its
-  documentation does not say what it keeps of an address created through the API and never confirmed: a monthly
-  clean-up in Brevo, step 7 below, holds both bounds until the account shows it does it itself.
+  documentation does not say what it keeps of an address created through the API and never confirmed, nor does it
+  delete a list's contacts after a time. So a job holds both bounds, never a person (the coordinator, 2026-11-28: a
+  forgotten month would break the promise): `modules/site/scripts/brevo-cleanup.mjs`, run each day by
+  `.github/workflows/site-brevo-cleanup.yml`, deletes the list's contacts added more than 12 months ago and the
+  contacts in no list older than 30 days, by id, and says only counts; a contact of another list is never touched.
+  Its key is a second Brevo key, a repository secret, revoked apart from the site's; a failed run notifies the
+  maintainers and the next day's retries ([Brevo's contacts API](https://developers.brevo.com/reference/get-contacts):
+  `createdAt` and `listIds` on each contact; [deletion](https://developers.brevo.com/reference/delete-contact) by id).
 - **The criticality.** The module now holds personal data: `criticality: standard`, the decider's, 2026-11-28,
   knowing it costs a verifier's sheet on each site pull request (`.nstack/handbook/05-workflow.md` §7).
 
@@ -132,7 +138,7 @@ goes.
 ## Consequences
 
 **Rejected as accepted risks** (the coordinator, 2026-11-28, on nora's reading): a cross-site POST, a host-derived
-link, a bound in characters, an autofillable trap; each is fixed above and tested.
+link, a bound in characters, an autofillable trap, a clean-up left to a person; each is fixed above and tested.
 
 **Positive:** a visitor who is interested now has a way to be told, in the site's own words, and the
 addresses stay in the EU under a processor's contract.
@@ -141,9 +147,10 @@ addresses stay in the EU under a processor's contract.
 verifier's sheet on every site pull request.
 
 **Impacts on other modules or contracts:** none. `docs/privacy.md`, read by the site, gains the paragraph that
-says what is kept.
+says what is kept. One workflow joins `.github/workflows/`, the repository's, running the site's script alone.
 
-**Rule to automate:** `tests/notify.test.mjs` — the function never calls Brevo for an invalid, empty, overlong
+**Rule to automate:** `tests/cleanup.test.mjs` — the job's bounds, its dry run, deletion by id, no address said;
+`tests/notify.test.mjs` — the function never calls Brevo for an invalid, empty, overlong
 or honeypot request, never writes the address or the key in its log or its answer, and answers with the site's
 pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 
@@ -159,8 +166,9 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
    Pages project, production only.
 6. A rate limiting rule on the path `/notify` in Cloudflare's WAF.
-7. Once a month, until the list is deleted: in Brevo, delete the contacts not confirmed after 30 days, and those
-   added more than 12 months ago.
+7. A second API key, `kitokey-cleanup`, set as the repository secret `BREVO_API_KEY`, and the list's id as the
+   repository variable `BREVO_LIST_ID`, for the daily job; then one run by hand, unticked, to see its dry run's
+   counts.
 
 ---
 
