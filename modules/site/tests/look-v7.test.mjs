@@ -327,3 +327,32 @@ test("« Reste sur votre ordinateur »'s lock stands apart from its words: 6 px 
   });
   assert.deepEqual(found, []);
 });
+
+// lina's note on #1338 (2026-11-28): Fedora's cell in the Linux price strip sat about 4 px low. Each cell's name and
+// mark measured against the others': the names on one line (their text's top within 1 px), each mark centred on its
+// name (within 1 px), in both languages and themes. The values are said when it fails.
+test("the Linux strip's three distributions stand on one line, each mark centred on its name", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const lang of ["fr", "en"]) {
+      for (const scheme of ["light", "dark"]) {
+        const page = await open(browser, origin, lang, scheme);
+        const cells = await page.evaluate(() => [...document.querySelectorAll(".pcard.linux .strip > span")].map((cell) => {
+          const b = cell.querySelector("b"), img = b.querySelector("img");
+          const words = [...b.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+          const range = document.createRange();
+          range.selectNodeContents(words);
+          const t = range.getBoundingClientRect(), m = img.getBoundingClientRect(), c = cell.getBoundingClientRect();
+          return { name: words.textContent.trim(), top: t.top - c.top, centre: (m.top + m.bottom) / 2 - (t.top + t.bottom) / 2 };
+        }));
+        if (cells.length !== 3) found.push([lang, scheme, `${cells.length} cells`]);
+        const first = cells[0]?.top;
+        for (const { name, top, centre } of cells) {
+          if (Math.abs(top - first) > 1 || Math.abs(centre) > 1) found.push([lang, scheme, name, `top ${top.toFixed(1)} (first ${first.toFixed(1)})`, `mark off its name's centre by ${centre.toFixed(1)}`]);
+        }
+        await page.close();
+      }
+    }
+  });
+  assert.deepEqual(found, []);
+});
