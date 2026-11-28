@@ -96,10 +96,14 @@ you ask for, as any web host does ([Cloudflare's privacy policy](https://www.clo
 site sets no cookie, runs no tracker and no analytics, and loads nothing from another domain.
 
 If you ask to be told when Kitokey is out, we keep your e-mail address for that alone: one message at the release,
-then we delete it. You confirm it first, by a link we send you; until then it joins no list. The site passes it to
-Brevo (Sendinblue SAS, France), which keeps it in the European Union and sends these two messages on our behalf,
-under a data processing agreement. The basis is your consent (GDPR art. 6(1)(a)): you may withdraw it at any time
-by the link in each message or by writing to support@kitokey.com, and ask to see, correct or delete it.
+then we delete it. You confirm it first, by a link we send you; until then it joins no list, and an address not
+confirmed within 30 days is deleted. If Kitokey is not out, your address is deleted at the latest 12 months after you
+signed up. The site passes it to Brevo (Sendinblue SAS, France), which keeps it in the European Union and sends these
+two messages on our behalf, under a data processing agreement. The basis is your consent (GDPR art. 6(1)(a)): you may
+withdraw it at any time, by the link in each message or by writing to support@kitokey.com. You may also ask to access
+your address, to have it rectified or erased, to restrict or object to its use, and to receive it in a portable form.
+If you think we do not respect these rights, you may lodge a complaint with the CNIL, France's data protection
+authority ([its complaint page](https://www.cnil.fr/fr/adresser-une-plainte), in French).
 
 ### Contact
 
@@ -193,10 +197,14 @@ autre domaine.
 
 Si vous demandez à être prévenu de la sortie de Kitokey, nous gardons votre adresse e-mail pour cela seul : un
 message à la sortie, puis nous l'effaçons. Vous la confirmez d'abord, par un lien que nous vous envoyons ; jusque-là,
-elle n'entre dans aucune liste. Le site la transmet à Brevo (Sendinblue SAS, France), qui la conserve dans
-l'Union européenne et envoie ces deux messages pour nous, sous un contrat de sous-traitance. La base en est votre
-consentement (RGPD art. 6.1.a) : vous pouvez le retirer à tout moment par le lien de chaque message ou en écrivant à
-support@kitokey.com, et demander à la voir, la corriger ou l'effacer.
+elle n'entre dans aucune liste, et une adresse non confirmée sous 30 jours est effacée. Si Kitokey ne sort pas, votre
+adresse est effacée au plus tard 12 mois après votre demande. Le site la transmet à Brevo (Sendinblue SAS, France),
+qui la conserve dans l'Union européenne et envoie ces deux messages pour nous, sous un contrat de sous-traitance. La
+base en est votre consentement (RGPD art. 6.1.a) : vous pouvez le retirer à tout moment, par le lien de chaque message
+ou en écrivant à support@kitokey.com. Vous pouvez aussi demander à accéder à votre adresse, à la faire rectifier ou
+effacer, à limiter son usage ou à vous y opposer, et à la recevoir dans un format portable. Si vous estimez que nous ne
+respectons pas ces droits, vous pouvez adresser une plainte à la CNIL
+([sa page de plainte](https://www.cnil.fr/fr/adresser-une-plainte)).
 
 ### Contact
 

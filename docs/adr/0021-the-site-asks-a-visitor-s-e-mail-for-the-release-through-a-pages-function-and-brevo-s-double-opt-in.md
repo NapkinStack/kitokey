@@ -88,11 +88,14 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   page. In the page rather than in a dialog: it needs no script and has no focus to manage, as the newsletter
   forms of most product pages. It posts to `/notify`, the site's own origin: `_headers`' CSP becomes
   `form-action 'self'`, nothing else in it changes.
-- **The function**, `modules/site/functions/notify.js`. It takes only a form-encoded POST of at most 2 KB; it
-  refuses an address longer than 254 characters or not of the form `local@domain.tld`, and a filled honeypot
-  field, without calling Brevo. Otherwise it asks Brevo's double opt-in endpoint, with an explicit timeout of
-  5 s and no retry (the visitor may send again; Brevo answers the same for an address already there). It answers
-  a 303 to a page of the site: « Vérifiez votre boîte » when Brevo accepted, a generic failure otherwise; the
+- **The function**, `modules/site/functions/notify.js`. It takes only a POST from the site's own page
+  (`Sec-Fetch-Site: same-origin`, or the site's `Origin` from a browser without Fetch Metadata); another site's
+  form gets a 403, since it could make the site mail a confirmation to any address. It takes only a form-encoded
+  body of at most 2 KB, counted in bytes; it refuses an address longer than 254 characters or not of the form
+  `local@domain.tld`, and a filled honeypot field (`hp_field`, a name no autofill fills), without calling Brevo. Otherwise it asks Brevo's double opt-in endpoint, with an explicit timeout of
+  5 s and no retry (the visitor may send again; Brevo answers the same for an address already there). Brevo's confirmation link lands on the
+  function's fixed origin, `https://kitokey.com` (held equal to `astro.config.mjs`'s `site` by the test), never on
+  the request's host. It answers a 303 to a page of the site: « Vérifiez votre boîte » when Brevo accepted, a generic failure otherwise; the
   detail goes to the log. Its log line is structured, says the outcome and Brevo's status, never the address nor
   the key.
 - **The secret.** `BREVO_API_KEY`, set by the decider on the Pages project, production only. Without it (the
@@ -101,8 +104,12 @@ Option 1, the decider's, 2026-11-28, knowing it costs a function and a secret.
   `BREVO_TEMPLATE_ID`, so that the decider sets the three together and no pull request waits on them.
 - **Abuse.** The honeypot; one rate limiting rule on `/notify` per IP (the free plan's one rule); double opt-in,
   so that an address typed by someone else receives one mail and never joins the list.
-- **The list.** Only confirmed addresses; one campaign at the release, then the list is deleted (`docs/privacy.md`,
-  *This website*).
+- **The list.** Only confirmed addresses; one campaign at the release, then the list is deleted. An address not
+  confirmed within 30 days is deleted; if there is no release, an address is deleted at the latest 12 months after
+  it was given (`docs/privacy.md`, *This website*, which also names every right under consent and the CNIL). Brevo's
+  confirmation link expires after 30 days ([its help](https://help.brevo.com/hc/en-us/articles/208733449)), but its
+  documentation does not say what it keeps of an address created through the API and never confirmed: a monthly
+  clean-up in Brevo, step 7 below, holds both bounds until the account shows it does it itself.
 - **The criticality.** The module now holds personal data: `criticality: standard`, the decider's, 2026-11-28,
   knowing it costs a verifier's sheet on each site pull request (`.nstack/handbook/05-workflow.md` §7).
 
@@ -123,6 +130,9 @@ goes.
 ---
 
 ## Consequences
+
+**Rejected as accepted risks** (the coordinator, 2026-11-28, on nora's reading): a cross-site POST, a host-derived
+link, a bound in characters, an autofillable trap; each is fixed above and tested.
 
 **Positive:** a visitor who is interested now has a way to be told, in the site's own words, and the
 addresses stay in the EU under a processor's contract.
@@ -149,6 +159,8 @@ pages; `tests/own-domain.test.mjs` keeps every page free of another domain.
 5. The list's and the template's ids, set as the plain variables `BREVO_LIST_ID` and `BREVO_TEMPLATE_ID` on the
    Pages project, production only.
 6. A rate limiting rule on the path `/notify` in Cloudflare's WAF.
+7. Once a month, until the list is deleted: in Brevo, delete the contacts not confirmed after 30 days, and those
+   added more than 12 months ago.
 
 ---
 

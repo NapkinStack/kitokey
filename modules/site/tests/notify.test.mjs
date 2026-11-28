@@ -191,7 +191,7 @@ for (const lang of ["fr", "en"]) {
     assert.match(f, new RegExp(`<input type="hidden" name="lang" value="${lang}"`));
     const trap = f.match(/<div class="trap" aria-hidden="true">[\s\S]*?<\/div>/)?.[0] ?? "";
     assert.match(trap, /<input[^>]* name="hp_field"[^>]* tabindex="-1"[^>]* autocomplete="off"/);
-    assert.doesNotMatch(f, /name="(website|url|homepage|e-?mail2?|name)"/, "a trap autofill would fill");
+    assert.doesNotMatch(trap.match(/name="([^"]*)"/)?.[1] ?? "", /web|url|site|home|mail|name|phone|tel|addr/i, "a trap autofill would fill");
     assert.match(f, new RegExp(`<a href="/${lang}/privacy/">`), "the form does not say where its words are kept");
   });
 
@@ -229,9 +229,10 @@ test("_headers lets a form post to the site itself, and nowhere else", async () 
 test("the privacy policy says what the form keeps, who sends, for how long, on what basis, in both languages", async () => {
   for (const [lang, said] of [
     // nora's reading against GDPR art. 13: the right to complain to the CNIL, how long an unconfirmed address and the
-    // list are kept, every right that applies under consent.
-    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "30 days", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/en/'] ],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "30 jours", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/'] ],
+    // list are kept, every right that applies under consent. The CNIL's complaint page is in French alone (a complaint is
+    // written in French), so both halves link it.
+    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "30 days", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"'] ],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "30 jours", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"'] ],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);

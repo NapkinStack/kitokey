@@ -221,7 +221,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
             <label for="notify-email">{mailLabel}</label>
             <div class="notify-row"><input id="notify-email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="notify-said" /><button type="submit">{mailGo}</button></div>
             <input type="hidden" name="lang" value={lang} />
-            <div class="trap" aria-hidden="true"><input name="website" type="text" tabindex="-1" autocomplete="off" /></div>
+            <div class="trap" aria-hidden="true"><input name="hp_field" type="text" tabindex="-1" autocomplete="off" /></div>
             <p class="notify-said" id="notify-said">{mailSaid} <a href={`/${lang}/privacy/`}>{mailWhat}</a></p>
           </form>
         </article>
