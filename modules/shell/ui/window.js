@@ -216,7 +216,7 @@ function roundTheDialog(dialog) {
 // in the window's language and theme, as `components.css` draws it — for the eye and for the e2e (CT).
 function showGallery(words) {
   const page = document.getElementById("gallery");
-  const [buttons, banners, dialogs, engines, chips, options, progresses, toasts] = words.gallery_parts;
+  const [buttons, banners, dialogs, engines, chips, options, progresses, toasts, tabsPart] = words.gallery_parts;
   const specimen = (made, component, state) => {
     made.dataset.component = component;
     made.dataset.state = state;
@@ -289,7 +289,72 @@ function showGallery(words) {
       made.setAttribute("role", "status");
       made.append(icon("check"), element("span", "", said));
       return specimen(made, "toast", state);
-    }))));
+    }))),
+    section(tabsPart, galleryTabs(words)));
+}
+
+// D123's tabs, in the gallery: three of Settings', each its panel and a sentence of it.
+function galleryTabs(words) {
+  const [recording, listening, sharing] = words.settings_tabs;
+  const made = tabsOf("gallery-tabs", tabsPart(words), [
+    ["recording", recording, element("p", "says", words.check_sound_says)],
+    ["listening", listening, element("p", "says", words.engine_auto_says)],
+    ["sharing", sharing, element("p", "says", words.destinations_none)],
+  ]);
+  const box = element("div", "tab-box");
+  box.dataset.component = "tabs";
+  box.dataset.state = "chosen";
+  box.append(made.list, ...made.panels);
+  return box;
+}
+const tabsPart = (words) => words.gallery_parts[8];
+
+// D123's component, the design system's tabs: WAI-ARIA APG's Tabs, automatic activation. A list named by `label`,
+// each item [its key, its words, what its panel holds]; the chosen tab the only stop of Tab, ← → Home End moving
+// and choosing — ← from the first to the last —, its panel next in Tab's order. `changed` hears each choice.
+function tabsOf(id, label, items, chosen = items[0][0], changed = () => {}) {
+  const list = element("div", "tabs");
+  list.setAttribute("role", "tablist");
+  list.setAttribute("aria-label", label);
+  const tabs = [];
+  const panels = [];
+  for (const [key, text, holds] of items) {
+    const tab = element("button", "tab", text);
+    tab.type = "button";
+    tab.id = `${id}-tab-${key}`;
+    tab.dataset.key = key;
+    tab.setAttribute("role", "tab");
+    const panel = element("div", "tab-panel");
+    panel.id = `${id}-panel-${key}`;
+    panel.setAttribute("role", "tabpanel");
+    panel.setAttribute("aria-labelledby", tab.id);
+    panel.tabIndex = 0;
+    if (holds) panel.append(...[holds].flat());
+    tab.setAttribute("aria-controls", panel.id);
+    tabs.push(tab);
+    panels.push(panel);
+  }
+  const choose = (key, focus = false) => {
+    tabs.forEach((tab, at) => {
+      const on = tab.dataset.key === key;
+      tab.setAttribute("aria-selected", String(on));
+      tab.tabIndex = on ? 0 : -1;
+      panels[at].hidden = !on;
+      if (on && focus) tab.focus();
+    });
+    changed(key);
+  };
+  for (const tab of tabs) tab.addEventListener("click", () => choose(tab.dataset.key));
+  list.addEventListener("keydown", (event) => {
+    const at = tabs.indexOf(document.activeElement);
+    const to = at < 0 ? undefined : { ArrowRight: at + 1, ArrowLeft: at - 1, Home: 0, End: tabs.length - 1 }[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    choose(tabs[(to + tabs.length) % tabs.length].dataset.key, true);
+  });
+  list.append(...tabs);
+  choose(chosen);
+  return { list, panels, choose };
 }
 
 // D120 2b's chip in its five tones, each with words it says in the window.
