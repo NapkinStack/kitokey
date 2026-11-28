@@ -174,16 +174,35 @@ async function redoDialog(session, words, step, corrected = false) {
   });
   if (!offered) return;
   const writing = step === "minutes";
-  const services = writing || offered.confidential ? []
-    : await window.__TAURI__.core.invoke("services_offered", { name }).then((all) => all.transcription, () => []);
+  // The services set up with their key, each model they list (D96); none for a confidential meeting (D60).
+  const services = offered.confidential ? []
+    : await window.__TAURI__.core.invoke("services_offered", { name }).then((all) => all[writing ? "minutes" : "transcription"], () => []);
   const title = writing ? words.redo_title : words.redo_transcript_title;
   const dialog = element("dialog", "dialog redo-dialog");
   const heading = element("h2", "", title);
   heading.id = "redo-dialog-title";
   dialog.setAttribute("aria-labelledby", heading.id);
   const cards = engineCards({ job: writing ? "write" : "transcribe", offered, words, scope: "meeting", services });
-  const notes = writing ? [element("p", "says", words.redo_note)] : [element("p", "says", words.redo_transcript_note)];
-  if (!writing && session.minutes) notes.push(element("p", "says", words.redo_keeps_minutes));
+  const note = element("p", "says", writing ? words.redo_note : words.redo_transcript_note);
+  note.id = "redo-dialog-note";
+  const notes = [note];
+  // Made again, the transcript alone: the summary there is kept, said so (the decider, 2026-11-18, D113).
+  if (!writing && session.minutes) {
+    const kept = element("p", "says", words.redo_keeps_minutes);
+    kept.id = "redo-dialog-keeps-minutes";
+    notes.push(kept);
+  }
+  // What the meeting chose and cannot be made by now — gone, or a service while confidential —, and Settings not
+  // read: said, « Par défaut » checked in its place, never silently another (D91).
+  const models = element("p", "note warn");
+  models.id = "redo-dialog-models-said";
+  models.textContent = [
+    offered.unreadable ?? "",
+    offered.gone.includes(step) ? (writing ? words.models_gone_minutes : words.models_gone_transcription) : "",
+    offered.unused.includes(step) ? words.models_unused_confidential : "",
+  ].filter(Boolean).join(" ");
+  models.hidden = models.textContent === "";
+  notes.push(models);
   // Made again, the transcript is another file: a person's corrections are not in it, said before it starts (ADR-0014).
   if (!writing && corrected) {
     const lost = element("p", "note warn", words.redo_loses_corrections);
@@ -191,6 +210,7 @@ async function redoDialog(session, words, step, corrected = false) {
     notes.push(lost);
   }
   const wrong = element("p", "note warn");
+  wrong.id = "redo-dialog-wrong";
   wrong.setAttribute("role", "status");
   wrong.hidden = true;
   const close = () => {
@@ -200,9 +220,11 @@ async function redoDialog(session, words, step, corrected = false) {
   };
   const cancel = element("button", "button secondary", words.send_cancel);
   cancel.type = "button";
+  cancel.id = "redo-dialog-cancel";
   cancel.addEventListener("click", close);
   const go = element("button", "button primary", title);
   go.type = "button";
+  go.id = "redo-dialog-do";
   go.addEventListener("click", async () => {
     // Asked, the dialog stays until the shell answers: a refusal is said in it, never in a dialog gone.
     go.disabled = cancel.disabled = true;
@@ -1201,7 +1223,7 @@ async function readMakings() {
   // quickly: drawn again, to show them — unless the user has a panel open there, or is typing in
   // it, which a redraw would take from under them; then once that is done.
   // « Refaire ▾ »'s dialog (D121) is the page's too, though outside #meeting: its « Refaire » to come back to.
-  const busy = document.querySelector("#meeting .redo, #meeting input:focus, #meeting textarea:focus, dialog.redo-dialog[open]");
+  const busy = document.querySelector("#meeting input:focus, #meeting textarea:focus, dialog.redo-dialog[open]");
   const drawn = (id) => document.getElementById(id)?.dataset.made;
   const moved = opened && makings
     && ((String(makings.made[opened] ?? 0) !== drawn("minutes-state") && minutesState(opened)?.kind !== "making")
@@ -1839,284 +1861,6 @@ function offer(card, label, id, command, session, words) {
   return button;
 }
 
-// « Avancé » (D91, board 6), closed by default: the meeting's own models — the transcription's and the
-// minutes' —, each on Settings' choice first, said as such; the same in the bar and in *Refaire…*.
-// `offered` is models_offered's answer; `chosen(models)` keeps a choice, and refused, the lists go
-// back to what was kept. A confidential meeting is offered no service (D60).
-function modelsAdvanced(words, prefix, offered, chosen) {
-  const box = element("div", "models-advanced");
-  const toggle = element("button", "disclose-advanced");
-  toggle.type = "button";
-  toggle.id = `${prefix}-advanced`;
-  toggle.setAttribute("aria-controls", `${prefix}-advanced-panel`);
-  toggle.append(icon("chevron-right"), element("span", "", words.bar_advanced));
-  const panel = element("div", "models-advanced-panel");
-  panel.id = `${prefix}-advanced-panel`;
-  const unfold = (now) => {
-    toggle.setAttribute("aria-expanded", String(now));
-    toggle.firstChild.replaceWith(icon(now ? "chevron-down" : "chevron-right"));
-    panel.hidden = !now;
-  };
-  toggle.addEventListener("click", () => unfold(toggle.getAttribute("aria-expanded") !== "true"));
-  unfold(false);
-  const here = (provider) => provider === offered.ollama_address;
-  const writerSaid = (provider, model) => `${modelSaid(model)}${here(provider) ? ` — ${words.on_computer}` : fill(words.written_via, via(provider))}`;
-  // Who hears and who writes as Settings name them: what « Celui des Réglages » means.
-  const settingsHear =
-    offered.engine === "speechanalyzer" ? "SpeechAnalyzer"
-    : offered.engine === "service" && offered.transcription_model ? `${offered.transcription_model}${fill(words.written_via, via(offered.transcription_provider ?? ""))}`
-    : spoken(offered.model);
-  // Settings' entry short: the model alone, where a service is named only when it sends the meeting away.
-  const settingsWrite =
-    offered.minutes_provider && offered.minutes_model ? `${modelSaid(offered.minutes_model)}${here(offered.minutes_provider) ? "" : fill(words.written_via, via(offered.minutes_provider))}`
-    : words.models_none;
-  // Settings' own choice, as an entry of its list would be: offered once, as Settings' — unless it is the
-  // meeting's own, which stays shown as chosen.
-  const settingsHearing =
-    offered.engine === "speechanalyzer" ? JSON.stringify({ engine: "speechanalyzer" })
-    : offered.engine === "service" && offered.transcription_model ? JSON.stringify({ engine: "service", provider: offered.transcription_provider, model: offered.transcription_model })
-    : JSON.stringify({ engine: "whisper", model: offered.model });
-  const settingsWriting = offered.minutes_provider && offered.minutes_model ? JSON.stringify({ provider: offered.minutes_provider, model: offered.minutes_model }) : "";
-  const ownHear = offered.chosen.transcription ? JSON.stringify(offered.chosen.transcription) : "";
-  const ownWrite = offered.chosen.minutes ? JSON.stringify({ provider: offered.chosen.minutes.provider, model: offered.chosen.minutes.model }) : "";
-  const hearing = [["", fill(words.models_settings, settingsHear)]];
-  const offer = (list, value, said, settings, own) => {
-    if (value !== settings || value === own) list.push([value, said]);
-  };
-  for (const model of offered.whisper) offer(hearing, JSON.stringify({ engine: "whisper", model }), spoken(model), settingsHearing, ownHear);
-  if (offered.apple) offer(hearing, JSON.stringify({ engine: "speechanalyzer" }), "SpeechAnalyzer", settingsHearing, ownHear);
-  if (offered.service) {
-    const [provider, model] = offered.service;
-    offer(hearing, JSON.stringify({ engine: "service", provider, model }), `${model}${fill(words.written_via, via(provider))}`, settingsHearing, ownHear);
-  }
-  const writing = [["", fill(words.models_settings, settingsWrite)]];
-  for (const model of offered.ollama) {
-    offer(writing, JSON.stringify({ provider: offered.ollama_address, model }), writerSaid(offered.ollama_address, model), settingsWriting, ownWrite);
-  }
-  const list = (id, label, options, value, gone) => {
-    const row = element("label", "models-row");
-    row.htmlFor = id;
-    const pick = element("select");
-    pick.id = id;
-    // What the meeting chose and is no longer offered — gone, or a service it may no longer have — is
-    // shown as chosen, said gone below: never silently another.
-    const all = value && !options.some(([known]) => known === value) && !gone ? [...options, [value, JSON.parse(value).model ?? JSON.parse(value).engine]] : options;
-    for (const [known, said] of all) {
-      const option = element("option", "", said);
-      option.value = known;
-      pick.append(option);
-    }
-    pick.value = gone ? "" : value;
-    // A name longer than the list is wide: said whole under it — a native list never wraps.
-    const whole = element("span", "says whole");
-    whole.id = `${id}-whole`;
-    whole.hidden = true;
-    row.append(element("span", "name", label), pick, whole);
-    return [row, pick];
-  };
-  const measure = document.createElement("canvas").getContext("2d");
-  // Said for the list's width as it is drawn: each change of it — « Avancé » opened, the window resized
-  // — measures again (ResizeObserver), and each choice (`changed`). Painted at the next frame, never in
-  // the observer's own turn: the line it shows or hides changes the bar's height, which the bar's own
-  // observer answers by resizing the window — in the same turn, the browser reports a loop as an error.
-  const sized = new ResizeObserver((entries) => {
-    const picks = entries.map(({ target }) => target);
-    requestAnimationFrame(() => picks.filter((pick) => pick.isConnected).forEach((pick) => paintWhole(pick)));
-  });
-  const paintWhole = (pick) => {
-    const whole = pick.parentElement?.querySelector(".whole");
-    if (!whole || pick.clientWidth === 0) return;
-    const style = getComputedStyle(pick);
-    measure.font = `${style.fontSize} ${style.fontFamily}`;
-    const text = pick.options[pick.selectedIndex]?.textContent ?? "";
-    // The list's own room: its padding and its arrow, about 36 px.
-    const cut = Math.ceil(measure.measureText(text).width) + 36 > pick.clientWidth;
-    whole.textContent = cut ? text : "";
-    whole.hidden = !cut;
-  };
-  const gone = new Set(offered.gone);
-  let [hearRow, hearPick] = list(`${prefix}-transcription-model`, words.models_transcription, hearing, ownHear, gone.has("transcription"));
-  let [writeRow, writePick] = list(`${prefix}-minutes-model`, words.models_minutes, writing, ownWrite, gone.has("minutes"));
-  const said = element("p", "note warn");
-  said.id = `${prefix}-models-said`;
-  said.setAttribute("role", "status");
-  const goneSaid = [
-    offered.unreadable ?? "",
-    gone.has("transcription") ? words.models_gone_transcription : "",
-    gone.has("minutes") ? words.models_gone_minutes : "",
-    offered.unused.length > 0 ? words.models_unused_confidential : "",
-  ].filter(Boolean).join(" ");
-  said.textContent = goneSaid;
-  said.hidden = goneSaid === "";
-  let kept = [hearPick.value, writePick.value];
-  const models = () => ({
-    transcription: hearPick.value ? JSON.parse(hearPick.value) : null,
-    minutes: writePick.value ? JSON.parse(writePick.value) : null,
-  });
-  const changed = async () => {
-    try {
-      await chosen(models());
-      kept = [hearPick.value, writePick.value];
-      said.textContent = "";
-      said.hidden = true;
-    } catch (why) {
-      hearPick = putBack(hearPick, kept[0]);
-      writePick = putBack(writePick, kept[1]);
-      for (const pick of [hearPick, writePick]) {
-        pick.addEventListener("change", changed);
-        sized.observe(pick);
-      }
-      said.textContent = fill(words.models_not_kept, why);
-      said.hidden = false;
-    }
-    paintWhole(hearPick);
-    paintWhole(writePick);
-  };
-  hearPick.addEventListener("change", changed);
-  writePick.addEventListener("change", changed);
-  sized.observe(hearPick);
-  sized.observe(writePick);
-  // What a choice here changes, said before the lists.
-  panel.append(element("p", "says", words.models_own_note), hearRow, writeRow, said);
-  box.append(toggle, panel);
-  // Each service set up with its key (D96): every model it lists, grouped under its name, as people
-  // say them — never Settings' own again, nor one already offered.
-  const grouped = (pick, offeredServices, valueOf, saidOf, settings) => {
-    const known = new Set([...pick.options].map((option) => option.value));
-    for (const service of offeredServices) {
-      const group = element("optgroup");
-      group.label = service.name;
-      for (const model of service.models) {
-        const value = valueOf(service.address, model);
-        if (known.has(value) || value === settings) continue;
-        const option = element("option", "", saidOf(service.address, model));
-        option.value = value;
-        group.append(option);
-        known.add(value);
-      }
-      if (group.childElementCount > 0) pick.append(group);
-    }
-    paintWhole(pick);
-  };
-  const services = (offeredServices) => {
-    grouped(writePick, offeredServices.minutes, (provider, model) => JSON.stringify({ provider, model }), writerSaid, settingsWriting);
-    grouped(hearPick, offeredServices.transcription, (provider, model) => JSON.stringify({ engine: "service", provider, model }),
-      (provider, model) => `${modelSaid(model)}${fill(words.written_via, via(provider))}`, settingsHearing);
-  };
-  // The model a step will be made by, as people say it — Settings' when none is chosen —, or null when
-  // there is none (D96: the button that starts names it).
-  const named = (step) => {
-    const chosen = models()[step];
-    if (step === "minutes") {
-      const model = chosen ? chosen.model : offered.minutes_provider && offered.minutes_model;
-      return model ? modelSaid(model) : null;
-    }
-    const heard = chosen ?? (offered.engine === "speechanalyzer" ? { engine: "speechanalyzer" }
-      : offered.engine === "service" && offered.transcription_model ? { engine: "service", model: offered.transcription_model }
-      : offered.model ? { engine: "whisper", model: offered.model } : null);
-    if (!heard) return null;
-    return heard.engine === "speechanalyzer" ? "SpeechAnalyzer" : heard.engine === "service" ? modelSaid(heard.model) : spoken(heard.model);
-  };
-  return { box, toggle, panel, models, unfold, services, named, get picks() { return [hearPick, writePick]; } };
-}
-
-// A panel of *Refaire…* closes on *Annuler* or Escape: nothing changed, the focus back on *Refaire…* (D68).
-function closes(panel, go, button, words) {
-  const cancel = element("button", "open", words.redo_cancel);
-  cancel.type = "button";
-  cancel.id = `${panel.id}-cancel`;
-  const close = () => {
-    panel.replaceWith(button);
-    button.focus();
-  };
-  cancel.addEventListener("click", close);
-  // From the panel, or from nowhere — its title clicked; a field elsewhere keeps its own Escape.
-  const onEscape = (event) => {
-    if (!panel.isConnected) return document.removeEventListener("keydown", onEscape);
-    if (event.key !== "Escape") return;
-    const at = document.activeElement;
-    if (at === document.body || panel.contains(at)) close();
-  };
-  document.addEventListener("keydown", onEscape);
-  const row = element("div", "redo-actions");
-  go.replaceWith(row);
-  row.append(go, cancel);
-  return panel;
-}
-
-// *Refaire…* (D11's sixth board, D91): made again by the meeting's own models, Settings' first; its
-// « Avancé », closed, chooses them — kept for the meeting once Refaire is pressed, never on Annuler.
-function redoWith(offered, session, words, button, id, title, notes, again, step, doing) {
-  const panel = element("section", "redo");
-  panel.id = id;
-  panel.append(element("h3", "", title), element("p", "says", words.redo_with));
-  const advanced = modelsAdvanced(words, id, offered, async () => {});
-  // The services set up, read as the panel opens: their models join the list when they answer (D96).
-  if (!offered.confidential) {
-    window.__TAURI__.core.invoke("services_offered", { name: nameOf(session) }).then(advanced.services, () => {});
-  }
-  const go = element("button", "primary");
-  go.type = "button";
-  go.id = id.replace(/-panel$/, "-do");
-  // The one button that starts names the making and its model, as chosen (D96); with none, the making.
-  const name = () => {
-    const model = advanced.named(step);
-    go.textContent = model ? fill(doing, model) : title;
-  };
-  name();
-  for (const pick of advanced.picks) pick.addEventListener("change", name);
-  go.addEventListener("click", async () => {
-    waiting(go, true);
-    try {
-      const chosen = advanced.models();
-      const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
-      if (JSON.stringify(chosen) !== JSON.stringify(own)) {
-        await window.__TAURI__.core.invoke("meeting_models_chosen", { name: nameOf(session), chosen });
-        // Another choice kept: the page's lists read it again (D93).
-        pageOffered = null;
-      }
-      await again();
-      // Asked: the panel goes, the making is said where it is made (D25).
-      panel.replaceWith(button);
-      readMakings();
-    } catch (why) {
-      // Not started: said why and what to do, the button kept for another try (#771).
-      wrong.textContent = fill(words.redo_not_done, why);
-      wrong.hidden = false;
-      waiting(go, false);
-    }
-  });
-  const wrong = element("p", "note warn");
-  wrong.hidden = true;
-  panel.append(advanced.box, ...notes, wrong, go);
-  return closes(panel, go, button, words);
-}
-
-function redoPanel(offered, session, words, button) {
-  return redoWith(offered, session, words, button, "redo-panel", words.redo_title, [element("p", "says", words.redo_note)], () =>
-    window.__TAURI__.core.invoke("minutes_redo", { name: nameOf(session), provider: null, model: null }), "minutes", words.redo_minutes_do);
-}
-
-function redoTranscriptPanel(offered, session, words, button, corrected) {
-  const note = element("p", "says", words.redo_transcript_note);
-  note.id = "redo-transcript-note";
-  const notes = [note];
-  // Made again, the transcript alone: the summary there is kept, said so (the decider, 2026-11-18, D113).
-  if (session.minutes) {
-    const kept = element("p", "says", words.redo_keeps_minutes);
-    kept.id = "redo-keeps-minutes";
-    notes.push(kept);
-  }
-  // Made again, the transcript is another file: a person's corrections are not in it (ADR-0014).
-  if (corrected) {
-    const lost = element("p", "note warn", words.redo_loses_corrections);
-    lost.id = "redo-loses-corrections";
-    notes.push(lost);
-  }
-  return redoWith(offered, session, words, button, "redo-transcript-panel", words.redo_transcript_title, notes, () =>
-    window.__TAURI__.core.invoke("transcript_redo_own", { name: nameOf(session) }), "transcription", words.redo_transcript_do);
-}
-
 // D93, criterion 5: what a meeting's page offers to make it by — models_offered's answer, read once a
 // page's opening by the first line that offers a choice, never at each drawing; shared by its two
 // lines, which keep the meeting's own choice whole between them. Dropped once another meeting is
@@ -2550,19 +2294,6 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
     }
     return card;
   }
-  // Refaire… (D11's sixth board): another model, this time only; the minutes stay until the new
-  // ones are whole.
-  const redo = iconButton("rotate-ccw", words.redo, "redo-minutes");
-  redo.addEventListener("click", async () => {
-    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) }).catch((why) => {
-      redo.after(element("p", "note warn", fill(words.models_not_read, why)));
-      return null;
-    });
-    if (offered === null) return;
-    const panel = redoPanel(offered, session, words, redo);
-    redo.replaceWith(panel);
-    panel.querySelector("button:enabled").focus();
-  });
   // Copied in one click, as written, to paste where the user writes (D45): said in place, a moment. As
   // rich text and as Markdown together, so that a document or a chat keeps its headings and lists, and
   // a plain field takes the Markdown (D109). Without ClipboardItem, the Markdown alone, as before.
@@ -2589,7 +2320,7 @@ function minutesCard(read, words, session, transcript, onPage, previous, otherVe
     }
   });
   const actions = element("span", "minutes-actions");
-  actions.append(copied, copy, redo);
+  actions.append(copied, copy);
   top.append(actions);
   sendPart(card, top, actions, session, words);
   // When they were made first, then who wrote them, the model as people say it (D93); what is not
@@ -3098,18 +2829,6 @@ function transcriptCard(read, words, session, onPage, previous, speakers) {
   // Its icon in the field, as the sidebar's search (D89).
   const finding = element("div", "finding");
   finding.append(icon("search"), search);
-  // Refaire…: another Whisper model of this computer, this time only; beside the search (board 4).
-  const redo = iconButton("rotate-ccw", words.redo, "redo-transcript");
-  redo.addEventListener("click", async () => {
-    const offered = await window.__TAURI__.core.invoke("models_offered", { name: nameOf(session) }).catch((why) => {
-      redo.after(element("p", "note warn", fill(words.models_not_read, why)));
-      return null;
-    });
-    if (offered === null) return;
-    const panel = redoTranscriptPanel(offered, session, words, redo, read.segments.some((segment) => segment.edited));
-    redo.replaceWith(panel);
-    panel.querySelector("button:enabled").focus();
-  });
   // Copied in one click, each line with when and who said it, as the page names them (D109); said in
   // place, a moment, as the minutes' copy is.
   const copy = iconButton("copy", words.copy_transcript, "copy-transcript");
@@ -3128,7 +2847,7 @@ function transcriptCard(read, words, session, onPage, previous, speakers) {
       copied.textContent = words.transcript_not_copied;
     }
   });
-  top.append(finding, copied, copy, redo);
+  top.append(finding, copied, copy);
   // Nommer les intervenants… (#1205), once complete: the two sides' names in two labelled fields, as Otter and
   // Zoom rename a speaker from the transcript; kept with the meeting, every line following at once.
   if (names && read.complete) top.append(speakersButton(card, names, read, words, session));
@@ -3568,9 +3287,10 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
   const redoing = [];
   if (minutes.state === "present") redoing.push(["redo-minutes-item", words.redo_title, () => redoDialog(session, words, "minutes")]);
   if (transcript.state === "present") redoing.push(["redo-transcript-item", words.redo_transcript_title, () => redoDialog(session, words, "transcription", transcript.segments.some((segment) => segment.edited))]);
+  // Nothing to make again — neither summary nor transcript —: no « Refaire » at all, never a button that does nothing.
   const redo = redoing.length
     ? moreActions(redoing, words, { id: "redo-open", menuId: "redo-menu", glyph: "rotate-ccw", label: words.meeting_redo, name: words.meeting_redo, chevron: true })
-    : actionButton("rotate-ccw", words.meeting_redo, "redo-open");
+    : null;
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.
   const refused = element("p", "note warn");
   refused.id = "trash-said";
@@ -3599,7 +3319,7 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     top.append(copied);
   }
   rarer.push(["trash-meeting", words.trash_meeting, () => trashAsked(session, transcript, minutes, words, refused), true]);
-  actions.append(share, redo, moreActions(rarer, words));
+  actions.append(...[share, redo].filter(Boolean), moreActions(rarer, words));
   top.append(refused);
   // The way back is the pane's, under 840 px alone (D61).
   top.append(actions);

@@ -554,9 +554,6 @@ pub struct Window {
     /// Shows: the sidebar and the recording bar, as a button. When: record button label while the
     /// recording stops. At most: about 24 characters. Placeholders: none.
     pub record_stopping: &'static str,
-    /// Shows: a meeting's page, its Redo… panel, as a button. When: closes the Redo panel. At most:
-    /// about 16 characters. Placeholders: none.
-    pub redo_cancel: &'static str,
     /// Shows: Settings, beside a setting just saved. When: for a moment after it is. At most: one
     /// line. Placeholders: none.
     pub saved: &'static str,
@@ -1298,20 +1295,12 @@ pub struct Window {
     /// The button beside the meeting last stopped (D92). Shows: the bar at rest. When: the meeting
     /// ready, stopped or failed; a press opens its page. At most: 12 characters. Placeholders: none.
     pub bar_last_open: &'static str,
-    /// « Avancé » (D90, board 6; D91), closed by default, in the bar opened and in *Refaire…*: the
-    /// meeting's own models, Settings' choice first, said as such — what it holds said on it.
-    /// Shows: the recording bar and Redo…, as a button. When: disclosure: per-meeting models.
-    /// At most: about 30 characters. Placeholders: none.
-    pub bar_advanced: &'static str,
     /// Shows: the recording bar and Redo…, as a label. When: per-meeting transcription model.
     /// At most: about 30 characters. Placeholders: none.
     pub models_transcription: &'static str,
     /// Shows: the recording bar and Redo…, as a label. When: per-meeting minutes model. At most:
     /// about 30 characters. Placeholders: none.
     pub models_minutes: &'static str,
-    /// Shows: the recording bar and Redo…, as a choice of a list. When: first choice: Settings'
-    /// model. At most: about 60 characters. Placeholders: {} model.
-    pub models_settings: &'static str,
     /// Shows: the recording bar and Redo…, as a choice of a list. When: no model chosen in
     /// Settings. At most: about 30 characters. Placeholders: none.
     pub models_none: &'static str,
@@ -1386,9 +1375,6 @@ pub struct Window {
     /// (D126, mock-up v5). Shows: the first run, its top right, as marks. When: Kitokey's first
     /// start. At most: about 20 characters. Placeholders: {} the screen's number.
     pub first_step: &'static str,
-    /// Shows: the recording bar and Redo…, as a help line. When: per-meeting choice does not change
-    /// Settings. At most: no limit. Placeholders: none.
-    pub models_own_note: &'static str,
     /// Shows: the recording bar and Redo…, as an error. When: choice not saved. At most: no limit.
     /// Placeholders: {} failure sentence.
     pub models_not_kept: &'static str,
@@ -1514,17 +1500,11 @@ pub struct Window {
     /// Shows: « Faire de la place », the sidebar's foot, as a status. When: after freeing. At most:
     /// no limit. Placeholders: none.
     pub free_done: &'static str,
-    /// *Refaire…* on the minutes (D11's sixth board): the panel's title, question, note and gesture.
-    /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) opening
-    /// the Redo panel. At most: no limit. Placeholders: none.
-    pub redo: &'static str,
-    /// Shows: a meeting's page, its Redo… panel, as a heading. When: redo the minutes. At most: no
+    /// « Refaire ▾ » on the minutes (D11's sixth board; D121, criterion 3): the dialog's title and note.
+    /// Shows: a meeting's page, its Redo dialog, as a heading. When: redo the minutes. At most: no
     /// limit. Placeholders: none.
     pub redo_title: &'static str,
-    /// Shows: a meeting's page, its Redo… panel, as a help line. When: uses this meeting's models.
-    /// At most: no limit. Placeholders: none.
-    pub redo_with: &'static str,
-    /// Shows: a meeting's page, its Redo… panel, as a help line. When: current minutes go to trash
+    /// Shows: a meeting's page, its Redo dialog, as a help line. When: current minutes go to trash
     /// once new ones are ready. At most: no limit. Placeholders: none.
     pub redo_note: &'static str,
     /// Shows: the summary's redo panel, its one button that starts, naming the making and its model
@@ -2152,7 +2132,6 @@ pub fn window(language: Language) -> Window {
             context_not_read: "Couldn’t reload the context: {}",
             record_starting: "Starting…",
             record_stopping: "Stopping…",
-            redo_cancel: "Cancel",
             saved: "Saved",
             small_not_confidential: "This meeting isn’t confidential. Open it to mark it as confidential.",
             trial_over: "Your trial has ended. Your meetings stay yours: you can still read, play and export them.",
@@ -2412,10 +2391,8 @@ pub fn window(language: Language) -> Window {
             bar_last_stopped: "{}: stopped",
             bar_last_failed: "{}: {}",
             bar_last_open: "Open",
-            bar_advanced: "Advanced — models",
             models_transcription: "Transcription model",
             models_minutes: "Summary model",
-            models_settings: "From Settings: {}",
             models_none: "no model chosen",
             engine_transcribe: "Transcription engine",
             engine_write: "Summary engine",
@@ -2439,7 +2416,6 @@ pub fn window(language: Language) -> Window {
             first_later: "I’ll choose later",
             first_next: "Continue",
             first_step: "Step {} of 3",
-            models_own_note: "For this meeting only; Settings stay the same.",
             models_not_kept: "Choice not saved: {}",
             models_not_read: "Couldn’t load the models: {}",
             models_gone_transcription: "The transcription model chosen for this meeting is no longer installed — the one in Settings will be used.",
@@ -2481,9 +2457,7 @@ pub fn window(language: Language) -> Window {
             free_do_whole: "Move meetings to trash",
             free_busy: "in progress",
             free_done: "Done — moved to the trash.",
-            redo: "Redo…",
             redo_title: "Write the summary again",
-            redo_with: "Uses this meeting’s models (choose them under “Advanced”).",
             redo_note: "The current summary stays in place until the new one is ready, then goes to the trash.",
             redo_minutes_do: "Write the summary again with {}",
             redo_transcript_do: "Write the transcript again with {}",
@@ -2713,7 +2687,6 @@ pub fn window(language: Language) -> Window {
             context_not_read: "Impossible de relire le contexte\u{a0}: {}",
             record_starting: "Démarrage…",
             record_stopping: "Arrêt…",
-            redo_cancel: "Annuler",
             saved: "Enregistré",
             small_not_confidential: "Cette réunion n’est pas confidentielle. Ouvrez-la pour la marquer comme telle.",
             trial_over: "Votre essai est terminé. Vos réunions restent à vous\u{a0}: vous pouvez toujours les lire, les écouter et les exporter.",
@@ -2979,10 +2952,8 @@ pub fn window(language: Language) -> Window {
             bar_last_stopped: "{}\u{a0}: arrêtée",
             bar_last_failed: "{}\u{a0}: {}",
             bar_last_open: "Ouvrir",
-            bar_advanced: "Avancé — modèles",
             models_transcription: "Modèle de transcription",
             models_minutes: "Modèle du compte rendu",
-            models_settings: "Celui des Réglages\u{a0}: {}",
             models_none: "aucun modèle choisi",
             engine_transcribe: "Moteur de transcription",
             engine_write: "Moteur de rédaction",
@@ -3006,7 +2977,6 @@ pub fn window(language: Language) -> Window {
             first_later: "Je choisirai plus tard",
             first_next: "Continuer",
             first_step: "Étape {} sur 3",
-            models_own_note: "Pour cette réunion uniquement\u{202f}; les Réglages ne changent pas.",
             models_not_kept: "Choix non enregistré\u{a0}: {}",
             models_not_read: "Impossible de lire les modèles\u{a0}: {}",
             models_gone_transcription: "Le modèle de transcription choisi pour cette réunion n’est plus installé\u{a0}: celui des Réglages sera utilisé.",
@@ -3051,9 +3021,7 @@ pub fn window(language: Language) -> Window {
             free_do_whole: "Mettre les réunions à la corbeille",
             free_busy: "en cours de traitement",
             free_done: "C’est fait\u{a0}: tout est dans la corbeille.",
-            redo: "Refaire…",
             redo_title: "Refaire le compte rendu",
-            redo_with: "Refait avec les modèles de cette réunion (à choisir dans «\u{a0}Avancé\u{a0}»).",
             redo_note: "Le compte rendu actuel reste en place tant que le nouveau n’est pas prêt, et se retrouve ensuite dans la corbeille.",
             redo_minutes_do: "Refaire le compte rendu avec {}",
             redo_transcript_do: "Refaire la transcription avec {}",
@@ -3595,34 +3563,34 @@ pub fn cause_own(cause: Cause, language: Language) -> Option<&'static str> {
     use Language::{English, French};
     Some(match (cause, language) {
         (Cause::TooSlow, English) => {
-            "{}, chosen for this meeting, took too long to respond. Try again later or choose a faster model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, took too long to respond. Try again later or choose a faster engine in Redo\u{a0}› Write the summary again."
         }
         (Cause::TooSlow, French) => {
-            "{}, choisi pour cette réunion, n’a pas répondu à temps. Réessayez plus tard ou choisissez un modèle plus rapide dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas répondu à temps. Réessayez plus tard ou choisissez un moteur plus rapide dans Refaire\u{a0}› Refaire le compte rendu."
         }
         (Cause::UnknownModel, English) => {
-            "The service doesn’t recognize {}, chosen for this meeting. Choose another in Redo…\u{a0}› Advanced."
+            "The service doesn’t recognize {}, chosen for this meeting. Choose another in Redo\u{a0}› Write the summary again."
         }
         (Cause::UnknownModel, French) => {
-            "Le service ne reconnaît pas {}, choisi pour cette réunion. Choisissez-en un autre dans Refaire…\u{a0}› Avancé."
+            "Le service ne reconnaît pas {}, choisi pour cette réunion. Choisissez-en un autre dans Refaire\u{a0}› Refaire le compte rendu."
         }
         (Cause::Down, English) => {
-            "The service is having problems. Try again later. If {} runs on this computer, it may be too large for its memory — choose a smaller one in Redo…\u{a0}› Advanced."
+            "The service is having problems. Try again later. If {} runs on this computer, it may be too large for its memory: choose a smaller one in Redo\u{a0}› Write the summary again."
         }
         (Cause::Down, French) => {
-            "Le service rencontre un problème. Réessayez plus tard. Si {} tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit dans Refaire…\u{a0}› Avancé."
+            "Le service rencontre un problème. Réessayez plus tard. Si {} tourne sur cet ordinateur, il est peut-être trop gros pour sa mémoire\u{a0}: choisissez-en un plus petit dans Refaire\u{a0}› Refaire le compte rendu."
         }
         (Cause::CutShort, English) => {
-            "{}, chosen for this meeting, stopped before finishing. Choose a model that handles longer answers in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, stopped before finishing. Choose an engine that handles longer answers in Redo\u{a0}› Write the summary again."
         }
         (Cause::CutShort, French) => {
-            "{}, choisi pour cette réunion, s’est arrêté avant la fin. Choisissez un modèle capable de réponses plus longues dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, s’est arrêté avant la fin. Choisissez un moteur capable de réponses plus longues dans Refaire\u{a0}› Refaire le compte rendu."
         }
         (Cause::NotMinutes, English) => {
-            "{}, chosen for this meeting, didn’t produce a summary. Try again or choose another model in Redo…\u{a0}› Advanced."
+            "{}, chosen for this meeting, didn’t produce a summary. Try again or choose another engine in Redo\u{a0}› Write the summary again."
         }
         (Cause::NotMinutes, French) => {
-            "{}, choisi pour cette réunion, n’a pas produit de compte rendu. Réessayez ou choisissez un autre modèle dans Refaire…\u{a0}› Avancé."
+            "{}, choisi pour cette réunion, n’a pas produit de compte rendu. Réessayez ou choisissez un autre moteur dans Refaire\u{a0}› Refaire le compte rendu."
         }
         _ => return None,
     })
