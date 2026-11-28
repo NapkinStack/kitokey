@@ -7416,7 +7416,8 @@ def meeting_exported(now: dt.datetime) -> None:
     (private / "confidential").write_bytes(b"")
     menu = ("const m = document.getElementById('share-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
             " return {items: [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim()]),"
-            " note: m.querySelector('.menu-note')?.textContent.trim() ?? null}")
+            " note: m.querySelector('.menu-note')?.textContent.trim() ?? null,"
+            " described: m.getAttribute('aria-describedby'), heard: document.getElementById(m.getAttribute('aria-describedby') ?? '')?.textContent.trim() ?? null}")
     said = "return document.getElementById('share-said')?.textContent.trim() ?? null"
     stub = ("const real = window.__TAURI__.core; window.__TAURI__.core = {...real, invoke: (asked, ...rest) =>"
             " asked === 'export_file_chosen' ? Promise.resolve(arguments[0]) : real.invoke(asked, ...rest)};"
@@ -7445,6 +7446,11 @@ def meeting_exported(now: dt.datetime) -> None:
                 note = got.get("note")
                 check(f"{short}, {'confidential' if confidential else 'ordinary'}: the menu's line on a confidential meeting {'said' if confidential else 'absent'} (PDR-0007)",
                       (note is not None and note.startswith(words["note"])) if confidential else note is None, note)
+                # Heard as the menu's description (ines, #1320, m7): the menu describedby the line, its words the line's;
+                # an ordinary meeting's menu describedby nothing.
+                check(f"{short}, {'confidential' if confidential else 'ordinary'}: the line {'is' if confidential else 'none is'} « Partager »'s description for a screen reader (aria-describedby)",
+                      [got.get("described"), got.get("heard")] == (["share-confidential", note] if confidential else [None, None]),
+                      [got.get("described"), got.get("heard")])
                 if confidential:
                     # The line is the menu's description, never one of its items: the menu as axe reads it (WAI-ARIA's menu).
                     found = axe_violations(browser)
