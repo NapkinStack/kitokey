@@ -153,6 +153,9 @@ pub struct Settings {
     pub export: Option<PathBuf>,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
+    /// J, K and « ? » as the window's shortcuts (D128, WCAG 2.2 SC 2.1.4): a single key each, the user may turn them
+    /// off — a voice dictating would press them. On by default, as Gmail has them.
+    pub single_keys: bool,
     /// Every window's look, the system's by default (D98).
     pub appearance: Appearance,
     /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
@@ -167,6 +170,8 @@ pub struct Settings {
     /// Where a summary can be sent (D110): each by its name and kind, its address shown only as its
     /// host and the end of its path — the address itself is in the keyring, never here.
     pub destinations: Vec<crate::destinations::Destination>,
+    /// The formats a summary is written in (D130): the person's own, the built-in ones hidden, the default.
+    pub formats: crate::formats::Formats,
 }
 
 /// The model a transcript is heard with when the settings name none (ADR-0003).
@@ -199,12 +204,14 @@ impl Default for Settings {
             log: Log::Info,
             welcomed: false,
             folded: false,
+            single_keys: true,
             appearance: Appearance::System,
             bar_at: None,
             language: None,
             microphone: None,
             microphone_description: None,
             destinations: Vec::new(),
+            formats: crate::formats::Formats::default(),
         }
     }
 }
@@ -290,12 +297,16 @@ struct Written {
     log: Option<Log>,
     welcomed: Option<bool>,
     folded: Option<bool>,
+    single_keys: Option<bool>,
     appearance: Option<Appearance>,
     bar_at: Option<[i32; 2]>,
     language: Option<String>,
     microphone: Option<String>,
     microphone_description: Option<String>,
     destinations: Option<Vec<crate::destinations::Destination>>,
+    formats: Option<Vec<crate::formats::Format>>,
+    formats_hidden: Option<Vec<String>>,
+    format_default: Option<String>,
 }
 
 /// What in a settings file Kitokey refuses, as the user is told it (#783): which setting, on which
@@ -329,7 +340,7 @@ impl std::fmt::Display for Unread {
 }
 
 /// The keys a settings file may hold: those a refusal names.
-const KEYS: [&str; 28] = [
+const KEYS: [&str; 32] = [
     "reminder",
     "sessions",
     "export",
@@ -352,12 +363,16 @@ const KEYS: [&str; 28] = [
     "log",
     "welcomed",
     "folded",
+    "single_keys",
     "appearance",
     "bar_at",
     "language",
     "microphone",
     "microphone_description",
     "destinations",
+    "formats",
+    "formats_hidden",
+    "format_default",
 ];
 
 /// Reads the settings. No file is no choice made: the defaults. A file that cannot be read as
@@ -414,6 +429,7 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     settings.window = written.window.unwrap_or(settings.window);
     settings.welcomed = written.welcomed.unwrap_or(settings.welcomed);
     settings.folded = written.folded.unwrap_or(settings.folded);
+    settings.single_keys = written.single_keys.unwrap_or(settings.single_keys);
     settings.appearance = written.appearance.unwrap_or(settings.appearance);
     settings.bar_at = written.bar_at;
     // One it does not speak, written by hand: the system's.
@@ -439,6 +455,11 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
             settings.destinations.push(crate::destinations::Destination { name, ..destination });
         }
     }
+    settings.formats = crate::formats::Formats::kept(
+        written.formats.unwrap_or_default(),
+        written.formats_hidden.unwrap_or_default(),
+        written.format_default,
+    );
     settings.minutes_agreed = written.minutes_agreed.filter(|named| !named.trim().is_empty());
     settings.transcription_provider = written.transcription_provider.filter(|named| !named.trim().is_empty());
     settings.transcription_model = written.transcription_model.filter(|named| !named.trim().is_empty());
@@ -526,6 +547,9 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.folded != before.folded {
         set(&mut document, "folded", Value::from(settings.folded));
+    }
+    if settings.single_keys != before.single_keys {
+        set(&mut document, "single_keys", Value::from(settings.single_keys));
     }
     if settings.appearance != before.appearance {
         set(&mut document, "appearance", Value::from(settings.appearance.as_str()));
@@ -627,6 +651,46 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
             document["destinations"] = Item::ArrayOfTables(tables);
         }
     }
+    if settings.formats != before.formats {
+        let formats = &settings.formats;
+        if formats.own.is_empty() {
+            document.remove("formats");
+        } else {
+            let mut tables = toml_edit::ArrayOfTables::new();
+            for format in &formats.own {
+                let mut table = toml_edit::Table::new();
+                table["structure"] = toml_edit::value(format.structure.as_str());
+                table["name"] = toml_edit::value(format.name.as_str());
+                if let Some(actions) = format.actions {
+                    table["actions"] = toml_edit::value(actions as i64);
+                }
+                let mut sections = toml_edit::Array::new();
+                for section in &format.sections {
+                    let mut inline = toml_edit::InlineTable::new();
+                    inline.insert("title", section.title.as_str().into());
+                    inline.insert("about", section.about.as_str().into());
+                    sections.push(inline);
+                }
+                table["sections"] = toml_edit::value(sections);
+                tables.push(table);
+            }
+            document["formats"] = Item::ArrayOfTables(tables);
+        }
+        if formats.hidden.is_empty() {
+            document.remove("formats_hidden");
+        } else {
+            set(
+                &mut document,
+                "formats_hidden",
+                Value::Array(formats.hidden.iter().map(String::as_str).collect()),
+            );
+        }
+        if formats.default == crate::formats::BUILT_IN[0] {
+            document.remove("format_default");
+        } else {
+            set(&mut document, "format_default", Value::from(formats.default.as_str()));
+        }
+    }
     // Said by `after` now, once `after` is written: the key it replaced would contradict it.
     if document.contains_key("after") {
         document.remove("transcript");
@@ -685,12 +749,16 @@ mod tests {
             log,
             welcomed,
             folded,
+            single_keys,
             appearance,
             bar_at,
             language,
             microphone,
             microphone_description,
             destinations,
+            formats,
+            formats_hidden,
+            format_default,
         );
         let mut keys = KEYS;
         fields.sort_unstable();

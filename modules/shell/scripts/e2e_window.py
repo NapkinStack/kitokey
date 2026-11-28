@@ -2166,16 +2166,21 @@ def first_run_screens(now: dt.datetime) -> None:
     checked and saying what it resolves to, « Sur cet ordinateur », « Service en ligne », each with its facts; the
     download of what « Auto » needs starts at once, before any click, but only what downloads without an install —
     Whisper's model; Ollama absent, « Auto » to write says it is to install and nothing is pulled; « Je choisirai plus
-    tard » keeps « Auto », nothing written for who writes, and ends on screen (3), the empty window said ready (CU).
-    Screen (2), the sound checked while it downloads, comes in the next pull request. The first start's own checks,
+    tard » keeps « Auto », nothing written for who writes, and goes on to screen (2): the sound checked inline, its two
+    meters moving, under it a progress of what is prepared, its size come and in all and the time left; « Retour »
+    back to (1); « Ça marche » ends on screen (3), the empty window said ready (CU), the sound no longer listened to.
+    The first start's own checks,
     scenario Y's until D126 (their names kept): the full window opens on it, with --window or without, no sidebar
     beside it, welcomed written as soon as it is shown, the small window kept as the one reopened, never shown again
     once welcomed, nothing of its answers written when it is left midway."""
     print("CV. the first run: three engine cards, Auto's download at once, « Je choisirai plus tard » ends ready (D126)")
-    served, model = WORK / "served-first", os.urandom(300_000)
+    served, model = WORK / "served-first", os.urandom(1_200_000)
     served.mkdir()
     (served / "model.bin").write_bytes(model)
     asked = []
+    # Asked for at once on screen (1), its bytes held back until screen (2) shows, then served slowly (about 12 s):
+    # its coming, its size and the time left are seen there, whatever screen (1)'s checks took.
+    flowing = threading.Event()
 
     class Slow(http.server.SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
@@ -2185,6 +2190,7 @@ def first_run_screens(now: dt.datetime) -> None:
             asked.append(self.path)
 
         def copyfile(self, source, sink):
+            flowing.wait(120)
             while chunk := source.read(30_000):
                 sink.write(chunk)
                 sink.flush()
@@ -2198,7 +2204,15 @@ def first_run_screens(now: dt.datetime) -> None:
              " c.querySelector('.default')?.textContent ?? null, c.querySelector('.facts')?.textContent.trim() ?? '',"
              " c.querySelector('.where')?.textContent.trim() ?? '']) : null")
     title = "const h = document.querySelector('#welcome h1'); return h && h.offsetParent ? h.textContent.trim() : null"
+    title2 = "const h = document.querySelector('#first-sound h1'); return h && h.offsetParent ? h.textContent.trim() : null"
     welcome = "return !document.getElementById('welcome').hidden && document.getElementById('welcome').innerText || ''"
+    meters = "return [...document.querySelectorAll('#first-sound .first-meter')].map((m) => [m.dataset.side, m.lastElementChild?.style.height ?? ''])"
+    # Its role, its words, and its value: what a screen reader says of it.
+    progress = ("const p = document.getElementById('first-progress'); return p ? [p.getAttribute('role'),"
+                " document.getElementById('first-progress-said')?.textContent.replace(/\\s/g, ' ') ?? '', p.hasAttribute('aria-valuenow')] : null")
+    size, left = r"\d[\d,.]*\s?(ko|Mo|Go|kB|MB|GB)", r"\d+\s?(s|min)\b"
+    published_host = ("const o = document.querySelector('#first-sound .first-once');"
+                      " if (o) o.textContent = o.textContent.replace(/127\\.0\\.0\\.1:\\d+/, 'huggingface.co')")
     logs = WORK / "state" / "kitokey" / "logs"
     pulls = lambda: sum(f.read_text().count('"message":"shell.model_pull_failed"') for f in logs.glob("shell.*.jsonl"))
 
@@ -2212,8 +2226,10 @@ def first_run_screens(now: dt.datetime) -> None:
 
     try:
         # The words of mock-up v5's screen 1, in French; the English ones are the same key's (words.rs).
-        for locale, lang, words in (("fr_FR.UTF-8", "fr", "Deux questions, et c’est prêt."), ("en_US.UTF-8", "en", None)):
+        for locale, lang, words, words2 in (("fr_FR.UTF-8", "fr", "Deux questions, et c’est prêt.", "On vérifie le son pendant que tout se prépare."),
+                                            ("en_US.UTF-8", "en", None, None)):
             asked.clear()
+            flowing.clear()
             window = started(lang, locale, [])
             pulled_before = pulls()
             with window as browser:
@@ -2309,11 +2325,111 @@ def first_run_screens(now: dt.datetime) -> None:
                 browser.set_window_size(wide["width"], wide["height"])
                 time.sleep(0.5)
                 press(browser, "first-later")
+                sound = wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                flowing.set()
+                text = window.file.read_text()
+                check(f"{lang}: (1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (2)",
+                      sound and "minutes_provider" not in text and "minutes_model" not in text, (browser.execute_script(welcome), text))
+                shown = browser.execute_script(title2)
+                check(f"{lang}: (2) its title, mock-up v5's", shown and (words2 is None or shown == words2), shown)
+                step = browser.execute_script("const s = document.getElementById('first-steps'); return s ? [s.getAttribute('aria-label'), [...s.children].map((i) => i.classList.contains('on'))] : null")
+                check(f"{lang}: (2) its steps « 2 of 3 »", step is not None and step[1] == [True, True, False] and (lang != "fr" or step[0] == "Étape 2 sur 3"), step)
+                listening = "return window.__TAURI__.core.invoke('sound_check_now').then((n) => n.open, () => null)"
+                check(f"{lang}: (2) the microphone and the call listened to while it shows", browser.execute_script(listening) is True, browser.execute_script(listening))
+                # The capture stand-in hears 40 % on the microphone and 5 % on the call (scenario AZ's levels).
+                moving = wait_for(browser, lambda b: b.execute_script(meters) == [["near", "40%"], ["far", "5%"]], 5)
+                check(f"{lang}: (2) the sound checked inline: two meters, the microphone and the call, each moving with its level",
+                      moving, browser.execute_script(meters))
+                said = wait_for(browser, lambda b: (p := b.execute_script(progress)) and len(re.findall(size, p[1])) >= 2 and re.search(left, p[1]), 8)
+                got = browser.execute_script(progress)
+                check(f"{lang}: (2) under it, what is prepared: a progress, its size come and in all, and the time left",
+                      bool(said) and got[0] == "progressbar" and got[2], got)
+                # Heard as it reads (the coordinator's audit of #1325): its value said in words, « 150 ko sur 1,2 Mo, environ 11 s ».
+                heard = browser.execute_script("const p = document.getElementById('first-progress'); return [p.getAttribute('aria-valuetext'), document.getElementById('first-progress-said').textContent]")
+                check(f"{lang}: (2) the progress's value said in words to a screen reader, as its line says it",
+                      bool(heard[0]) and len(re.findall(size, heard[0])) >= 2 and heard[0] == heard[1].replace(" · ", ", "), heard)
+                # Where it comes from, in words, as v5 says it: the host the model is fetched from, and that it is checked.
+                source = browser.execute_script("return document.querySelector('#first-sound .first-once')?.textContent ?? ''")
+                host = browser.execute_script("return window.__TAURI__.core.invoke('makings').then((m) => m.model_offer_host)")
+                check(f"{lang}: (2) where the engine comes from said in words, its host, and that it is checked (v5)",
+                      bool(host) and host in source and (lang != "fr" or ("Une seule fois." in source and "vérifié" in source)), [source, host])
+                # Its track seen on the card, 3:1 at least in both themes, as the steps' marks (WCAG 2.2 SC 1.4.11).
+                if lang == "fr":
+                    track, rgb = {}, lambda text: [float(n) for n in re.findall(r"[\d.]+", text)[:3]]
+                    for theme in ("light", "dark"):
+                        browser.execute_script("document.documentElement.style.cssText = arguments[0] + '; color-scheme: ' + arguments[1]", tokens(theme), theme)
+                        read = browser.execute_script("const p = getComputedStyle(document.getElementById('first-progress')), c = getComputedStyle(document.getElementById('first-sound'));"
+                                                      " return [p.borderTopWidth, p.borderTopColor, c.backgroundColor]")
+                        track[theme] = [read[0], round(contrast(rgb(read[1]), rgb(read[2])), 2)]
+                    browser.execute_script("document.documentElement.style.cssText = ''")
+                    check("(2) the progress's track edged on the card, 3:1 at least, light and dark (WCAG 2.2 SC 1.4.11)",
+                          all(w == "1px" and r >= 3.0 for w, r in track.values()), track)
+                violations = axe_violations(browser)
+                check(f"{lang}: (2) no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+                # No machine's address in a published shot: the stand-in's host said as the published one is (huggingface.co).
+                browser.execute_script(published_host)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-sound-{lang}-{theme}", theme)
+                # A narrow window: nothing wider than it, shot in both themes.
+                wide = browser.get_window_size()
+                browser.set_window_size(420, 860)
+                time.sleep(0.5)
+                fits = browser.execute_script("const e = document.documentElement; return [innerWidth, e.scrollWidth <= e.clientWidth]")
+                check(f"{lang}: (2) at the window's {fits[0]} px, nothing wider than the window", fits[0] <= 420 and fits[1], fits)
+                browser.execute_script(published_host)
+                for theme in ("light", "dark"):
+                    shot_themed(browser, f"d126-sound-{lang}-small-{theme}", theme)
+                browser.set_window_size(wide["width"], wide["height"])
+                time.sleep(0.5)
+                if lang == "fr":
+                    # « Retour »: screen (1) again, its heading focused, nothing listened to; then on again.
+                    press(browser, "first-back")
+                    back = wait_for(browser, lambda b: b.execute_script(title) is not None and b.execute_script(title2) is None, 5)
+                    focus = browser.execute_script("return document.activeElement.id")
+                    check("(2) « Retour »: screen (1) again, its heading focused, the sound no longer listened to",
+                          back and focus == "welcome-heading" and wait_for(browser, lambda b: b.execute_script(listening) is False, 3),
+                          (browser.execute_script(title), focus, browser.execute_script(listening)))
+                    # « Retour » keeps what was chosen on (1) (nora's reading of #1325): another card than « Auto », on to (2), back.
+                    checked = "return document.querySelector('#welcome .engine-card input:checked')?.closest('.engine-card').dataset.engine ?? null"
+                    browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=local] input').click()")
+                    press(browser, "first-later")
+                    wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                    press(browser, "first-back")
+                    wait_for(browser, lambda b: b.execute_script(title2) is None, 5)
+                    check("(2) « Retour »: screen (1) as it was left, the card chosen still chosen",
+                          browser.execute_script(checked) == "local", browser.execute_script(checked))
+                    browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=auto] input').click()")
+                    press(browser, "first-later")
+                    wait_for(browser, lambda b: b.execute_script(title2) is not None, 10)
+                    # The window hidden: the sound no longer listened to; shown again, screen (2) listens again and acts.
+                    seen = "Object.defineProperty(document, 'visibilityState', {configurable: true, get: () => arguments[0]}); document.dispatchEvent(new Event('visibilitychange'))"
+                    browser.execute_script(seen, "hidden")
+                    hushed = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+                    browser.execute_script(seen, "visible")
+                    browser.execute_script("delete document.visibilityState")
+                    again = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 5)
+                    check("(2) the window hidden, the sound no longer listened to; shown again, listened to again",
+                          hushed and again, [hushed, browser.execute_script(title2), browser.execute_script(listening)])
+                    # The capture listening for real — its meters moving — before (2) is left again: a stop sent while the
+                    # program still starts is not read before it does, and the shell kills it past D88's second (#1325's attest).
+                    wait_for(browser, lambda b: b.execute_script(meters) == [["near", "40%"], ["far", "5%"]], 5)
+                    # Hidden and shown again at once — another window glanced at —: shown while the sound still closes, screen (2)
+                    # listens again all the same (the attest of #1325 at 6d38cdaf, under the load of the whole e2e).
+                    browser.execute_script(seen, "hidden")
+                    browser.execute_script(seen, "visible")
+                    browser.execute_script("delete document.visibilityState")
+                    quick = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 5)
+                    check("(2) hidden and shown again at once, listened to again", quick, [browser.execute_script(title2), browser.execute_script(listening)])
+                    wait_for(browser, lambda b: b.execute_script(meters) == [["near", "40%"], ["far", "5%"]], 5)
+                press(browser, "first-works")
                 ready = wait_for(browser, lambda b: b.find_element(By.ID, "none").is_displayed()
                                  and b.find_element(By.ID, "none").text in ("Prêt. Enregistrez votre premier appel.", "Ready. Record your first call."), 10)
                 text = window.file.read_text()
-                check(f"{lang}: (1) « Je choisirai plus tard » keeps « Auto »: nothing written for who writes, then screen (3), the empty window said ready (CU)",
+                check(f"{lang}: (2) « Ça marche »: nothing written for who writes, then screen (3), the empty window said ready (CU)",
                       ready and "minutes_provider" not in text and "minutes_model" not in text, (browser.find_element(By.ID, "none").text, text))
+                # Listened to while screen (2) showed (above), and no longer once it is left.
+                closed = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+                check(f"{lang}: (2) left, the sound no longer listened to", closed, browser.execute_script(listening))
                 if lang == "fr":
                     check("the window left is not changed: the small one stays the one reopened (D35)", "window =" not in text, text)
             if lang == "fr":
@@ -2333,8 +2449,17 @@ def first_run_screens(now: dt.datetime) -> None:
             wait_for(browser, lambda b: "welcomed = true" in window.file.read_text(), 5)
             before = window.file.read_text()
             browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=online] input').click()")
+            # Screen (2) left by another address — Settings, from the address bar or a shortcut —: the sound no longer listened to.
+            browser.execute_script("document.querySelector('#welcome .engine-card[data-engine=auto] input').click()")
+            press(browser, "first-later")
+            on_two = wait_for(browser, lambda b: b.execute_script(title2) is not None and b.execute_script(listening) is True, 10)
+            wait_for(browser, lambda b: b.execute_script(meters) == [["near", "40%"], ["far", "5%"]], 5)
+            browser.execute_script("location.hash = '#/settings'")
+            left = wait_for(browser, lambda b: b.execute_script(listening) is False, 3)
+            check("(2) left for another page, the sound no longer listened to", on_two and left, browser.execute_script(listening))
         check("left midway, nothing of its answers is written", window.file.read_text() == before, window.file.read_text())
     finally:
+        flowing.set()
         server.shutdown()
 
 
@@ -2371,6 +2496,9 @@ def first_run_ready(now: dt.datetime) -> None:
             asked = wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
             check(f"{short}: not welcomed, the first run opens on its first question", asked)
             press(browser, "first-later")
+            # Screen (2), the sound checked, then « Ça marche » (CV holds it).
+            wait_for(browser, lambda b: b.find_elements(By.ID, "first-works") and b.find_element(By.ID, "first-works").is_displayed(), 10)
+            press(browser, "first-works")
             shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
             check(f"{short}: answered, the first run ends on its third screen: ready, what Kitokey does, « Enregistrer », the example; one primary action in the window",
                   shown, browser.execute_script(pane))
@@ -2413,6 +2541,8 @@ def first_run_ready(now: dt.datetime) -> None:
             with window as browser:
                 wait_for(browser, lambda b: b.find_elements(By.ID, "first-later") and b.find_element(By.ID, "first-later").is_displayed(), 10)
                 press(browser, "first-later")
+                wait_for(browser, lambda b: b.find_elements(By.ID, "first-works") and b.find_element(By.ID, "first-works").is_displayed(), 10)
+                press(browser, "first-works")
                 shown = wait_for(browser, lambda b: b.execute_script(pane) == texts, 10)
                 check(f"{short}, less motion asked: the same third screen", shown and browser.execute_script(LESS_MOTION),
                       (browser.execute_script(pane), browser.execute_script(LESS_MOTION)))
@@ -9993,6 +10123,191 @@ def bar_stop_neutral(now: dt.datetime) -> None:
             stop_from_small(browser)
 
 
+def keys_taught(now: dt.datetime) -> None:
+    """CX. D128a, Kitokey by the keyboard: Ctrl+R records and stops, Ctrl+F reaches the page's search, Ctrl+, opens
+    Settings, Ctrl+Maj+C copies the summary, Échap goes back, J and K the next and previous meeting, « ? » the sheet that
+    lists them all, Ctrl+B's fold of the sidebar with them — a modal dialog, axe clean. Each said in its button's tooltip and to a screen reader
+    (aria-keyshortcuts). None taken while a field has the focus. J, K and « ? », a single key each, turned off by
+    Settings' « Raccourcis à une touche » (WCAG 2.2 SC 2.1.4), on by default; the Ctrl ones then still act."""
+    print("CX. Kitokey by the keyboard: Ctrl+R, Ctrl+F, Ctrl+,, Ctrl+Maj+C, Échap, J, K and « ? »'s sheet; said in the tooltips; "
+          "none taken in a field; the single keys turned off in Settings (D128, WCAG 2.1.4)")
+    meetings = WORK / "keys"
+    first, second = meetings / "2026-11-25_10-00", meetings / "2026-11-24_10-00"
+    for folder, ago in ((first, 2), (second, 3)):
+        session(folder, now - dt.timedelta(days=ago), 10, {"local.wav": 1000})
+        (folder / "transcript.jsonl").write_text(
+            '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+            '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour."}\n{"type":"complete","duration":1.0}\n')
+        (folder / "minutes.md").write_text(
+            "---\ncontract: minutes/v1\nmade: 2026-11-25T10:30:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+            "## 1.\n\nLe budget est validé.\n\n## 2.\n\n- Envoyer le devis — Inès — vendredi\n\n## 3.\n\n- Rien\n")
+    stand_in = ("window.__copied = []; Object.defineProperty(navigator, 'clipboard', {configurable: true, value: {"
+                " writeText: (text) => (window.__copied.push(text), Promise.resolve()),"
+                " write: async (items) => { for (const item of items) window.__copied.push(await (await item.getType('text/plain')).text()); }}})")
+    hash_ = "return location.hash"
+    focused = "const a = document.activeElement; return [a.id, a.tagName]"
+
+    def chord(browser, *keys: str) -> None:
+        """Keys held then the last pressed, as a person does: Ctrl and Maj down, the key, then up."""
+        actions = ActionChains(browser)
+        for key in keys[:-1]:
+            actions.key_down(key)
+        actions.send_keys(keys[-1])
+        for key in reversed(keys[:-1]):
+            actions.key_up(key)
+        actions.perform()
+        time.sleep(0.3)
+
+    def to_body(browser) -> None:
+        """The focus on the page itself, as after a click on its empty part."""
+        browser.execute_script("document.activeElement?.blur()")
+
+    window = Window(meetings, "fr_FR.UTF-8", "reminder = false\n")
+    with window as browser:
+        browser.set_window_size(1100, 800)
+        wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#groups .session"), 10)
+        # Said where the gesture is: in the tooltip, and to a screen reader by aria-keyshortcuts.
+        said = browser.execute_script(
+            "const r = document.getElementById('record'), s = document.getElementById('settings-link');"
+            " return [r.title, r.getAttribute('aria-keyshortcuts'), s.title, s.getAttribute('aria-keyshortcuts')]")
+        check("« Démarrer un enregistrement » and « Réglages » say their shortcut in their tooltip and to a screen reader",
+              "Ctrl+R" in said[0] and said[1] == "Control+R" and "Ctrl+," in said[2] and said[3] == "Control+Comma", said)
+        rows = browser.execute_script("return [...document.querySelectorAll('#groups .session')].map((r) => r.getAttribute('href'))")
+        browser.execute_script("location.hash = arguments[0]", rows[0])
+        wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes"), 10)
+        copy = browser.execute_script("const c = document.getElementById('copy-minutes'); return [c.title, c.getAttribute('aria-keyshortcuts')]")
+        check("« Copier le compte rendu » says Ctrl+Maj+C in its tooltip and to a screen reader",
+              "Ctrl+Maj+C" in copy[0] and copy[1] == "Control+Shift+C", copy)
+        # J and K: the next and the previous meeting of the list, as Gmail and Linear move.
+        to_body(browser)
+        chord(browser, "j")
+        moved = wait_for(browser, lambda b: b.execute_script(hash_) == rows[1], 3)
+        to_body(browser)
+        chord(browser, "k")
+        back = wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3)
+        check("J: the next meeting of the list; K: the one before", moved and back, browser.execute_script(hash_))
+        # Caps lock on, J says « J »: the next meeting all the same (lina's reading of #1317).
+        browser.execute_script("document.activeElement?.blur(); document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'J', code: 'KeyJ', bubbles: true}))")
+        capped = wait_for(browser, lambda b: b.execute_script(hash_) == rows[1], 3)
+        browser.execute_script("document.body.dispatchEvent(new KeyboardEvent('keydown', {key: 'K', code: 'KeyK', bubbles: true}))")
+        check("caps lock on: J and K move all the same", capped and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3), browser.execute_script(hash_))
+        # A key held down: its repeats act no more than once, and are still kept from the page (lina's reading of #1317).
+        # J moved above, so a repeat that acted would show rows[1]; Ctrl+R repeated would start a recording.
+        held = browser.execute_script(
+            "document.activeElement?.blur();"
+            " const kept = [{key: 'j', code: 'KeyJ'}, {key: 'r', code: 'KeyR', ctrlKey: true}]"
+            "   .map((k) => !document.body.dispatchEvent(new KeyboardEvent('keydown', {...k, repeat: true, bubbles: true, cancelable: true})));"
+            " return kept")
+        time.sleep(0.5)
+        after = browser.execute_script("return [location.hash, document.getElementById('record').classList.contains('live')]")
+        check("a key held down: J and Ctrl+R repeated do nothing (the same meeting, no recording), their repeats kept from the page",
+              held == [True, True] and after == [rows[0], False], [held, after])
+        # Ctrl+Maj+C: the summary copied, « Copié » said where the button says it.
+        browser.execute_script(stand_in)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, Keys.SHIFT, "c")
+        copied = wait_for(browser, lambda b: b.execute_script("return window.__copied.length") == 1, 3)
+        check("Ctrl+Maj+C: the summary copied, as « Copier le compte rendu » copies it",
+              copied and "Le budget est validé." in browser.execute_script("return window.__copied[0]"), browser.execute_script("return window.__copied"))
+        # Ctrl+F: the page's own search, its field focused.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "f")
+        check("Ctrl+F on a meeting: the focus in « Rechercher dans le texte »", browser.execute_script(focused)[0] == "search", browser.execute_script(focused))
+        # In a field, no shortcut is taken: what is typed is typed.
+        for key in ("j", "?"):
+            chord(browser, key)
+        chord(browser, Keys.CONTROL, "r")
+        typed = browser.execute_script("return [document.getElementById('search').value, location.hash, document.getElementById('record').classList.contains('live'), !!document.getElementById('keys-sheet')]")
+        check("in a field, J and « ? » are typed, Ctrl+R records nothing, the page stays", typed == ["j?", rows[0], False, False], typed)
+        browser.execute_script("const f = document.getElementById('search'); f.value = ''; f.dispatchEvent(new Event('input'))")
+        # Ctrl+, then Échap: Settings, and back where the user was.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, ",")
+        opened = wait_for(browser, lambda b: b.execute_script(hash_) == "#/settings", 3)
+        to_body(browser)
+        chord(browser, Keys.ESCAPE)
+        check("Ctrl+, opens Settings; Échap goes back to the meeting", opened and wait_for(browser, lambda b: b.execute_script(hash_) == rows[0], 3),
+              browser.execute_script(hash_))
+        # On the list alone — a narrow window: a wide one shows the first meeting beside it (D61), and Ctrl+F then
+        # searches that meeting's text —, Ctrl+F reaches the sidebar's search.
+        browser.set_window_size(800, 800)
+        browser.execute_script("location.hash = '#/'")
+        alone = wait_for(browser, lambda b: b.execute_script("return document.getElementById('meeting').hidden"), 5)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "f")
+        check("Ctrl+F on the list alone: the focus in the sidebar's « Rechercher »", alone and browser.execute_script(focused)[0] == "find", browser.execute_script(focused))
+        browser.set_window_size(1100, 800)
+        # « ? »: the sheet, a modal dialog listing every shortcut; Échap closes it, the focus back where it was.
+        to_body(browser)
+        chord(browser, "?")
+        sheet = ("const d = document.getElementById('keys-sheet'); return d && d.open ? {modal: d.matches(':modal'), title: d.getAttribute('aria-labelledby') &&"
+                 " document.getElementById(d.getAttribute('aria-labelledby')).textContent, rows: [...d.querySelectorAll('tr')].map((r) => r.textContent.replace(/\\s+/g, ' ').trim()),"
+                 " kbd: d.querySelectorAll('kbd').length} : null")
+        shown = wait_for(browser, lambda b: b.execute_script(sheet) is not None, 3)
+        got = browser.execute_script(sheet) or {}
+        # Ctrl+K, the palette, joins the sheet with the palette itself (D128b): a shortcut listed acts.
+        wanted = ("Ctrl+R", "Ctrl+F", "Ctrl+,", "Ctrl+Maj+C", "Ctrl+B", "Échap", "J", "K", "?")
+        check("« ? »: the sheet, a modal dialog named « Raccourcis clavier », each shortcut a row with its keys",
+              shown and got.get("modal") and got.get("title") == "Raccourcis clavier" and all(any(w in r for r in got["rows"]) for w in wanted) and got["kbd"] >= len(wanted), got)
+        violations = axe_violations(browser)
+        check("the sheet: no violation of WCAG 2.2 A and AA (axe)", violations == [], violations)
+        # A table of data has its headers (WCAG 2.2 SC 1.3.1; lina's reading of #1317): « Touche » and « Action ».
+        heads = browser.execute_script("return [...document.querySelectorAll('#keys-sheet thead th[scope=col]')].map((t) => t.textContent)")
+        check("the sheet's table: its two columns headed « Touche » and « Action »", heads == ["Touche", "Action"], heads)
+        # WAI-ARIA APG's modal dialog: Tab and Shift+Tab stay on its controls, never on the <dialog> itself (#1312's roundTheDialog).
+        inside = ("const e = document.activeElement, d = document.getElementById('keys-sheet');"
+                  " return [e.tagName, !!d && d.contains(e) && e !== d]")
+        went = []
+        for back in (False,) * 3 + (True,) * 3:
+            keys = ActionChains(browser)
+            (keys.key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT) if back else keys.send_keys(Keys.TAB)).perform()
+            went.append(browser.execute_script(inside))
+        check("the sheet: Tab and Shift+Tab stay on its button, never on the dialog itself (APG)",
+              all(tag == "BUTTON" and held for tag, held in went), went)
+        for theme in ("light", "dark"):
+            shot_themed(browser, f"cx-sheet-fr-{theme}", theme)
+        chord(browser, Keys.ESCAPE)
+        check("Échap closes the sheet", wait_for(browser, lambda b: b.execute_script(sheet) is None, 3), browser.execute_script(sheet))
+        # Opened from a real element — the meeting's row, not the page —, Échap gives the focus back to it (APG modal
+        # dialog; lina's reading of #1317: from the page itself there is nothing to give back).
+        browser.execute_script("const r = [...document.querySelectorAll('#groups .session')].find((r) => r.getAttribute('href') === arguments[0]);"
+                               " r.dataset.sheetFrom = 'yes'; r.focus()", rows[0])
+        chord(browser, "?")
+        reopened = wait_for(browser, lambda b: b.execute_script(sheet) is not None, 3)
+        chord(browser, Keys.ESCAPE)
+        wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
+        returned = browser.execute_script("return [document.activeElement?.dataset.sheetFrom ?? null, document.activeElement?.tagName]")
+        check("the sheet opened from the meeting's row: Échap gives the focus back to that row", reopened and returned[0] == "yes", [reopened, returned])
+        # Ctrl+R: a recording starts; again, it stops.
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "r")
+        live = wait_for(browser, lambda b: b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+        time.sleep(0.6)
+        to_body(browser)
+        chord(browser, Keys.CONTROL, "r")
+        stopped = wait_for(browser, lambda b: not b.execute_script("return document.getElementById('record').classList.contains('live')"), 10)
+        check("Ctrl+R: a recording starts; Ctrl+R again: it stops", live and stopped)
+        # Settings: « Raccourcis à une touche », on by default; off, J and « ? » act no more, Ctrl+, still does.
+        browser.execute_script("location.hash = '#/settings'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "single-keys"), 10)
+        switch = "const b = document.getElementById('single-keys'); return [b.checked, b.getAttribute('role'), b.closest('label')?.textContent ?? '']"
+        got = browser.execute_script(switch)
+        check("Settings offer « Raccourcis à une touche », a switch, on by default", got[0] is True and got[1] == "switch" and "Raccourcis à une touche" in got[2], got)
+        browser.find_element(By.ID, "single-keys").click()
+        kept = wait_for(browser, lambda b: "single_keys = false" in window.file.read_text(), 3)
+        browser.execute_script("location.hash = arguments[0]", rows[0])
+        wait_for(browser, lambda b: b.find_elements(By.ID, "copy-minutes"), 10)
+        to_body(browser)
+        chord(browser, "j")
+        chord(browser, "?")
+        still = browser.execute_script("return [location.hash, !!document.getElementById('keys-sheet')?.open]")
+        to_body(browser)
+        chord(browser, Keys.CONTROL, ",")
+        ctrl = wait_for(browser, lambda b: b.execute_script(hash_) == "#/settings", 3)
+        check("turned off: kept in the settings; J and « ? » act no more; Ctrl+, still opens Settings (WCAG 2.2 SC 2.1.4)",
+              kept and still == [rows[0], False] and ctrl, [window.file.read_text(), still, browser.execute_script(hash_)])
+
+
 def dates_mentioned(now: dt.datetime) -> None:
     """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
     print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
@@ -11558,7 +11873,7 @@ def two_panes(now: dt.datetime) -> None:
         # The pane's stops in one run: none of the sidebar's between them — past the last, the page starts again.
         last = len(places) - 1 - places[::-1].index("pane") if "pane" in places else 0
         check("in English, the keyboard reaches the sidebar first, then the pane's stops in one run", english == ["Start recording", ["Hide sidebar", "Hide sidebar (Ctrl+B)"], ["Show sidebar", "Show sidebar (Ctrl+B)"],
-                                                                                                         ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings"]]
+                                                                                                         ["Free up space", "Free up space"], ["Recording bar", "Recording bar"], ["Settings", "Settings (Ctrl+,)"]]
               and places[0] == "side" and "pane" in places and set(places[places.index("pane"):last + 1]) == {"pane"} and "other" not in places,
               (english, places))
         check("the focus is always seen", unseen == [], unseen)
@@ -11580,7 +11895,8 @@ def two_panes(now: dt.datetime) -> None:
               and browser.find_element(By.ID, "empty-record").text == "Start recording", browser.find_element(By.ID, "none").text)
         # D89: the shortcut, gone from under the sidebar's button, is said here, where nothing was recorded yet.
         keys = browser.execute_script("const k = document.getElementById('empty-keys'); return [!!k && k.offsetParent !== null, k && k.textContent, document.getElementById('record').title]")
-        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89)", keys[0] and keys[1] and keys[2] == f"Start recording ({keys[1]})", keys)
+        # The window's own Ctrl+R first (D128), then the desktop's, which works from anywhere.
+        check("no meeting: the shortcut said beside what to do, and in the button's tooltip (D89, D128)", keys[0] and keys[1] and keys[2] == f"Start recording (Ctrl+R · {keys[1]})", keys)
         # One primary action, the header's (#775): the pane's start is a secondary one, the folder a discreet line under it.
         primaries = browser.execute_script("return [...document.querySelectorAll('button.primary')].filter(b => b.offsetParent !== null).map(b => b.id)")
         under = browser.execute_script("const r = document.getElementById('empty-record').getBoundingClientRect(), f = document.getElementById('empty-folder');"
@@ -14914,8 +15230,9 @@ def main() -> int:
                 " e.classList.contains('icon-button') && e.querySelectorAll('svg.glyph').length === 1])")
             searched = browser.execute_script("return !!document.getElementById('search').previousElementSibling?.matches('svg.glyph')")
             check("the transcript's search holds its icon, as the sidebar's (D89)", searched)
-            check("each secondary action of the meeting: an icon button, its tooltip and its name (D89)", actions == [
-                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu", True],
+            # Its tooltip also says its shortcut (D128a, as CX checks); its name stays the action alone.
+            check("each secondary action of the meeting: an icon button, its tooltip and its name (D89, D128a)", actions == [
+                ["copy-minutes", "", "Copier le compte rendu", "Copier le compte rendu (Ctrl+Maj+C)", True],
                 ["redo-minutes", "", "Refaire…", "Refaire…", True], ["redo-transcript", "", "Refaire…", "Refaire…", True]], actions)
             # D89, board 4: the meeting's settings in one row of 32 px controls; the context opened from it.
             row = browser.execute_script(
@@ -16449,6 +16766,7 @@ def main() -> int:
     store_shots(now)
     actions_rows(now)
     dates_mentioned(now)
+    keys_taught(now)
     confidential_locked(now)
     bar_stop_neutral(now)
     announced(now)

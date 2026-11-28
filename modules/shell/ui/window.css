@@ -538,11 +538,23 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 #welcome:has(> .first-run)::before, #welcome:has(> .first-run)::after { content: ""; position: absolute; width: 50vmax; height: 40vmax; border-radius: 50%; filter: blur(80px); opacity: var(--halo-opacity); pointer-events: none; }
 #welcome:has(> .first-run)::before { background: var(--blue-200); left: -10vmax; top: -12vmax; }
 #welcome:has(> .first-run)::after { background: var(--violet-300); right: -12vmax; bottom: -14vmax; }
-#first-choice { position: relative; z-index: 1; width: min(760px, 100%); padding: var(--sp-8); border-radius: var(--r-xl); box-shadow: var(--e3); }
+#first-choice, #first-sound { position: relative; z-index: 1; width: min(760px, 100%); padding: var(--sp-8); border-radius: var(--r-xl); box-shadow: var(--e3); }
 #first-choice .engine-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 /* Three on a line, the shorter ones as tall as the tallest: their lines stay packed at their top, as v5 stacks them. */
 #first-choice .engine-card { align-content: start; }
-@media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice { padding: var(--sp-5); } }
+@media (max-width: 720px) { #first-choice .engine-cards { grid-template-columns: 1fr; } #first-choice, #first-sound { padding: var(--sp-5); } }
+/* Screen (2), v5's 1b: the two sides' meters on a sunken band, then how far the listening engine came. */
+.first-meters { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--sp-2) var(--sp-4); padding: var(--sp-4); border-radius: var(--r-md); background: var(--color-sunken); }
+.first-side { display: inline-flex; align-items: center; gap: var(--sp-2); color: var(--color-text-soft); font-size: var(--fs-small); }
+.first-meter { height: 24px; }
+.first-meter > i { background: var(--color-voice-you); }
+.first-meter[data-side="far"] > i { background: var(--color-voice-others); }
+.first-getting { display: grid; gap: var(--sp-2); }
+.first-getting[hidden] { display: none; }
+/* Its track edged in the edge role: 3:1 on the card, where the sunken ground alone is 1.1:1 (WCAG 2.2 SC 1.4.11). */
+.first-progress { height: 8px; border: 1px solid var(--color-edge); border-radius: var(--r-xs); background: var(--color-sunken); overflow: hidden; }
+.first-progress > i { display: block; width: 0; height: 100%; border-radius: var(--r-xs); background: var(--color-accent); }
+.first-once { font-size: var(--fs-caption); }
 .first-steps { display: flex; gap: var(--sp-1); }
 /* Its marks to come in the edge role, not v5's sunken: 3.7:1 on the card in both themes (WCAG 2.2 SC 1.4.11; lina, #1307). */
 .first-steps i { width: 24px; height: 6px; border-radius: var(--r-pill); background: var(--color-edge); }
@@ -776,3 +788,10 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .with-mark select { flex: 1 1 auto; min-width: 0; }
 /* A summary's section with nothing in it (#1234): said, in the soft colour. */
 .minutes .body .empty-section { color: var(--soft); }
+
+/* D128a: the sheet of the window's shortcuts (« ? »), each row its keys then what they do. */
+.keys-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+.keys-table td { padding: var(--sp-2) 0; border-bottom: 1px solid var(--color-divider); }
+.keys-table th { padding: 0 0 var(--sp-2); text-align: left; font-size: var(--fs-caption); font-weight: 600; color: var(--color-text-soft); border-bottom: 1px solid var(--color-divider); }
+.keys-table td:first-child { width: 40%; }
+.keys-table kbd { padding: 2px var(--sp-2); border: 1px solid var(--color-edge); border-radius: var(--r-xs); background: var(--color-sunken); font: inherit; font-variant-numeric: tabular-nums; }

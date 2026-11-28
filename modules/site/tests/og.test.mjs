@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dist, root, pages, route, unindexed } from "./helpers.mjs";
+import { landing } from "../src/lib/landing.mjs";
 
 const meta = (html, key) => html.match(new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`))?.[1];
 
@@ -21,9 +22,17 @@ test("every indexed page says what a link to it shows, in its own language", asy
     assert.equal(meta(html, "og:description"), html.match(/<meta name="description" content="([^"]*)"/)?.[1], at);
     assert.equal(meta(html, "og:url"), html.match(/<link rel="canonical" href="([^"]*)"/)?.[1], at);
     assert.equal(meta(html, "og:locale"), lang === "fr" ? "fr_FR" : "en_US", at);
+    assert.equal(meta(html, "og:locale:alternate"), lang === "fr" ? "en_US" : "fr_FR", at);
     assert.equal(meta(html, "og:image"), `https://kitokey.com/og/og-${lang}.png`, at);
     assert.equal(meta(html, "twitter:card"), "summary_large_image", at);
-    assert.ok((meta(html, "og:image:alt") ?? "").length > 20, at);
+    // lina's reading of #1339: the picture's size as the PNG's own, and its alt in the page's language (WCAG 3.1.2: a
+    // screen reader says it in the page's voice), never the other's.
+    const png = await readFile(join(root, "public", "og", `og-${lang}.png`));
+    assert.deepEqual([meta(html, "og:image:width"), meta(html, "og:image:height")], [String(png.readUInt32BE(16)), String(png.readUInt32BE(20))], at);
+    const alt = meta(html, "og:image:alt") ?? "";
+    const other = lang === "fr" ? "en" : "fr";
+    assert.ok(alt.includes(landing.hero[lang][0]), `${at}: the alt « ${alt} » is not the page's promise`);
+    assert.ok(!alt.includes(landing.hero[other][0]), `${at}: the alt in the other language`);
   }
 });
 
