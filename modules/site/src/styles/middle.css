@@ -65,7 +65,8 @@ html[data-site="dark"] .mid .v .doc { stroke: var(--border-control); filter: non
 .mid .v .w-mid { stroke: var(--border-control); stroke-width: 1; opacity: .6; }
 .mid .v text { font: 700 11px system-ui, sans-serif; fill: var(--accent); }
 .mid .v text.onacc { fill: var(--on-accent); }
-.mid .ft h3 .chip { position: absolute; top: 22px; right: 22px; height: 22px; font-size: 12px; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
+/* « Bientôt » as planche v4 draws it (.soon): right after the title, on its line, the accent on its tint. */
+.mid .ft h3 .chip { display: inline-flex; margin-left: 6px; height: 20px; padding: 0 8px; vertical-align: 2px; border-radius: var(--r-pill); background: var(--bg-tint); color: var(--accent); font-size: 12px; font-weight: 700; font-family: system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif; letter-spacing: 0; }
 .mid .pf p, .mid .ft p { color: var(--text-secondary); font-size: 15px; line-height: 1.5; }
 /* A meeting's page as the app draws it, in the page's language: the Store's own screenshot (D103's store_shots), light
    in both themes, framed and lifted on the dark ground. To be filmed again after D121's layout. */
