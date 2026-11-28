@@ -4071,8 +4071,17 @@ def settings_tabbed(now: dt.datetime) -> None:
         at_first = browser.execute_script("return [history.length, location.hash]")
         seen = browser.execute_script(listed)
         check("Settings open on five tabs in their order, the first chosen, a list named « Réglages » (D123)",
-              drawn and seen["names"] == ["Enregistrement", "Écoute et rédaction", "Partage", "Stockage et confidentialité", "Général"]
+              drawn and seen["names"] == ["Enregistrement", "Écoute et rédaction", "Partage", "Confidentialité", "Général"]
               and seen["chosen"] == [True, False, False, False, False] and seen["shown"] == seen["chosen"] and seen["label"] == "Réglages", seen)
+        # One row, never two (GNOME's view switcher, Fluent's pivot): in French, the longest, at the window's 1100 px, every
+        # tab on the same line and none cut off; « Confidentialité »'s section keeps its full name as its heading.
+        row = browser.execute_script(
+            "const l = document.querySelector('#settings [role=tablist]'); const t = [...l.querySelectorAll('[role=tab]')];"
+            " const p = document.getElementById(t[3].getAttribute('aria-controls'));"
+            " return {width: innerWidth, tops: [...new Set(t.map((x) => Math.round(x.getBoundingClientRect().top)))].length,"
+            " cut: l.scrollWidth > l.clientWidth + 1, heading: p?.querySelector('h2, h3')?.textContent.trim()}")
+        check("Settings' tabs on one row in French at 1100 px, none cut off; « Confidentialité »'s heading « Stockage et confidentialité » (D123)",
+              row["tops"] == 1 and not row["cut"] and row["heading"] == "Stockage et confidentialité", row)
         everything = [id for ids in homes.values() for id in ids]
         found = dict(browser.execute_script(home_of, everything))
         misplaced = {id: found.get(id) for key, ids in homes.items() for id in ids if found.get(id) != key}
