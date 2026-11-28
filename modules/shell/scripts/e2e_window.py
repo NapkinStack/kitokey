@@ -14687,6 +14687,28 @@ def formats_redone(now: dt.datetime) -> None:
         redone(browser, "general")
         given = args.read_text().split()
         check("Général chosen: no structure, as before (minutes/v4)", "--structure" not in given and "--format" not in given, given)
+        # lina's points 1 and 2 on #1340: no list when the formats cannot be read — the making then in the default —,
+        # and no line for minutes written in a format the person deleted since, never its id.
+        browser.execute_script("const c = window.__TAURI__.core, real = c.invoke;"
+                               " c.invoke = (command, args) => command === 'formats_offered' ? Promise.reject('read') : real(command, args)")
+        press(browser, "redo-minutes")
+        time.sleep(1)
+        row = browser.execute_script("const p = document.getElementById('redo-format'); return p && p.closest('label').getClientRects().length > 0")
+        check("the formats unread: Refaire… shows no empty « Format » list", row is False, row)
+        press(browser, "redo-panel-cancel")
+        gone = meetings / "2026-11-27_11-00"
+        session(gone, now - dt.timedelta(hours=20), 10, {"local.wav": 1000})
+        (gone / "transcript.jsonl").write_text((meeting / "transcript.jsonl").read_text())
+        (gone / "minutes.md").write_text(
+            "---\ncontract: minutes/v5\nmade: 2026-11-27T12:00:00+01:00\nprovider: \"local\"\nmodel: \"m\"\ncontext: null\n"
+            'structure: point_ancien\nsections: [{"id": "contexte", "about": "Le contexte"}]\n---\n\n## Contexte\n\nLe point.\n')
+        browser.execute_script("location.reload()")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "redo-minutes"), 10)
+        browser.execute_script(f"location.hash = '#/meeting/{gone.name}'")
+        wait_for(browser, lambda b: b.execute_script("return document.querySelectorAll('#meeting .minutes .body h2').length === 1"), 10)
+        time.sleep(1)
+        line = browser.execute_script("return document.getElementById('minutes-format')?.textContent ?? null")
+        check("minutes in a format deleted since: no line naming it, never its id", line is None, line)
 
 
 def bar_offers_no_engine_nor_language(now: dt.datetime) -> None:

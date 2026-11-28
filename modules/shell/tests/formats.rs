@@ -370,3 +370,16 @@ fn kitokey_summary_is_given_the_format_chosen_as_summarising_v1_says() {
         );
     }
 }
+
+/// lina's point 3 on #1340: the page names the built-in formats in `formats::BUILT_IN`'s order, its own copy
+/// the same — `words.format_names` follows that order.
+#[test]
+fn the_page_lists_the_built_in_formats_as_formats_rs_does() {
+    let page = include_str!("../ui/window.js");
+    let line = page
+        .lines()
+        .find(|line| line.starts_with("const BUILT_IN = ["))
+        .expect("window.js's BUILT_IN");
+    let listed: Vec<&str> = line.split('"').skip(1).step_by(2).collect();
+    assert_eq!(listed, formats::BUILT_IN);
+}
