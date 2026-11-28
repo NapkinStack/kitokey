@@ -7535,11 +7535,11 @@ def page_estimate(now: dt.datetime) -> None:
 
 
 def channel_added_from_page(now: dt.datetime) -> None:
-    """CA. D121, criterion 2: with no channel set up, « Partager » offers « Ajouter un canal », which opens the channel's
+    """DB. D121, criterion 2: with no channel set up, « Partager » offers « Ajouter un canal », which opens the channel's
     form — Settings' own, its kind, its name, its address — in a sheet of the page, a modal dialog (D120), never
     Settings; Escape closes it, nothing kept; a channel added there is said, kept in the settings, and « Partager »
     then sends to it. French light, English dark; axe with the sheet open."""
-    print("CA. « Partager » with no channel: « Ajouter un canal », Settings' form in a sheet of the page (D121)")
+    print("DB. « Partager » with no channel: « Ajouter un canal », Settings' form in a sheet of the page (D121)")
     meetings = WORK / "channel-from-page"
     folder = meetings / "2026-11-25_10-00"
     session(folder, now - dt.timedelta(days=1), 20, {"local.wav": 1000})
@@ -7596,7 +7596,7 @@ def channel_added_from_page(now: dt.datetime) -> None:
             check(f"{short}: Tab goes round the sheet: past its last control, its first; before its first, its last", first is True and last is True, [first, last])
             found = axe_violations(browser)
             check(f"{short}, {theme}: the sheet open, no violation of axe's WCAG 2.2 A and AA rules", found == [], found)
-            shot_themed(browser, f"ca-sheet-{short}-{theme}", theme)
+            shot_themed(browser, f"db-sheet-{short}-{theme}", theme)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             closed = wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
             check(f"{short}: Escape closes the sheet, nothing kept, the focus back on « Partager »",
@@ -7613,7 +7613,7 @@ def channel_added_from_page(now: dt.datetime) -> None:
                                           " return [r.left >= 0, r.right <= innerWidth + 0.5, d.scrollWidth <= d.clientWidth + 1,"
                                           " [...d.querySelectorAll('.tile')].every((t) => t.getBoundingClientRect().right <= r.right + 0.5)]")
             check(f"{short}: at 420 px, the sheet within the window, its kinds and fields uncut, nothing scrolls sideways", fits == [True, True, True, True], fits)
-            shot_themed(browser, f"ca-sheet-420-{short}-{theme}", theme)
+            shot_themed(browser, f"db-sheet-420-{short}-{theme}", theme)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
             browser.set_window_size(1100, 800)

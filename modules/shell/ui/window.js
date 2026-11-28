@@ -96,6 +96,7 @@ function lock() {
 const ICONS = {
   calendar: ["M8 2v4", "M16 2v4", ["rect", { width: 18, height: 18, x: 3, y: 4, rx: 2 }], "M3 10h18"],
   check: ["M20 6 9 17l-5-5"],
+  plus: ["M5 12h14", "M12 5v14"],
   "chevron-left": ["m15 18-6-6 6-6"],
   "chevron-down": ["m6 9 6 6 6-6"],
   "chevron-up": ["m18 15-6-6-6 6"],
@@ -2453,7 +2454,8 @@ function sendPart(card, top, actions, session, words) {
     shareAddsChannel = shown.destinations.length === 0;
     if (shareAddsChannel) {
       const item = document.getElementById("share-send");
-      if (item) item.textContent = words.channel_add;
+      // Its « + » before its words, as v5 draws it (l. 728).
+      if (item) item.replaceChildren(icon("plus"), element("span", "", words.channel_add));
     }
     if (!shown.offered) return;
     let offered = shown.destinations;
