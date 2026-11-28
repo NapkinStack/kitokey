@@ -13894,7 +13894,10 @@ def store_shots(now: dt.datetime) -> None:
         " lines: [shown('#meeting .transcript .lines li').length, document.querySelectorAll('#meeting .transcript .lines li').length],"
         " rows: [shown('#groups li').length, document.querySelectorAll('#groups li').length],"
         " fetch: shown('#model-fetch').length, said: shown('#groups li').map(e => e.innerText),"
-        " models: shown('#settings h2').filter(h => ['Modèles', 'Models'].includes(h.textContent)).map(h => Math.round(h.getBoundingClientRect().top)),"
+        " framed: (() => { const top = e => e ? Math.round(e.getBoundingClientRect().top) : null, h = shown('#settings h2');"
+        " return {tabs: shown('#settings [role=tab]').map(t => [top(t), Math.round(t.getBoundingClientRect().bottom)]),"
+        " after: top(h.find(e => ['Après un enregistrement', 'After a recording'].includes(e.textContent))),"
+        " models: top(h.find(e => ['Modèles', 'Models'].includes(e.textContent)))}; })(),"
         " cut: [...document.querySelectorAll('#groups li *')].filter(e => e.offsetParent && e.scrollWidth > e.clientWidth + 1).map(e => e.textContent),"
         " here: document.getElementById('minutes-here')?.checked ?? null,"
         " confidential: document.getElementById('confidential-switch')?.checked ?? null,"
@@ -14176,9 +14179,15 @@ def store_shots(now: dt.datetime) -> None:
           {shot: found for shot, found in clocks.items() if found})
     zero = {shot: page["zero"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
     check("Settings' shot says the model's size as it is, never « 0 o » (D103)", len(zero) == 2 and not any(zero.values()), zero)
-    models = {shot: page["models"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
-    check("Settings' shot shows its models at the top: their heading in the image's first third — Microsoft's « top two-thirds » for what matters (D103)",
-          len(models) == 2 and all(len(top) == 1 and 0 <= top[0] < 1080 / 3 for top in models.values()), models)
+    # « Écoute et rédaction » from its top (D123, the coordinator, 2026-11-28): the tabs, then « Après un
+    # enregistrement », then the models, their heading in Microsoft's « top two-thirds » for what matters. D103's
+    # « models at the top » was a scroll of one long page; the tab is that page now.
+    framed = {shot: page["framed"] for shot, page in shown.items() if shot.endswith("4-settings.png")}
+    check("Settings' shot from its tab's top: the five tabs whole in the image, then « Après un enregistrement », then the models,"
+          " their heading in the image's top two-thirds (D123, D103)",
+          len(framed) == 2 and all(len(f["tabs"]) == 5 and all(0 <= t < b <= 1080 / 3 for t, b in f["tabs"])
+                                   and f["after"] is not None and f["models"] is not None
+                                   and max(b for _, b in f["tabs"]) <= f["after"] < f["models"] < 1080 * 2 / 3 for f in framed.values()), framed)
 
 def trial_over(now: dt.datetime) -> None:
     """AV. The trial over on a stand-in licence (PDR-0005, D83): no recording from the window, the
