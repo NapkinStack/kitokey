@@ -4105,6 +4105,11 @@ def settings_tabbed(now: dt.datetime) -> None:
         check("« À propos » last of « Général »: the version, « Logiciel libre sous GPL v3 », the updates by the system's package manager (Copr, PPA) on Linux (D123)",
               about is not None and about["last"] and "Version" in about["text"] and "Logiciel libre sous GPL v3" in about["text"]
               and "par le gestionnaire de paquets de votre système (Copr, PPA)" in about["text"], about)
+        # Three buttons side by side: each apart from the next, as every row of buttons (--sp-2).
+        gaps = browser.execute_script(
+            "const r = ['about-source', 'about-licences', 'about-privacy'].map((id) => document.getElementById(id)?.getBoundingClientRect());"
+            " return r.every(Boolean) ? r.slice(1).map((b, i) => Math.round(b.top >= r[i].bottom ? b.top - r[i].bottom : b.left - r[i].right)) : null")
+        check("« À propos »'s three buttons apart, 8 px at least between two (D123)", gaps is not None and all(g >= 8 for g in gaps), gaps)
         browsed.unlink(missing_ok=True)
         for link in ("about-source", "about-licences", "about-privacy"):
             # Pressed when there: a link missing fails the check below, it does not stop the scenario.
