@@ -6224,6 +6224,12 @@ def bar_after_stop(now: dt.datetime) -> None:
                       and browser.execute_script(focused) != "small-last-open",
                       [browser.execute_script(said), browser.execute_script("return window.saidLast"), browser.execute_script(focused)])
                 shot_themed(browser, f"d92-bar-ready-{short}-{theme}", theme)
+                # A stage that did not fail keeps its one line, cut by an ellipsis (D92): two lines are a failure's alone (D125;
+                # ines's surviving m3 on #1315).
+                one = browser.execute_script(
+                    "const l = document.getElementById('small-last'), s = document.getElementById('small-last-said');"
+                    " return [l.classList.contains('failed'), getComputedStyle(s).whiteSpace, Math.round(s.getBoundingClientRect().height / parseFloat(getComputedStyle(s).lineHeight))]")
+                check(f"{short}: ready, its line not a failure's: one line, cut by its ellipsis where it is longer (D92, D125)", one == [False, "nowrap", 1], one)
                 # « Ouvrir » by the keyboard: the full window opens on its page, in the bar's place (one window, D35),
                 # and the shell no longer says the meeting; then back to the bar, as a person goes back.
                 small = browser.current_window_handle
