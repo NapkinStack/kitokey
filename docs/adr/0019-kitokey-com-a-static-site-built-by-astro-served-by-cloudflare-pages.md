@@ -4,6 +4,7 @@
 
 - **Status**: Accepted by the decider with D114's framing (#1143), 2026-11-23; proposed by sam (session
   wholeheard-sam-a2), framer of D114, the same day
+- **Amended by**: [ADR-0021](0021-the-site-asks-a-visitor-s-e-mail-for-the-release-through-a-pages-function-and-brevo-s-double-opt-in.md), 2026-11-28 — one Pages Function, `/notify`, and `criticality: standard`
 - **Date**: 2026-11-23
 - **Decision makers**: the decider, `@napkinstack-admin`; the host decided by them, 2026-11-23
 - **Scope**: module `site` — its creation, its stack, its host, its criticality
