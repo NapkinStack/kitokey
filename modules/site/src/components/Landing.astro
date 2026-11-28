@@ -32,7 +32,11 @@ const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
 // Each system's own mark, unaltered, decorative beside its name (BRANDS.md); a link cannot sit in a tab, so Fedora's
 // and Debian's projects are linked in their panel.
-const marks = { fedora: ["/img/brands/fedora-logo-official.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
+// The three distributions' marks, at the install tabs' height (18 px): Fedora's « f » alone, its wordmark a speck at this size;
+// Debian's swirl on a plate of its own where the ground is dark (its red is 2.4:1 there); Ubuntu's white on the dark tabs,
+// on its own orange disc on the price card's light ground (the audit of 2026-11-28).
+const marks = { fedora: ["/img/brands/fedora-icon-2021.svg", 18, 18], ubuntu: ["/img/brands/ubuntu-cof-white.svg", 19, 18], debian: ["/img/brands/debian-openlogo-nd.svg", 15, 18] };
+const mark = (os) => marks[os] && `<img class="mark-${os}" src="${marks[os][0]}" alt="" width="${marks[os][1]}" height="${marks[os][2]}" />`;
 const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ </span>${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}`).join("\n");
 ---
 <Page lang={lang} title={t("title")} description={t("description")} path="" nav={t("nav")}>
@@ -208,13 +212,13 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           <div class="strip" role="group" aria-label={pr.main[4]}>{pr.main[5].map(([big, small]) => <span><b class="num">{big}</b>{small}</span>)}</div>
           <div class="incl"><p class="incl-h">{pr.main[6]}</p><ul class="checks">{pr.main[7].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
           <p class="mac">{pr.main[8]}</p>
-          <div class="row-b"><span class="store-soon is-soon">{pr.main[9]}</span></div>
+          <div class="row-b"><span class="store-soon is-soon"><span><span class="mark" aria-hidden="true"></span>{pr.main[9]}</span></span></div>
         </article>
         <article class="pcard linux">
           <div class="pc-top"><div class="oslogos"><span class="lg tux-l"><img src="/img/brands/tux.svg" alt="" width="34" height="40" /></span></div></div>
           <h3 class="sr-only">{pr.linux[0]}</h3>
           <div class="pblock"><div class="amount"><b>{pr.linux[1]}</b></div><p class="pnote">{pr.linux[2]}</p></div>
-          <div class="strip" role="group" aria-label={pr.linux[3]}>{pr.linux[4].map(([big, small]) => <span><b>{big}</b>{small}</span>)}</div>
+          <div class="strip" role="group" aria-label={pr.linux[3]}>{pr.linux[4].map(([big, small]) => <span><b><Fragment set:html={mark(big.toLowerCase())} />{big}</b>{small}</span>)}</div>
           <div class="incl"><p class="incl-h">{pr.linux[5]}</p><ul class="checks">{pr.linux[6].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
           <div class="row-b"><a class="install-l" href={`#${installId}`}><Fragment set:html={ico("download")} />{pr.linux[7]}</a></div>
         </article>
@@ -239,7 +243,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       <div class="code" data-copied={copied} data-failed={failed}>
         <div class="code-bar">
           <div class="os-tabs" role="group" aria-label={osLabel}>
-            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}>{marks[os] && <img src={marks[os][0]} alt="" width={marks[os][1]} height={marks[os][2]} />}<span>{name}</span></button>)}
+            {channels.map(([os, name], i) => <button type="button" class="os-tab" data-os={os} aria-pressed={i === 0 ? "true" : "false"}>{marks[os] && <Fragment set:html={mark(os)} />}<span>{name}</span></button>)}
           </div>
           <button class="copy" type="button" aria-describedby="copy-status" hidden>{copy}</button>
         </div>
@@ -255,7 +259,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
   <section class="end" id={faqId} aria-labelledby={`${faqId}-h`}>
     <div class="wrap faq-grid">
       <div class="sh"><p class="kicker">{faqKicker}</p><h2 id={`${faqId}-h`}>{faqH}</h2></div>
-      <div class="faq">{faq.map(([q, answer], i) => <details open={i === 0}><summary>{q}<Fragment set:html={ico("chev", "ico chev")} /></summary><div class="a">{answer.map((p) => <p>{p}</p>)}</div></details>)}</div>
+      <div class="faq">{faq.map(([q, answer], i) => <details open={i === 0}><summary><span>{q}</span><Fragment set:html={ico("chev", "ico chev")} /></summary><div class="a">{answer.map((p) => <p>{p}</p>)}</div></details>)}</div>
     </div>
   </section>
 

@@ -26,10 +26,13 @@ const source = "https://github.com/NapkinStack/kitokey";
     {(!open || !indexed) && <meta name="robots" content="noindex" />}
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#F2F4F7" />
+    {/* A page kept out of the index (the 404) names no canonical nor alternates: no mixed signal (the audit, 2026-11-28). */}
+    {indexed && <>
     <link rel="canonical" href={url(lang)} />
     <link rel="alternate" hreflang="en" href={url("en")} />
     <link rel="alternate" hreflang="fr" href={url("fr")} />
     <link rel="alternate" hreflang="x-default" href={new URL("/en/", site).href} />
+    </>}
     <link rel="icon" href="/kitokey.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin />
     <script src="/theme.js" is:inline></script>

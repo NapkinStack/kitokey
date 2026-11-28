@@ -99,3 +99,45 @@ test("the Windows mark is the button's one colour, its owner's file as a mask, n
   assert.match(rule, /height: 1cap/);
   assert.doesNotMatch(css, /#FFFFFF/i, "a white plate");
 });
+
+test("each FAQ question is one item of its summary: a word held whole (.nb) never a flex item of its own (the audit, 2026-11-28)", async () => {
+  for (const lang of ["fr", "en"]) {
+    const html = await page(lang);
+    const summaries = [...html.matchAll(/<div class="faq">[\s\S]*?<\/div><\/details><\/div>/g)].join("").match(/<summary>[\s\S]*?<\/summary>/g) ?? [];
+    assert.ok(summaries.length >= 9, `/${lang}/: ${summaries.length} questions`);
+    for (const s of summaries) {
+      assert.match(s, /^<summary><span>(?:[^<]|<span class="nb">[^<]*<\/span>)+<\/span><svg class="ico chev"/, `/${lang}/: ${s.slice(0, 90)}`);
+    }
+  }
+});
+
+test("the walk's selected tab draws the keyboard's focus as every control does, after its own edge (the audit, 2026-11-28)", async () => {
+  const css = await readFile(join(root, "src", "styles", "walk.css"), "utf8");
+  const edge = css.indexOf('.wtab[aria-selected="true"] {');
+  const focus = css.indexOf(".wtab:focus-visible { outline: 3px solid var(--accent)");
+  assert.ok(edge >= 0 && focus > edge, `edge at ${edge}, focus at ${focus}`);
+});
+
+test("the 404, kept out of the index, names no canonical and no alternate (the audit, 2026-11-28)", async () => {
+  const html = await readFile(join(dist, "404.html"), "utf8");
+  assert.doesNotMatch(html, /<link rel="(canonical|alternate)"/);
+  assert.match(await page("en"), /<link rel="canonical" href="https:\/\/kitokey\.com\/en\/"/);
+});
+
+test("the legal notice's values wrap anywhere, each under its name at a phone's width (the audit, 2026-11-28)", async () => {
+  const css = await readFile(join(root, "src", "styles", "site.css"), "utf8");
+  assert.match(css, /\.legal dd \{[^}]*overflow-wrap: anywhere/);
+  assert.match(css, /@media \(max-width: 480px\) \{ \.legal \{ grid-template-columns: 1fr;/);
+});
+
+test("Fedora's mark is its « f » alone; Debian's swirl on a plate on the dark tabs; the price card's distributions bear their marks", async () => {
+  const html = await page("en");
+  const tab = (os) => html.match(new RegExp(`<button type="button" class="os-tab" data-os="${os}"[\\s\\S]*?</button>`))?.[0] ?? "";
+  assert.match(tab("fedora"), /src="\/img\/brands\/fedora-icon-2021\.svg"/);
+  assert.match(tab("debian"), /<img class="mark-debian"/);
+  const site = await readFile(join(root, "src", "styles", "site.css"), "utf8");
+  assert.match(site, /\.os-tab \.mark-debian \{ background: #FFFFFF;/);
+  const end = await readFile(join(root, "src", "styles", "end.css"), "utf8");
+  assert.match(end, /\.end \.strip \.mark-ubuntu \{ background: #E95420;/);
+  assert.ok(!existsSync(join(root, "public", "img", "brands", "fedora-logo-official.svg")), "the wordmark kept");
+});

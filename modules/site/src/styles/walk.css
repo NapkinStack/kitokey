@@ -26,6 +26,8 @@
 .wtab b { font-family: var(--display); font-weight: 700; font-size: 18px; letter-spacing: -.01em; color: var(--text-primary); line-height: 28px; }
 .wtab span.d { font-size: 15px; line-height: 1.45; max-height: 0; overflow: hidden; opacity: 0; transition: max-height .32s var(--ease-out), opacity .32s; }
 .wtab[aria-selected="true"] { background: var(--bg-canvas); box-shadow: var(--e1); outline: 1px solid var(--border-subtle); }
+/* Its edge above is no focus ring: the keyboard's focus still drawn as everywhere else (WCAG 2.4.7, 1.4.11; the audit, 2026-11-28). */
+.wtab:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .wtab[aria-selected="true"] .wn { background: var(--accent); color: var(--on-accent); }
 .wtab[aria-selected="true"] span.d { max-height: 9em; opacity: 1; margin-top: 2px; margin-bottom: 6px; }
 .wtab.priv[aria-selected="true"] .wn { background: var(--private); color: var(--on-accent); }
