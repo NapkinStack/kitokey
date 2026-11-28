@@ -10138,6 +10138,16 @@ def keys_taught(now: dt.datetime) -> None:
             shot_themed(browser, f"cx-sheet-fr-{theme}", theme)
         chord(browser, Keys.ESCAPE)
         check("Échap closes the sheet", wait_for(browser, lambda b: b.execute_script(sheet) is None, 3), browser.execute_script(sheet))
+        # Opened from a real element — the meeting's row, not the page —, Échap gives the focus back to it (APG modal
+        # dialog; lina's reading of #1317: from the page itself there is nothing to give back).
+        browser.execute_script("const r = [...document.querySelectorAll('#groups .session')].find((r) => r.getAttribute('href') === arguments[0]);"
+                               " r.dataset.sheetFrom = 'yes'; r.focus()", rows[0])
+        chord(browser, "?")
+        reopened = wait_for(browser, lambda b: b.execute_script(sheet) is not None, 3)
+        chord(browser, Keys.ESCAPE)
+        wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
+        returned = browser.execute_script("return [document.activeElement?.dataset.sheetFrom ?? null, document.activeElement?.tagName]")
+        check("the sheet opened from the meeting's row: Échap gives the focus back to that row", reopened and returned[0] == "yes", [reopened, returned])
         # Ctrl+R: a recording starts; again, it stops.
         to_body(browser)
         chord(browser, Keys.CONTROL, "r")
