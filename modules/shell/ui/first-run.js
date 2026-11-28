@@ -168,16 +168,18 @@ function showFirstSound(words, offered, back) {
   };
   const left = () => end();
   // Hidden, the sound is no longer listened to; shown again, the screen is drawn again and listens again.
+  // Its « shown » listened for at once, never once the close is done: a window shown again while the sound still
+  // closes would be missed (#1325's attest). Drawn again only once the close is done, so the two never overlap.
   const hidden = () => {
     if (document.visibilityState !== "hidden") return;
-    end(() => {
-      const shown = () => {
-        if (document.visibilityState !== "visible") return;
-        document.removeEventListener("visibilitychange", shown);
-        if (page.contains(made)) showFirstSound(words, offered, back);
-      };
-      document.addEventListener("visibilitychange", shown);
-    });
+    const closing = end();
+    const shown = async () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", shown);
+      await closing;
+      if (page.contains(made)) showFirstSound(words, offered, back);
+    };
+    document.addEventListener("visibilitychange", shown);
   };
   window.addEventListener("hashchange", left);
   document.addEventListener("visibilitychange", hidden);
