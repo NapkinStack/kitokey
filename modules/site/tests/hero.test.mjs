@@ -32,7 +32,7 @@ for (const lang of ["fr", "en"]) {
     assert.match(html, new RegExp(`<a class="quiet" href="#[a-z]+"><img class="tux" src="/img/brands/tux\\.svg"[^>]*>${linux}</a>`));
     assert.ok(html.includes(mac));
     for (const [, target] of html.matchAll(/<a class="(?:store-soon|quiet)" href="#([a-z]+)"/g)) {
-      assert.match(await page(lang), new RegExp(`<section[^>]* id="${target}"`), `#${target} is no section`);
+      assert.match(await page(lang), new RegExp(`<(?:section|form)[^>]* id="${target}"`), `#${target} is no section, nor the release's form`);
     }
   });
 

@@ -21,6 +21,9 @@ export async function pages(dir = dist) {
 // whole (src/lib/nb.mjs, its own tests in v7-content and look-v7); a test of the words reads them unwrapped.
 export const unwrapped = (html) => html.replace(/<span class="nb">([^<]*)<\/span>/g, "$1");
 
+// The pages kept out of the index: the 404, and the three /notify answers with (ADR-0021).
+export const unindexed = (at) => at === "/404.html" || /^\/(en|fr)\/notify\/(sent|failed|confirmed)\/$/.test(at);
+
 export function route(file) {
   return file.slice(dist.length).replace(/index\.html$/, "");
 }

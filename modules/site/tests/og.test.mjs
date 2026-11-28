@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { dist, root, pages, route } from "./helpers.mjs";
+import { dist, root, pages, route, unindexed } from "./helpers.mjs";
 import { landing } from "../src/lib/landing.mjs";
 
 const meta = (html, key) => html.match(new RegExp(`<meta (?:property|name)="${key}" content="([^"]*)"`))?.[1];
@@ -12,8 +12,8 @@ const meta = (html, key) => html.match(new RegExp(`<meta (?:property|name)="${ke
 test("every indexed page says what a link to it shows, in its own language", async () => {
   for (const file of await pages()) {
     const html = await readFile(file, "utf8");
-    if (route(file) === "/404.html") {
-      assert.equal(meta(html, "og:title"), undefined, "the 404 shared");
+    if (unindexed(route(file))) {
+      assert.equal(meta(html, "og:title"), undefined, `${route(file)} shared`);
       continue;
     }
     const lang = html.match(/<html lang="(en|fr)"/)?.[1];

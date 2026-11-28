@@ -7,6 +7,7 @@ import Icons from "./Icons.astro";
 import Scene from "./Scene.astro";
 import { channels, landing as w } from "../lib/landing.mjs";
 import { ico } from "../lib/icons.mjs";
+import { say } from "../lib/words.mjs";
 import "../styles/walk.css";
 import "../styles/middle.css";
 import "../styles/end.css";
@@ -30,6 +31,7 @@ const pr = t("price");
 const [faqKicker, faqH, faq] = t("faq");
 const [finalH, finalP] = t("final");
 const notes = t("channelNotes");
+const [mailLabel, mailSaid, mailWhat, mailGo] = say("notify", lang);
 // Each system's own mark, unaltered, decorative beside its name (BRANDS.md); a link cannot sit in a tab, so Fedora's
 // and Debian's projects are linked in their panel.
 // The three distributions' marks, at the install tabs' height (18 px): Fedora's « f » alone, its wordmark a speck at this size;
@@ -53,7 +55,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         <div class="buy">
           <p class="buy-line">{buyLine}</p>
           <div class="cta">
-            <a class="store-soon" href={`#${priceId}`}><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a>
+            <a class="store-soon" href="#notify"><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a>
             <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
           </div>
         </div>
@@ -213,6 +215,15 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
           <div class="incl"><p class="incl-h">{pr.main[6]}</p><ul class="checks">{pr.main[7].map((item) => <li><Fragment set:html={ico("check")} />{item}</li>)}</ul></div>
           <p class="mac">{pr.main[8]}</p>
           <div class="row-b"><span class="store-soon is-soon"><span><span class="mark" aria-hidden="true"></span>{pr.main[9]}</span></span></div>
+          {/* « Me prévenir de la sortie » (ADR-0021): posted to the site's own /notify, no script needed. The trap is a
+              field no person sees nor reaches; a robot that fills it is told it worked. */}
+          <form class="notify" id="notify" method="post" action="/notify">
+            <label for="notify-email">{mailLabel}</label>
+            <div class="notify-row"><input id="notify-email" type="email" name="email" required maxlength="254" autocomplete="email" inputmode="email" aria-describedby="notify-said" /><button type="submit">{mailGo}</button></div>
+            <input type="hidden" name="lang" value={lang} />
+            <div class="trap" aria-hidden="true"><input name="hp_field" type="text" tabindex="-1" autocomplete="off" /></div>
+            <p class="notify-said" id="notify-said">{mailSaid} <a href={`/${lang}/privacy/`}>{mailWhat}</a></p>
+          </form>
         </article>
         <article class="pcard linux">
           <div class="pc-top"><div class="oslogos"><span class="lg tux-l"><img src="/img/brands/tux.svg" alt="" width="34" height="40" /></span></div></div>
@@ -279,7 +290,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       </svg>
       <h2 id="final-h">{finalH}</h2>
       <p>{finalP}</p>
-      <div class="cta"><a class="store-soon" href={`#${priceId}`}><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
+      <div class="cta"><a class="store-soon" href="#notify"><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
     </div>
   </section>
 </Page>

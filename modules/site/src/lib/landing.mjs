@@ -26,9 +26,9 @@ const raw = {
     keeps: "PDR-0009, the promise; docs/store/listing.md: the minutes written on the computer, any calling app, no bot in the call (D103)",
   },
   buy: {
-    fr: ["Essai gratuit, puis 69 € une fois.", "Bientôt dans le Microsoft Store", "Linux, gratuit", "Bientôt sur Mac, au même prix."],
-    en: ["Free trial, then $69 once.", "Coming soon to the Microsoft Store", "Linux, free", "Coming to the Mac, at the same price."],
-    keeps: "PDR-0009, 69 € once on macOS and Windows after a free trial, 69 $ where the price is said in English (amended in #1311), the Store's button once its listing exists (until then these words, no badge); PDR-0001, free on Linux",
+    fr: ["Essai gratuit, puis 69 € une fois.", "Me prévenir de la sortie", "Linux, gratuit", "Bientôt sur Mac, au même prix."],
+    en: ["Free trial, then $69 once.", "Tell me when it’s out", "Linux, free", "Coming to the Mac, at the same price."],
+    keeps: "PDR-0009, 69 € once on macOS and Windows after a free trial, 69 $ where the price is said in English (amended in #1311), the Store's button once its listing exists (until then « Me prévenir de la sortie », leading to the release's form, ADR-0021; no badge); PDR-0001, free on Linux",
   },
   assure: {
     fr: ["Sans compte.", "Sans abonnement.", "Aucun robot dans l’appel."],
