@@ -159,6 +159,78 @@ function icon(name) {
   return svg;
 }
 
+// « Refaire le compte rendu » and « Refaire la transcription » (D121, criterion 3; no ellipsis, the voice guide D124): a dialog of the page (D120) with D122's
+// engine card for the meeting, its own choice checked — « Par défaut » being Settings' —, the panels' notes, « Annuler »
+// then a button naming the making, never an engine. Another engine chosen is kept for the meeting first, as Refaire…
+// keeps it (D93, D96); then the making starts, said where it is made (D25). Escape keeps everything as it was.
+async function redoDialog(session, words, step) {
+  const back = document.activeElement;
+  const name = nameOf(session);
+  // Not read: said under the bar, where the meeting says what it refused, and no dialog opens.
+  const offered = await window.__TAURI__.core.invoke("models_offered", { name }).catch((why) => {
+    const said = document.getElementById("trash-said");
+    if (said) said.textContent = fill(words.models_not_read, why);
+    return null;
+  });
+  if (!offered) return;
+  const writing = step === "minutes";
+  const services = writing || offered.confidential ? []
+    : await window.__TAURI__.core.invoke("services_offered", { name }).then((all) => all.transcription, () => []);
+  const title = writing ? words.redo_title : words.redo_transcript_title;
+  const dialog = element("dialog", "dialog redo-dialog");
+  const heading = element("h2", "", title);
+  heading.id = "redo-dialog-title";
+  dialog.setAttribute("aria-labelledby", heading.id);
+  const cards = engineCards({ job: writing ? "write" : "transcribe", offered, words, scope: "meeting", services });
+  const notes = writing ? [element("p", "says", words.redo_note)] : [element("p", "says", words.redo_transcript_note)];
+  if (!writing && session.minutes) notes.push(element("p", "says", words.redo_keeps_minutes));
+  const wrong = element("p", "note warn");
+  wrong.setAttribute("role", "status");
+  wrong.hidden = true;
+  const close = () => {
+    dialog.close();
+    dialog.remove();
+    if (back instanceof HTMLElement && back.isConnected) back.focus();
+  };
+  const cancel = element("button", "button secondary", words.send_cancel);
+  cancel.type = "button";
+  cancel.addEventListener("click", close);
+  const go = element("button", "button primary", title);
+  go.type = "button";
+  go.addEventListener("click", async () => {
+    go.disabled = true;
+    try {
+      const own = { transcription: offered.chosen.transcription ?? null, minutes: offered.chosen.minutes ?? null };
+      const value = cards.value();
+      const chosen = { ...own, [writing ? "minutes" : "transcription"]: value ? JSON.parse(value) : null };
+      if (JSON.stringify(chosen) !== JSON.stringify(own)) {
+        await window.__TAURI__.core.invoke("meeting_models_chosen", { name, chosen });
+        pageOffered = null;
+      }
+      await (writing
+        ? window.__TAURI__.core.invoke("minutes_redo", { name, provider: null, model: null })
+        : window.__TAURI__.core.invoke("transcript_redo_own", { name }));
+      close();
+      readMakings();
+    } catch (why) {
+      wrong.textContent = fill(words.redo_not_done, why);
+      wrong.hidden = false;
+      go.disabled = false;
+    }
+  });
+  const actions = element("div", "actions");
+  actions.append(cancel, go);
+  dialog.append(heading, cards.box, ...notes, wrong, actions);
+  dialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  document.body.append(dialog);
+  roundTheDialog(dialog);
+  dialog.showModal();
+  (cards.box.querySelector("input[type=radio]:checked") ?? cards.box.querySelector("input[type=radio]"))?.focus();
+}
+
 // A question the platform asks (D120, PDR-0008): its own modal `<dialog>` — the rest of the window inert, Escape
 // answering no —, its title, what it says, its safe answer first and focused, the other destructive when the
 // action deletes. The focus back where it was. True if the user said yes.
@@ -3483,8 +3555,13 @@ function showMeeting({ session, transcript, minutes, developer, listen: listened
     menu.prepend(note);
     menu.setAttribute("aria-describedby", note.id);
   }
-  const redo = actionButton("rotate-ccw", words.meeting_redo, "redo-open");
-  redo.addEventListener("click", press("redo-minutes"));
+  // « Refaire ▾ » (D121, criterion 3): a menu as « Partager »'s, each making again in a dialog with D122's engine card.
+  const redoing = [];
+  if (minutes.state === "present") redoing.push(["redo-minutes-item", words.redo_title, () => redoDialog(session, words, "minutes")]);
+  if (transcript.state === "present") redoing.push(["redo-transcript-item", words.redo_transcript_title, () => redoDialog(session, words, "transcription")]);
+  const redo = redoing.length
+    ? moreActions(redoing, words, { id: "redo-open", menuId: "redo-menu", glyph: "rotate-ccw", label: words.meeting_redo, name: words.meeting_redo, chevron: true })
+    : actionButton("rotate-ccw", words.meeting_redo, "redo-open");
   // A meeting refused the trash (being recorded or made): said in place, nothing moved.
   const refused = element("p", "note warn");
   refused.id = "trash-said";

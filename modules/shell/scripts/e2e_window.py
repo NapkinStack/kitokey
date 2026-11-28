@@ -10442,8 +10442,8 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             time.sleep(0.5)
             press(browser, "redo-open")
             items = wait_for(browser, lambda b: b.execute_script(menu), 3) and browser.execute_script(menu)
-            check("« Refaire » is a menu: « Refaire le compte rendu… », « Refaire la transcription… » (D121, criterion 3)",
-                  items == [["redo-minutes-item", "Refaire le compte rendu…"], ["redo-transcript-item", "Refaire la transcription…"]], items)
+            check("« Refaire » is a menu: « Refaire le compte rendu », « Refaire la transcription », no ellipsis (D121, criterion 3; D124)",
+                  items == [["redo-minutes-item", "Refaire le compte rendu"], ["redo-transcript-item", "Refaire la transcription"]], items)
             if items:
                 press(browser, "redo-minutes-item")
             opened = wait_for(browser, lambda b: b.execute_script(dialog), 5)
