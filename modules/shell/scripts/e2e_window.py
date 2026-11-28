@@ -7571,6 +7571,9 @@ def channel_added_from_page(now: dt.datetime) -> None:
             items = wait_for(browser, lambda b: b.execute_script(menu), 3) and browser.execute_script(menu)
             check(f"{short}: no channel, « Partager » offers « {words['add']} », never a send to nowhere (D121)",
                   bool(items) and [said for _, said in items].count(words["add"]) == 1 and words["send"] not in [said for _, said in items], items)
+            plus = browser.execute_script("const i = [...document.querySelectorAll('#share-menu [role=menuitem]')].find((e) => e.textContent.trim() === arguments[0]);"
+                                          " return i ? !!i.querySelector('svg') : null", words["add"])
+            check(f"{short}: « {words['add']} » begins with its « + », as v5 draws it (l. 728)", plus is True, plus)
             target = next((i for i, said in (items or []) if said == words["add"]), "share-send")
             press(browser, target)
             opened = wait_for(browser, lambda b: b.execute_script(sheet), 3)
@@ -7579,6 +7582,18 @@ def channel_added_from_page(now: dt.datetime) -> None:
                   bool(opened) and got.get("modal") is True and got.get("title") == words["add"] and got.get("labelled")
                   and got.get("kinds") == ["webhook", "discord", "slack"] and got.get("name") and got.get("address")
                   and got.get("focused") is not None and got.get("settings") is False, got)
+            # The audit of #1333 against v5: room under the sheet's lead, and Tab going round it (roundTheDialog, WAI-ARIA APG).
+            gap = browser.execute_script("const d = document.querySelector('dialog[open]'), p = d.querySelector(':scope > p.says'), f = d.querySelector('.adding');"
+                                         " return p && f ? f.getBoundingClientRect().top - p.getBoundingClientRect().bottom : null")
+            check(f"{short}: the sheet's lead has room under it, 8 px at least before the form", gap is not None and gap >= 8, gap)
+            stops = ("const d = document.querySelector('dialog[open]'); const s = [...d.querySelectorAll('button, input, select, textarea, a[href], [tabindex]:not([tabindex=\"-1\"])')]"
+                     ".filter((e) => !e.disabled && e.getClientRects().length && !(e.type === 'radio' && !e.checked)); return s")
+            browser.execute_script("const s = (() => { " + stops + " })(); s[s.length - 1].focus()")
+            ActionChains(browser).send_keys(Keys.TAB).perform()
+            first = browser.execute_script("const s = (() => { " + stops + " })(); return document.activeElement === s[0]")
+            ActionChains(browser).key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT).perform()
+            last = browser.execute_script("const s = (() => { " + stops + " })(); return document.activeElement === s[s.length - 1]")
+            check(f"{short}: Tab goes round the sheet: past its last control, its first; before its first, its last", first is True and last is True, [first, last])
             found = axe_violations(browser)
             check(f"{short}, {theme}: the sheet open, no violation of axe's WCAG 2.2 A and AA rules", found == [], found)
             shot_themed(browser, f"ca-sheet-{short}-{theme}", theme)
@@ -7587,6 +7602,22 @@ def channel_added_from_page(now: dt.datetime) -> None:
             check(f"{short}: Escape closes the sheet, nothing kept, the focus back on « Partager »",
                   closed and "destinations" not in window.file.read_text() and browser.execute_script("return document.activeElement?.id") == "share-open",
                   [closed, browser.execute_script("return document.activeElement?.id")])
+            # At 420 px (the audit of #1333): the sheet within the window, its three kinds wrapping, nothing cut.
+            browser.set_window_size(420, 800)
+            wait_for(browser, lambda b: b.execute_script("return innerWidth") <= 440, 3)
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, target)
+            wait_for(browser, lambda b: b.execute_script(sheet), 3)
+            fits = browser.execute_script("const d = document.querySelector('dialog[open]'), r = d.getBoundingClientRect();"
+                                          " return [r.left >= 0, r.right <= innerWidth + 0.5, d.scrollWidth <= d.clientWidth + 1,"
+                                          " [...d.querySelectorAll('.tile')].every((t) => t.getBoundingClientRect().right <= r.right + 0.5)]")
+            check(f"{short}: at 420 px, the sheet within the window, its kinds and fields uncut, nothing scrolls sideways", fits == [True, True, True, True], fits)
+            shot_themed(browser, f"ca-sheet-420-{short}-{theme}", theme)
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
+            browser.set_window_size(1100, 800)
+            time.sleep(0.4)
             press(browser, "share-open")
             wait_for(browser, lambda b: b.execute_script(menu), 3)
             press(browser, target)
