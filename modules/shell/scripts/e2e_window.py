@@ -10440,13 +10440,31 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
             wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"), 10)
             time.sleep(0.5)
-            press(browser, "redo-open")
+            at = lambda: browser.execute_script("return document.activeElement?.id ?? null")  # noqa: E731
+            keys = lambda *k: ActionChains(browser).send_keys(*k).perform()  # noqa: E731
+            # The keyboard of WAI-ARIA APG's menu button, on this menu (the verifier's reading, #1337).
+            browser.execute_script("document.getElementById('redo-open').focus()")
+            keys(Keys.ARROW_DOWN)
             items = wait_for(browser, lambda b: b.execute_script(menu), 3) and browser.execute_script(menu)
             check("« Refaire » is a menu: « Refaire le compte rendu », « Refaire la transcription », no ellipsis (D121, criterion 3; D124)",
                   items == [["redo-minutes-item", "Refaire le compte rendu"], ["redo-transcript-item", "Refaire la transcription"]], items)
-            if items:
-                press(browser, "redo-minutes-item")
+            moved = [at()]
+            for key in (Keys.END, Keys.HOME, Keys.ARROW_DOWN, Keys.ARROW_UP):
+                keys(key)
+                moved.append(at())
+            keys(Keys.ESCAPE)
+            moved.append([at(), browser.execute_script(menu)])
+            check("the menu's keyboard: ↓ on « Refaire » its first item, End, Home, ↓, ↑ move in it, Escape closes it on « Refaire » (WAI-ARIA APG)",
+                  moved == ["redo-minutes-item", "redo-transcript-item", "redo-minutes-item", "redo-transcript-item", "redo-minutes-item", ["redo-open", None]], moved)
+            keys(Keys.ENTER)
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            entered = at()
+            keys(Keys.ENTER)
             opened = wait_for(browser, lambda b: b.execute_script(dialog), 5)
+            check("Enter on « Refaire » its first item, Enter on it its dialog, the focus on the meeting's own choice (WAI-ARIA APG, WCAG 2.4.3)",
+                  entered == "redo-minutes-item" and bool(opened)
+                  and browser.execute_script("return document.activeElement?.matches('dialog[open] input[type=radio]:checked') ?? false"),
+                  [entered, bool(opened), browser.execute_script("return document.activeElement?.outerHTML?.slice(0, 120)")])
             got = browser.execute_script(dialog) or {}
             check("« Refaire le compte rendu… »: a dialog of the page, modal, the engine card to write, the meeting's own choice checked (« Par défaut »), its button naming the making, never an engine (D121, D122)",
                   bool(opened) and got.get("modal") is True and got.get("title") == "Refaire le compte rendu" and got.get("job") == "write"
@@ -10469,12 +10487,34 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.execute_script(dialog), 5)
             browser.execute_script("const d = document.querySelector('dialog[open]');"
                                    " [...d.querySelectorAll('.engine-card')].find((c) => c.textContent.includes('Mistral')).querySelector('input[type=radio]').click()")
+            made = browser.execute_script("return document.getElementById('minutes-state')?.dataset.made")
             browser.execute_script("const d = document.querySelector('dialog[open]'); [...d.querySelectorAll('.actions button')].find((b) => b.textContent.trim() === 'Refaire le compte rendu').click()")
             started = wait_for(browser, lambda b: (WORK / "summary-args").exists() and (meeting / "models.json").exists(), 15)
             kept = (meeting / "models.json").read_text() if (meeting / "models.json").exists() else ""
             check("another engine chosen: kept for the meeting, the making started, the dialog closed (D121, D93)",
                   started and "mistral:7b" in kept and browser.execute_script(dialog) is None, [started, kept])
             wait_for(browser, lambda b: b.execute_script(idle), 30)
+            # The minutes written, the page drawn again: the focus still on « Refaire » (#1337).
+            redrawn = wait_for(browser, lambda b: (meeting / "minutes.md").read_text() != minutes and at() == "redo-open"
+                               and b.execute_script("return document.getElementById('minutes-state')?.dataset.made") != made, 10)
+            check("the making done and the page drawn again, the focus still on « Refaire » (WCAG 2.4.3)", bool(redrawn), at())
+            # A making written while the dialog is open: no redraw under it, « Refaire » kept to come back to (#1337).
+            browser.execute_script("const n = arguments[0]; window.backTo = document.getElementById('redo-open'); const real = window.__TAURI__.core;"
+                                   " window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'makings'"
+                                   " ? real.invoke(asked, ...rest).then((m) => ({ ...m, made: { ...m.made, [n]: (m.made[n] ?? 0) + 7 } }))"
+                                   " : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };", meeting.name)
+            press(browser, "redo-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "redo-minutes-item")
+            wait_for(browser, lambda b: b.execute_script(dialog), 5)
+            time.sleep(3.5)  # two of the header's readings (1.5 s)
+            under = browser.execute_script("return [window.backTo.isConnected, !!document.querySelector('dialog[open]')]")
+            keys(Keys.ESCAPE)
+            wait_for(browser, lambda b: b.execute_script(dialog) is None, 3)
+            check("a making read while the dialog is open: the page not drawn under it, Escape back on « Refaire »",
+                  under == [True, True] and at() == "redo-open", [under, at()])
+            browser.execute_script("window.restore()")
+            wait_for(browser, lambda b: b.execute_script("return document.getElementById('redo-open') !== window.backTo"), 5)
             press(browser, "redo-open")
             wait_for(browser, lambda b: b.execute_script(menu), 3)
             press(browser, "redo-transcript-item")
@@ -10483,7 +10523,40 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             check("« Refaire la transcription… »: the engine card to transcribe, its button naming the making (D121, D122)",
                   got.get("title") == "Refaire la transcription" and got.get("job") == "transcribe"
                   and got.get("go") == ["Annuler", "Refaire la transcription"], got)
-            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            keys(Keys.ESCAPE)
+            wait_for(browser, lambda b: b.execute_script(dialog) is None, 3)
+            (WORK / "summary-args").unlink(missing_ok=True)
+            # Asked, the shell slow then refusing: Escape keeps the dialog, the refusal is said in it, its buttons back (#1337).
+            browser.execute_script("const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'minutes_redo'"
+                                   " ? new Promise((_, no) => { window.release = () => no('refusé pour l’essai'); }) : real.invoke(asked, ...rest) };"
+                                   " window.restore = () => { window.__TAURI__.core = real; };")
+            press(browser, "redo-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "redo-minutes-item")
+            wait_for(browser, lambda b: b.execute_script(dialog), 5)
+            browser.execute_script("[...document.querySelectorAll('dialog[open] .actions button')].at(-1).click()")
+            wait_for(browser, lambda b: b.execute_script("return typeof window.release === 'function'"), 3)
+            keys(Keys.ESCAPE)
+            time.sleep(0.3)
+            held = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
+            browser.execute_script("window.release()")
+            said = wait_for(browser, lambda b: b.execute_script("const w = document.querySelector('dialog[open] .note.warn'); return w && !w.hidden && w.textContent"), 3)
+            back = browser.execute_script("const d = document.querySelector('dialog[open]'); return d && [...d.querySelectorAll('.actions button')].map((b) => b.disabled)")
+            check("asked, Escape keeps the dialog and its buttons wait; refused, « Non refait » said in it, its buttons back, nothing made",
+                  held == [True, True] and bool(said) and "refusé pour l’essai" in (said or "") and back == [False, False]
+                  and not (WORK / "summary-args").exists(), [held, said, back])
+            keys(Keys.ESCAPE)
+            wait_for(browser, lambda b: b.execute_script(dialog) is None, 3)
+            # The models not read: said under the bar, no dialog (#1337).
+            browser.execute_script("window.restore(); const real = window.__TAURI__.core; window.__TAURI__.core = { ...real, invoke: (asked, ...rest) => asked === 'models_offered'"
+                                   " ? Promise.reject('illisible pour l’essai') : real.invoke(asked, ...rest) }; window.restore = () => { window.__TAURI__.core = real; };")
+            press(browser, "redo-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "redo-minutes-item")
+            unread = wait_for(browser, lambda b: "illisible pour l’essai" in (b.execute_script("return document.getElementById('trash-said')?.textContent") or ""), 3)
+            check("the models not read: said under the bar, no dialog opened", bool(unread) and browser.execute_script(dialog) is None,
+                  [browser.execute_script("return document.getElementById('trash-said')?.textContent"), browser.execute_script(dialog)])
+            browser.execute_script("window.restore()")
     finally:
         tags.shutdown()
 
