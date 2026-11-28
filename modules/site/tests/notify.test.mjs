@@ -232,11 +232,12 @@ test("_headers lets a form post to the site itself, and nowhere else", async () 
 test("the privacy policy says what the form keeps, who sends, for how long, on what basis, in both languages", async () => {
   for (const [lang, said] of [
     // nora's reading against GDPR art. 13: the right to complain to the CNIL, how long an unconfirmed address and the
-    // list are kept (the decider, 2026-11-28: 90 days for an unconfirmed address, the list deleted right after the one
-    // message and at the latest 12 months after the sign-up, held by hand), every right that applies under consent. The CNIL's complaint page is in French alone (a complaint is
+    // list are kept (the decider and the coordinator, 2026-11-28, what a quarterly clean-up by hand holds: an unconfirmed
+    // address at the latest 4 months after the request, the list right after the one message and at the latest 12 months
+    // after the sign-up), every right that applies under consent. The CNIL's complaint page is in French alone (a complaint is
     // written in French), so both halves link it.
-    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "90 days", "right after", "12 months", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "never write to it again"] ],
-    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "90 jours", "aussitôt après", "12 mois", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "ne plus jamais lui écrire"] ],
+    ["en", ["Brevo", "European Union", "consent", "6(1)(a)", "delete it", "at the latest 4 months after", "right after", "at the latest 12 months after", "restrict", "object", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "never write to it again"] ],
+    ["fr", ["Brevo", "Union européenne", "consentement", "6.1.a", "l’effaçons", "au plus tard 4 mois après", "aussitôt après", "au plus tard 12 mois après", "limiter", "opposer", "portab", "CNIL", 'href="https://www.cnil.fr/fr/adresser-une-plainte"', "ne plus jamais lui écrire"] ],
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);
