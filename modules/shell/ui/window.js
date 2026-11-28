@@ -2650,8 +2650,6 @@ function datesPanel(mentioned, session, transcript, words, back) {
   google.type = "button";
   google.id = "dates-google";
   google.disabled = true;
-  // Read when it opens: the switch may have changed since the page was drawn; the shell refuses it anyway.
-  google.hidden = document.getElementById("confidential-switch")?.checked === true;
   const ics = element("button", "open", words.dates_ics);
   ics.type = "button";
   ics.id = "dates-ics";
@@ -2663,10 +2661,12 @@ function datesPanel(mentioned, session, transcript, words, back) {
   said.id = "dates-said";
   said.setAttribute("role", "status");
   said.hidden = true;
+  const asking = element("div", "send-panel");
+  asking.hidden = true;
   const goes = element("div", "dates-goes");
   goes.append(ics, google);
   dayLabel.append(day);
-  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, saved, said);
+  dialog.append(head, element("p", "note", words.dates_says), dayLabel, list, goes, asking, saved, said);
   const full = new Intl.DateTimeFormat(document.documentElement.lang, { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
   let shown = [];
   const ticked = () => shown.filter((item) => item.box.checked);
@@ -2709,19 +2709,49 @@ function datesPanel(mentioned, session, transcript, words, back) {
       said.hidden = false;
     }
   });
-  google.addEventListener("click", async () => {
+  const toGoogle = async (confirmed) => {
     said.hidden = true;
     const meeting = document.querySelector("#meeting h1")?.textContent ?? name;
     for (const { date, action, passage } of ticked()) {
       const item = { date, what: action.what, who: action.who, passage, meeting };
       try {
-        await window.__TAURI__.core.invoke("date_google", { name, item });
+        await window.__TAURI__.core.invoke("date_google", { name, item, confirmed });
       } catch (why) {
         said.textContent = why;
         said.hidden = false;
         return;
       }
     }
+  };
+  // A confidential meeting (PDR-0007 §4, #1319): asked again, each time, in one sentence saying what leaves and where;
+  // « Annuler » focused, the safe one (PDR-0008). The switch is read at the press: it may have changed since.
+  // Either answer gives the focus back to the button that asked (WAI-ARIA APG, dialog: the invoking control).
+  const askDone = () => {
+    asking.hidden = true;
+    asking.replaceChildren();
+    google.focus();
+  };
+  google.addEventListener("click", () => {
+    if (document.getElementById("confidential-switch")?.checked !== true) return toGoogle(false);
+    const ask = element("p", "note send-confidential", words.dates_confidential_ask);
+    ask.id = "dates-confidential";
+    const yes = element("button", "primary", words.bar_last_open);
+    yes.type = "button";
+    yes.id = "dates-confirm";
+    yes.setAttribute("aria-describedby", ask.id);
+    yes.addEventListener("click", () => {
+      askDone();
+      toGoogle(true);
+    });
+    const no = element("button", "", words.send_cancel);
+    no.type = "button";
+    no.id = "dates-cancel";
+    no.addEventListener("click", () => askDone());
+    const choices = element("div", "send-choices");
+    choices.append(yes, no);
+    asking.replaceChildren(ask, choices);
+    asking.hidden = false;
+    no.focus();
   });
   const end = () => {
     dialog.close();

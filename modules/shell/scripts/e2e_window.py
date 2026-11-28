@@ -10311,7 +10311,7 @@ def keys_taught(now: dt.datetime) -> None:
 def dates_mentioned(now: dt.datetime) -> None:
     """CM. « Dates mentionnées » (D115): each action's by when read against the meeting's day; ticked, to Google Calendar."""
     print("CM. « Dates mentionnées »: the dates an action names, in full, its passage beside it, nothing ticked; the day changed, read again; "
-          "nothing leaves before a tick and a destination; none offered without a date; no link for a confidential meeting (D115)")
+          "nothing leaves before a tick and a destination; none offered without a date; a confidential meeting's link only once confirmed again (D115, PDR-0007 §4)")
     meetings = WORK / "dating"
     # Tuesday 24 November 2026, started at 23:30 local time: its day is the 24th, whatever UTC says.
     folder = meetings / "2026-11-24_23-30"
@@ -10410,20 +10410,53 @@ def dates_mentioned(now: dt.datetime) -> None:
             wait_for(browser, lambda b: b.find_elements(By.CSS_SELECTOR, "#meeting .minutes table.actions"), 10)
             time.sleep(0.5)
             check(f"{language}: no date named, « {opens} » not offered", not browser.execute_script(offered), browser.execute_script(offered))
-            # Confidential: no link offered, and the shell refuses one anyway.
+            # Confidential (PDR-0007 §4, amended 2026-11-24): the link offered, asked again in one plain sentence
+            # saying what leaves; nothing opens before the confirmation — nor by a call the page did not confirm.
+            asked = {"fr": "Cette réunion est confidentielle\u00a0: ses échéances, avec la phrase où chacune a été dite, la personne concernée et le titre de la réunion, vont quitter cet ordinateur pour Google Agenda.",
+                     "en": "This meeting is confidential: its dates, each with the words it was said in, the person it concerns and the meeting’s title, will leave this computer for Google Calendar."}[language[:2]]
             (folder / "confidential").write_bytes(b"")
             browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
             wait_for(browser, lambda b: b.execute_script(offered), 10)
             wait_for(browser, lambda b: b.execute_script("return document.getElementById('confidential-switch')?.checked === true"), 5)
             press(browser, "dates-open")
             wait_for(browser, lambda b: (b.execute_script(panel) or {}).get("items"), 5)
-            check(f"{language}: a confidential meeting is offered no link, the .ics still (it stays on this computer)",
-                  browser.execute_script(panel)["google"][0] is True and browser.execute_script("return document.getElementById('dates-ics').hidden") is False,
+            check(f"{language}: a confidential meeting is offered the link, and the .ics",
+                  browser.execute_script(panel)["google"][0] is False and browser.execute_script("return document.getElementById('dates-ics').hidden") is False,
                   browser.execute_script(panel))
-            refused = browser.execute_async_script(
-                "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('date_google', {name: arguments[0], item: "
-                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}).then(() => done('opened'), (why) => done(String(why)))", folder.name)
-            check(f"{language}: and the shell refuses it", refused != "opened" and browsed.read_text().count("\n") == 1, [refused, browsed.read_text()])
+            lines = lambda: browsed.read_text().count("\n") if browsed.exists() else 0
+            before = lines()
+            browser.execute_script("document.querySelector('#dates .dates-item input').click()")
+            press(browser, "dates-google")
+            ask = ("const a = document.getElementById('dates-confidential'), y = document.getElementById('dates-confirm'), n = document.getElementById('dates-cancel');"
+                   " return a && [a.textContent, y && y.textContent, n && n.textContent, document.activeElement.id, (y && y.getAttribute('aria-describedby')) || '']")
+            shown = wait_for(browser, lambda b: b.execute_script(ask), 5)
+            got = browser.execute_script(ask)
+            time.sleep(0.5)
+            check(f"{language}: pressed, it asks again in one sentence saying what leaves, then « Ouvrir » or « Annuler », the focus on « Annuler »; nothing opened yet",
+                  shown and got[0] == asked and got[1] in ("Ouvrir", "Open") and got[2] in ("Annuler", "Cancel")
+                  and got[3] == "dates-cancel" and "dates-confidential" in got[4] and lines() == before, [got, lines(), before])
+            press(browser, "dates-cancel")
+            time.sleep(0.5)
+            check(f"{language}: « Annuler »: nothing opened, the question gone, the focus back on the button",
+                  browser.execute_script("return document.getElementById('dates-confidential')") is None and lines() == before
+                  and browser.execute_script("return document.activeElement.id") == "dates-google",
+                  [lines(), browser.execute_script("return document.activeElement.id")])
+            press(browser, "dates-google")
+            wait_for(browser, lambda b: b.execute_script(ask), 5)
+            press(browser, "dates-confirm")
+            opened = wait_for(browser, lambda b: lines() == before + 1, 5)
+            check(f"{language}: « Ouvrir »: the ticked date alone handed to Google Calendar, the focus back on the button",
+                  opened and browser.execute_script("return document.activeElement.id") == "dates-google",
+                  [lines(), before, browser.execute_script("return document.activeElement.id")])
+            # Unconfirmed, whether the page says nothing or says no: refused by the shell.
+            refused = [browser.execute_async_script(
+                "const done = arguments[arguments.length - 1], args = {name: arguments[0], item: "
+                "{date: '2026-12-03', what: 'x', who: null, passage: null, meeting: 'y'}}; if (arguments[1] !== null) args.confirmed = arguments[1];"
+                " window.__TAURI__.core.invoke('date_google', args).then(() => done('opened'), (why) => done(String(why)))", folder.name, confirmed)
+                for confirmed in (None, False)]
+            time.sleep(0.5)
+            check(f"{language}: a call the page did not confirm (none, or false) is refused by the shell, nothing handed",
+                  "opened" not in refused and lines() == before + 1, [refused, lines()])
             press(browser, "dates-close")
     (folder / "confidential").unlink(missing_ok=True)
 
