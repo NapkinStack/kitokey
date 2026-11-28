@@ -55,6 +55,8 @@ p { text-wrap: pretty; }
 .skip { position: absolute; left: 16px; top: -100px; z-index: 100; background: var(--accent); color: var(--on-accent); padding: .6rem 1rem; border-radius: 999px; }
 .skip:focus { top: 10px; color: var(--on-accent); }
 .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+/* A compound word kept whole (src/lib/nb.mjs): it never breaks at its hyphen. */
+.nb { white-space: nowrap; }
 @media (min-width: 700px) { .wrap { padding: 0 32px; } }
 
 /* ---- A page of text: the privacy policy ---- */
@@ -79,6 +81,8 @@ p { text-wrap: pretty; }
 /* Install: the commands on a dark block, one tab per system. */
 /* On the grid of every other section (v7): its heading at the wrap's left, its commands no wider than 860 px. */
 .get .code { max-width: 860px; }
+/* In the dark theme, the commands' block is edged in the control's ink, so it stands out of the canvas (nora, #1318). */
+html[data-site="dark"] .code { outline: 1px solid var(--border-control); }
 .code { position: relative; background: #0F1218; color: #E6EAF2; border-radius: 20px; padding: 1.4rem; margin-top: 2rem; }
 .code pre { margin: 0; overflow-x: auto; font: .95rem/1.8 ui-monospace, "SF Mono", "Cascadia Mono", "DejaVu Sans Mono", monospace; }
 .code pre .p { color: #8AB0FF; user-select: none; }

@@ -126,3 +126,17 @@ test("the titles' face keeps Bricolage's optical axis, as v7 loads it: opsz and 
   const woff2 = await readFile(join(root, "public/fonts/bricolage-latin.woff2"));
   assert.deepEqual(axes(woff2).sort(), ["opsz", "wght"]);
 });
+
+// A compound word never breaks at its hyphen (the coordinator, 2026-11-28: « revenez- / y »), and stays the word one
+// searches, copies and the titles' face draws: the ASCII hyphen kept, the word wrapped in <span class="nb">
+// (white-space: nowrap) by one function at build time, in every page's text but code.
+const body = (html) => html.slice(html.indexOf("<body")).replace(/<(pre|code|script|style|svg|textarea)[\s\S]*?<\/\1>/g, "");
+test("every compound word of a page's text is kept whole, its hyphen the ASCII one", async () => {
+  for (const file of await pages()) {
+    const html = body(await readFile(file, "utf8"));
+    assert.doesNotMatch(html, /‑/, `${route(file)}: a non-breaking hyphen, which no one searches nor types`);
+    const loose = html.replace(/<span class="nb">[^<]*<\/span>/g, " ").replace(/<[^>]+>/g, " ")
+      .match(/[\p{L}\p{N}’]+(?:-[\p{L}\p{N}’]+)+/gu) ?? [];
+    assert.deepEqual(loose, [], `${route(file)}: compound words left to break`);
+  }
+});
