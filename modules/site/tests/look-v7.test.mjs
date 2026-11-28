@@ -261,3 +261,44 @@ test("the install tabs' marks stand at one optical height, drawn whole at 200 %"
     }
   });
 });
+
+test("the Store's and the Mac's marks stand on their text's baseline, the Windows one as tall as the capitals, in the button's colour", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const [lang, scheme] of [["fr", "light"], ["en", "dark"]]) {
+      const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1440, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const [store, mac] = await page.evaluate(() => {
+        // A probe of no width at the text's end: its bottom is the baseline, its height 1cap.
+        const against = (mark) => {
+          const probe = document.createElement("span");
+          probe.style.cssText = "display:inline-block;width:0;height:1cap";
+          mark.parentElement.append(probe);
+          const m = mark.getBoundingClientRect(), p = probe.getBoundingClientRect();
+          probe.remove();
+          return { bottom: Math.round(m.bottom - p.bottom), height: Math.round(m.height - p.height), cap: Math.round(p.height), shown: m.height > 0,
+            tint: getComputedStyle(mark).backgroundColor === getComputedStyle(mark.parentElement).color };
+        };
+        const mac = [...document.querySelectorAll(".hero .cta-note .mark")].find((m) => m.getBoundingClientRect().height > 0);
+        return [against(document.querySelector(".hero .store-soon .mark")), mac ? against(mac) : null];
+      });
+      if (!store.shown || Math.abs(store.bottom) > 1 || Math.abs(store.height) > 1 || !store.tint) found.push([lang, scheme, "store", store]);
+      if (!mac || Math.abs(mac.bottom) > 1) found.push([lang, scheme, "mac", mac]);
+      await page.close();
+    }
+  });
+  assert.deepEqual(found, []);
+});
+
+test("the language switch stays in the header at 420 px, a 44 px target, its globe and the other language's name", async () => {
+  await look(async (browser, origin) => {
+    for (const [lang, name] of [["fr", "English"], ["en", "Français"]]) {
+      const page = await browser.newPage({ colorScheme: "light", viewport: { width: 420, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const box = await page.locator(".top .lang").boundingBox();
+      assert.ok(box && box.height >= 44 && box.width >= 44 && box.x + box.width <= 420, `/${lang}/ at 420 px: ${JSON.stringify(box)}`);
+      assert.equal((await page.locator(".top .lang").innerText()).trim(), name);
+      await page.close();
+    }
+  });
+});

@@ -49,7 +49,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
         <div class="buy">
           <p class="buy-line">{buyLine}</p>
           <div class="cta">
-            <a class="store-soon" href={`#${priceId}`}><img class="mark" src="/img/brands/windows-logo-2021.svg" alt="" width="16" height="16" />{storeSoon}</a>
+            <a class="store-soon" href={`#${priceId}`}><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a>
             <a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a>
           </div>
         </div>
@@ -275,7 +275,7 @@ const prompt = (commands) => commands.split("\n").map((c) => `<span class="p">$ 
       </svg>
       <h2 id="final-h">{finalH}</h2>
       <p>{finalP}</p>
-      <div class="cta"><a class="store-soon" href={`#${priceId}`}><img class="mark" src="/img/brands/windows-logo-2021.svg" alt="" width="16" height="16" />{storeSoon}</a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
+      <div class="cta"><a class="store-soon" href={`#${priceId}`}><span><span class="mark" aria-hidden="true"></span>{storeSoon}</span></a><a class="quiet" href={`#${installId}`}><img class="tux" src="/img/brands/tux.svg" alt="" width="22" height="26" />{linuxFree}</a></div>
     </div>
   </section>
 </Page>
