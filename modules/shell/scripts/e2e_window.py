@@ -4151,6 +4151,25 @@ def toasts_said(now: dt.datetime) -> None:
         got = browser.execute_script(clear_of, "minutes-own-save", None)
         check("the minutes' Enregistrer: « Enregistré » by the toast, in view, over neither its button nor the focus, the page not moved (D120)",
               told and got == [True, True, at], (toast_now(browser), got, at))
+        # A window full of controls, no band free (the coordinator, #1329): the toast keeps the foot, or the top when
+        # the focus is at the foot — never over the focus, never in a band of its own over a control.
+        wait_for(browser, lambda b: toast_now(b)[1] == "", 8)
+        browser.execute_script(
+            "const f = document.createElement('div'); f.id = 'probe-full'; f.style.cssText = 'position:fixed;inset:0;display:grid;grid-template-columns:repeat(4,1fr);z-index:1';"
+            " for (let i = 0; i < 120; i++) { const b = document.createElement('button'); b.textContent = i; b.id = 'probe-' + i; f.append(b); } document.body.append(f);")
+        placed = ("const t = document.getElementById('toast'), r = t.getBoundingClientRect(), f = document.activeElement.getBoundingClientRect();"
+                  " return [t.classList.contains('high'), t.style.top, !t.hidden && r.top >= 0 && r.bottom <= innerHeight,"
+                  " r.left < f.right && f.left < r.right && r.top < f.bottom && f.top < r.bottom]")
+        full = []
+        # The focus in the middle, then on the button where the toast says it at the foot.
+        at_foot = browser.execute_script("const t = document.getElementById('toast'); t.classList.remove('high'); t.style.top = t.style.bottom = ''; t.hidden = false; t.textContent = 'x'; const r = t.getBoundingClientRect();"
+                                         " t.hidden = true; t.textContent = ''; return document.elementFromPoint(innerWidth / 2, r.top + r.height / 2)?.id ?? ''")
+        for where in ("probe-58", at_foot):
+            browser.execute_script("document.getElementById(arguments[0])?.focus(); say('Enregistré')", where)
+            full.append(browser.execute_script(placed))
+        browser.execute_script("document.getElementById('probe-full').remove()")
+        check("a window full of controls: the toast at the foot, at the top when the focus is at the foot, never over the focus (D120)",
+              at_foot.startswith("probe-") and full == [[False, "", True, False], [True, "", True, False]], (at_foot, full))
 
 def minutes_copied(now: dt.datetime) -> None:
     """AJ. A meeting's minutes copied in one click, ready to paste where the user writes (D45)."""
