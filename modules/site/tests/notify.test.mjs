@@ -243,5 +243,9 @@ test("the privacy policy says what the form keeps, who sends, for how long, on w
   ]) {
     const html = await page(lang, "privacy");
     for (const words of said) assert.ok(html.includes(words), `/${lang}/privacy/ does not say « ${words} »`);
+    // The processor as its terms of service name it, the party to the DPA (nora's reading of #1344): Brevo SAS, not
+    // the name it had until 2023.
+    assert.ok(html.includes("Brevo SAS"), `/${lang}/privacy/ does not name Brevo SAS`);
+    assert.doesNotMatch(html, /Sendinblue/, `/${lang}/privacy/ names the processor by its old name`);
   }
 });
