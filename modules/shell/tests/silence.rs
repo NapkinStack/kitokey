@@ -25,8 +25,8 @@ const SILENT: &[(&str, usize, &str)] = &[
     ),
     (
         "services_offered",
-        2,
-        "an addition to the redo list (D96), the panel's and « Refaire ▾ »'s dialog's (D121): not read, Settings' models and this computer's are still offered; a service that does not answer is logged by the shell",
+        1,
+        "an addition to « Refaire ▾ »'s dialog's engine cards (D96, D121): not read, Settings' models and this computer's are still offered; a service that does not answer is logged by the shell",
     ),
     ("makings", 2, "returns no `Result`: it cannot fail"),
     (

@@ -63,7 +63,11 @@ function engineCards({ job, offered, words, scope, services = [] }) {
       { engine: "online", value: "online", name: words.engine_online_kind, at: "online", state: online, said: said(online), facts: words.engine_online_says, details: services.map((service) => service.name), checked: false },
     );
   } else {
-    const own = scope === "meeting" ? (writing ? offered.chosen.minutes : offered.chosen.transcription) : null;
+    // The meeting's own choice — unless it is gone, or a service while it is confidential: then « Par défaut », the
+    // dialog saying why (D91).
+    const step = writing ? "minutes" : "transcription";
+    const usable = scope === "meeting" && !(offered.gone ?? []).includes(step) && !(offered.unused ?? []).includes(step);
+    const own = usable ? (writing ? offered.chosen.minutes : offered.chosen.transcription) : null;
     const ownValue = own ? modelValue(writing ? "minutes" : "transcription", own) : "";
     // Settings' choice, as one value: none named is « Auto ».
     const settingsValue = writing
@@ -108,6 +112,8 @@ function engineCards({ job, offered, words, scope, services = [] }) {
       }
     }
   }
+  // A meeting's own choice no card offers now: « Par défaut » checked, never none.
+  if (scope === "meeting" && !cards.some((card) => card.checked)) cards[0].checked = true;
   for (const card of cards) box.append(engineCard(job, group, card));
   const told = [];
   box.addEventListener("change", (event) => {

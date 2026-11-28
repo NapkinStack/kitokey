@@ -1831,7 +1831,7 @@ fn broken(text: &str) -> Vec<&'static str> {
 /// The sentences right to keep against a rule of D124, each by its key, with its reason: an action
 /// in progress or an entry that opens a dialog keeps its « … » (V3, GNOME HIG and Apple HIG); a raw
 /// value shown under « Avancé », « Détails » or the developer mode keeps it (V1). Never a pattern.
-const KEPT: [(&str, &str, &str); 28] = [
+const KEPT: [(&str, &str, &str); 26] = [
     (
         "ellipsis",
         r#"menu.minuting[0] "Rédaction du compte rendu…""#,
@@ -1914,8 +1914,6 @@ const KEPT: [(&str, &str, &str); 28] = [
         r#"window.record_stopping[0] "Stopping…""#,
         "the record button while the recording stops",
     ),
-    ("ellipsis", r#"window.redo[0] "Redo…""#, "opens the dialog of a redo"),
-    ("ellipsis", r#"window.redo[0] "Refaire…""#, "opens the dialog of a redo"),
     ("ellipsis", r#"window.send_open[0] "Envoyer…""#, "opens the choice of a channel"),
     ("ellipsis", r#"window.send_open[0] "Send…""#, "opens the choice of a channel"),
     (
