@@ -4,7 +4,7 @@
   "editing": "code",
   "createdOnFiles": {
     "v": 1,
-    "at": "2026-11-27T22:23:48+01:00"
+    "at": "2026-11-28T04:45:40+01:00"
   },
   "title": "Kitokey",
   "namespace": "Kitokey",
@@ -18,8 +18,8 @@
     "sections": []
   },
   "lastChange": {
-    "at": "2026-11-27T22:23:48+01:00",
-    "via": "local · 753df9303cb910cd063d7a94cf4232690422420b",
+    "at": "2026-11-28T04:45:40+01:00",
+    "via": "local · 0ba3fe4ee463e6627d374fc6341895db26facf40",
     "note": "Exported from ui/tokens.css and ui/components.css by scripts/design-export.py."
   }
 }

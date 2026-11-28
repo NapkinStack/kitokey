@@ -624,8 +624,13 @@ pub struct Window {
     /// gallery shown. At most: one line. Placeholders: none.
     pub gallery_title: &'static str,
     /// Shows: the gallery's sections: its buttons, its banners, its dialogs, its engine cards, its chips, its option
-    /// cards, its progress, its toasts (D120). When: the gallery shown. At most: one line each. Placeholders: none.
-    pub gallery_parts: [&'static str; 8],
+    /// cards, its progress, its toasts (D120), its tabs (D123). When: the gallery shown. At most: one line each.
+    /// Placeholders: none.
+    pub gallery_parts: [&'static str; 9],
+    /// Shows: Settings' tabs, in their order — recording, listening and writing, sharing, storage and privacy,
+    /// general (D123, ux-ia §2) —, and the gallery's tabs. When: Settings or the gallery shown. At most: about 28
+    /// characters each. Placeholders: none.
+    pub settings_tabs: [&'static str; 5],
     /// The menu of a meeting's rarer actions (D89), and a setting's name before its value.
     /// Shows: a meeting's page, as a name for a screen reader. When: icon button (tooltip) of the
     /// menu of rarer actions. At most: no limit. Placeholders: none.
@@ -2182,7 +2187,9 @@ pub fn window(language: Language) -> Window {
                 "Option cards",
                 "Progress",
                 "Toasts",
+                "Tabs",
             ],
+            settings_tabs: ["Recording", "Listening and writing", "Sharing", "Storage and privacy", "General"],
             more_actions: "More actions",
             meeting_share: "Share",
             export_pdf: "Export to PDF",
@@ -2743,6 +2750,14 @@ pub fn window(language: Language) -> Window {
                 "Cartes d’option",
                 "Progression",
                 "Messages brefs",
+                "Onglets",
+            ],
+            settings_tabs: [
+                "Enregistrement",
+                "Écoute et rédaction",
+                "Partage",
+                "Stockage et confidentialité",
+                "Général",
             ],
             more_actions: "Plus d’actions",
             meeting_share: "Partager",

@@ -312,7 +312,7 @@ a sentence. Chosen, it is edged in the accent on the tint. The radios give the g
 progress bar (`role=progressbar`) named and at its value.
 """, """<div style="padding:16px;background:var(--color-canvas)">
   <div class="progress">
-    <div class="label">""" + FILE + """<b>Rédaction du compte rendu</b><span class="left">environ 3 min</span><button type="button" class="button ghost">Annuler</button></div>
+    <div class="task">""" + FILE + """<b>Rédaction du compte rendu</b><span class="left">environ 3 min</span><button type="button" class="button ghost">Annuler</button></div>
     <div class="bars"><div class="bar" role="progressbar" aria-label="Transcription" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i style="width:100%"></i></div><div class="bar" role="progressbar" aria-label="Rédaction du compte rendu" aria-valuemin="0" aria-valuemax="100" aria-valuenow="38"><i style="width:38%"></i></div></div>
   </div>
 </div>"""),
@@ -321,6 +321,19 @@ text's colour on the surface's, so that it stands out in both themes. It pops in
 motion.
 """, """<div style="padding:16px;background:var(--color-canvas)">
   <div class="toast" role="status" style="position:static">""" + CHECK + """<span>Copié</span></div>
+</div>"""),
+    "Tabs": ("Navigation", 140, """Tabs split a page into its parts, one shown at a time (WAI-ARIA's Tabs, automatic activation): drawn as
+segments — the list a sunken band, each tab its words, the chosen one raised on the surface with e1 and edged, so
+that its state is seen by more than a shade (WCAG 1.4.11). The chosen tab
+is the only stop of Tab; ← → Home End move and choose; its panel comes next in Tab's order. Settings' five parts use
+them (D123).
+""", """<div style="padding:16px;background:var(--color-canvas)">
+  <div class="tabs" role="tablist" aria-label="Réglages">
+    <button type="button" class="tab" role="tab" aria-selected="true" tabindex="0">Enregistrement</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1">Écoute et rédaction</button>
+    <button type="button" class="tab" role="tab" aria-selected="false" tabindex="-1">Partage</button>
+  </div>
+  <div class="tab-panel" role="tabpanel"><p style="margin:0;color:var(--color-text-soft)">Testez votre micro et le son de la réunion avant d’enregistrer.</p></div>
 </div>"""),
 }
 
