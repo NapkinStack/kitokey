@@ -42,6 +42,11 @@ html[data-site="dark"] .end .on-dark { display: block; }
 .end .strip span + span { border-left: 1px solid color-mix(in srgb, var(--accent) 14%, transparent); }
 .end .linux .strip span + span { border-left-color: var(--border-subtle); }
 .end .strip b { font-family: var(--display); font-size: 17px; font-weight: 700; color: var(--text-primary); letter-spacing: -.01em; }
+/* The distributions' marks before their names, at the install tabs' height; Ubuntu's white on its orange disc, Debian's on a plate in the dark. */
+.end .strip b { display: inline-flex; align-items: center; gap: 8px; }
+.end .strip b img { height: 18px; width: auto; flex: none; }
+.end .strip .mark-ubuntu { background: #E95420; border-radius: 50%; box-shadow: 0 0 0 3px #E95420; }
+html[data-site="dark"] .end .strip .mark-debian { background: #FFFFFF; border-radius: 3px; box-shadow: 0 0 0 3px #FFFFFF; }
 .end .incl-h { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
 .end .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .end .checks li { display: grid; grid-template-columns: 20px 1fr; gap: 10px; color: var(--text-secondary); font-size: 15.5px; }

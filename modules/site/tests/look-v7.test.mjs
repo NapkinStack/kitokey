@@ -219,3 +219,86 @@ test("each « Bientôt » pill follows its card's title, as planche v4 draws it:
   });
   assert.deepEqual(found, []);
 });
+
+test("each section a nav link reaches lands just under the sticky header, at 1440 and 420 px", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const [width, lang] of [[1440, "fr"], [420, "fr"], [1440, "en"]]) {
+      const page = await browser.newPage({ colorScheme: "light", viewport: { width, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const ids = await page.evaluate(() => [...document.querySelectorAll(".top nav a[href^='#']")].map((a) => a.getAttribute("href").slice(1)));
+      for (const id of ids) {
+        // Where the scroll ends, not mid-way: the page scrolls smoothly (html's scroll-behavior), and a heading that
+        // rises in (.rise, 12 px, .4 s) is measured once it has risen.
+        await page.evaluate((id) => document.getElementById(id).scrollIntoView({ block: "start", behavior: "instant" }), id);
+        await page.waitForTimeout(700);
+        const gap = await page.evaluate((id) => {
+          const el = document.getElementById(id);
+          const header = document.querySelector(".top").getBoundingClientRect().bottom;
+          const heading = el.querySelector("h2") ?? el;
+          return heading.getBoundingClientRect().top - header;
+        }, id);
+        if (!(gap >= 0 && gap <= 72)) found.push([lang, width, id, Math.round(gap)]);
+      }
+      if (!ids.length && width === 1440) found.push([lang, width, "no nav link"]);
+      await page.close();
+    }
+  });
+  assert.deepEqual(found, []);
+});
+
+test("the install tabs' marks stand at one optical height, drawn whole at 200 %", async () => {
+  await look(async (browser, origin) => {
+    for (const scheme of ["light", "dark"]) {
+      const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+      await page.goto(`${origin}/en/#still`, { waitUntil: "networkidle" });
+      const marks = await page.evaluate(() => [...document.querySelectorAll(".os-tab img")].map((i) => [i.getAttribute("src"), Math.round(i.getBoundingClientRect().height), i.complete && i.naturalWidth > 0]));
+      assert.ok(marks.length >= 3, `${scheme}: ${marks.length} marks`);
+      const heights = marks.map(([, h]) => h);
+      assert.ok(Math.max(...heights) - Math.min(...heights) <= 1, `${scheme}: heights ${JSON.stringify(marks)}`);
+      assert.ok(marks.every(([, , drawn]) => drawn), `${scheme}: a mark not drawn ${JSON.stringify(marks)}`);
+      await page.close();
+    }
+  });
+});
+
+test("the Store's and the Mac's marks stand on their text's baseline, the Windows one as tall as the capitals, in the button's colour", async () => {
+  const found = [];
+  await look(async (browser, origin) => {
+    for (const [lang, scheme] of [["fr", "light"], ["en", "dark"]]) {
+      const page = await browser.newPage({ colorScheme: scheme, viewport: { width: 1440, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const [store, mac] = await page.evaluate(() => {
+        // A probe of no width at the text's end: its bottom is the baseline, its height 1cap.
+        const against = (mark) => {
+          const probe = document.createElement("span");
+          probe.style.cssText = "display:inline-block;width:0;height:1cap";
+          mark.parentElement.append(probe);
+          const m = mark.getBoundingClientRect(), p = probe.getBoundingClientRect();
+          probe.remove();
+          return { bottom: Math.round(m.bottom - p.bottom), height: Math.round(m.height - p.height), cap: Math.round(p.height), shown: m.height > 0,
+            tint: getComputedStyle(mark).backgroundColor === getComputedStyle(mark.parentElement).color };
+        };
+        const mac = [...document.querySelectorAll(".hero .cta-note .mark")].find((m) => m.getBoundingClientRect().height > 0);
+        return [against(document.querySelector(".hero .store-soon .mark")), mac ? against(mac) : null];
+      });
+      if (!store.shown || Math.abs(store.bottom) > 1 || Math.abs(store.height) > 1 || !store.tint) found.push([lang, scheme, "store", store]);
+      if (!mac || Math.abs(mac.bottom) > 1) found.push([lang, scheme, "mac", mac]);
+      await page.close();
+    }
+  });
+  assert.deepEqual(found, []);
+});
+
+test("the language switch stays in the header at 420 px, a 44 px target, its globe and the other language's name", async () => {
+  await look(async (browser, origin) => {
+    for (const [lang, name] of [["fr", "English"], ["en", "Français"]]) {
+      const page = await browser.newPage({ colorScheme: "light", viewport: { width: 420, height: 900 } });
+      await page.goto(`${origin}/${lang}/`, { waitUntil: "networkidle" });
+      const box = await page.locator(".top .lang").boundingBox();
+      assert.ok(box && box.height >= 44 && box.width >= 44 && box.x + box.width <= 420, `/${lang}/ at 420 px: ${JSON.stringify(box)}`);
+      assert.equal((await page.locator(".top .lang").innerText()).trim(), name);
+      await page.close();
+    }
+  });
+});

@@ -53,11 +53,15 @@ for (const lang of ["fr", "en"]) {
     assert.doesNotMatch(text(ready), /import/i, "a feature about importing");
   });
 
-  test(`/${lang}/: no promise the app does not keep: no health, no law's name, no « passage exact », no Word or subtitles`, async () => {
+  test(`/${lang}/: no promise the app does not keep: no health, no compliance claimed, GDPR named once as a fact, no « passage exact », no Word or subtitles`, async () => {
     const said = text((await sections(lang)).join(" "));
-    for (const word of ["médecin", "doctor", "RGPD", "GDPR", "HIPAA", "HDS", "conforme", "compliant", "passage exact", "Word", "sous-titres", "subtitles"]) {
+    for (const word of ["médecin", "doctor", "HIPAA", "HDS", "conforme", "compliant", "passage exact", "Word", "sous-titres", "subtitles"]) {
       assert.ok(!said.includes(word), `« ${word} » is said`);
     }
+    // The decider, 2026-11-28: GDPR said as what the app spares, once, in the privacy section's lead, never a badge.
+    const law = lang === "fr" ? "RGPD" : "GDPR";
+    assert.equal(said.split(law).length - 1, 1, `« ${law} » said ${said.split(law).length - 1} times`);
+    assert.ok(landing.sovereign[lang].lead.includes(law), `« ${law} » not in the privacy section's lead`);
   });
 }
 

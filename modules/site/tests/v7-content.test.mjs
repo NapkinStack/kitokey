@@ -61,7 +61,7 @@ test("Fedora, Ubuntu and Debian: their logo in their tab, decorative; Fedora's a
   for (const lang of ["fr", "en"]) {
     const html = await page(lang);
     const tab = (os) => html.match(new RegExp(`<button type="button" class="os-tab" data-os="${os}"[\\s\\S]*?</button>`))?.[0] ?? "";
-    for (const [os, logo, site] of [["fedora", "fedora-logo", "https://fedoraproject.org/"], ["debian", "debian-openlogo", "https://www.debian.org/"]]) {
+    for (const [os, logo, site] of [["fedora", "fedora-icon", "https://fedoraproject.org/"], ["debian", "debian-openlogo", "https://www.debian.org/"]]) {
       assert.match(tab(os), new RegExp(`<img[^>]*src="/img/brands/${logo}[^"]*\\.svg"[^>]*alt=""`), `/${lang}/: ${os}'s tab has no logo`);
       assert.match(text(tab(os)), new RegExp(os === "fedora" ? "Fedora" : "Debian"), `/${lang}/: ${os}'s tab lost its name`);
       assert.doesNotMatch(tab(os), /<a /, `/${lang}/: a link in ${os}'s tab`);

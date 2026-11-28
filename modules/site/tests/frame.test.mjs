@@ -17,7 +17,7 @@ test("each page skips to its content, offers the other language and names the so
     const other = lang === "en" ? "fr" : "en";
     assert.match(html, /<a class="skip" href="#main">/, `${route(file)}: no skip link`);
     assert.match(html, /<main id="main"/, `${route(file)}: no #main`);
-    assert.match(html, new RegExp(`<a class="lang" href="/${other}/[^"]*" hreflang="${other}" lang="${other}"`), `${route(file)}: no link to ${other}`);
+    assert.match(html, new RegExp(`<a class="lang" href="/${other}/[^"]*" hreflang="${other}">[\\s\\S]*?<span lang="${other}">`), `${route(file)}: no link to ${other}`);
     const footer = html.match(/<footer[\s\S]*<\/footer>/)?.[0] ?? "";
     assert.match(footer, /href="https:\/\/github\.com\/NapkinStack\/kitokey"/, `${route(file)}: the footer names no source`);
     assert.match(footer, new RegExp(`href="/${lang}/privacy/"`), `${route(file)}: the footer names no policy`);

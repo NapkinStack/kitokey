@@ -31,8 +31,8 @@ html[data-site="dark"] .halo::after { mix-blend-mode: screen; opacity: .04; }
 .top .nav { display: flex; gap: var(--sp-5); margin-left: auto; }
 .top .nav a { color: var(--text-secondary); text-decoration: none; font-weight: 600; font-size: 15px; padding: 12px 2px; }
 .top .nav a:hover { color: var(--text-primary); }
-.top .lang { color: var(--text-secondary); text-decoration: none; font-weight: 700; font-size: 14px; letter-spacing: .02em; height: 44px; min-width: 44px; display: grid; place-items: center; border-radius: var(--r-sm); }
-.top .lang:hover { color: var(--text-primary); background: var(--bg-hover); }
+.top .lang { color: var(--text-secondary); text-decoration: none; font-weight: 600; font-size: 15px; min-height: 44px; min-width: 44px; padding: 0 2px; }
+.top .lang:hover { color: var(--text-primary); }
 .top .theme-toggle { width: 44px; height: 44px; border-radius: var(--r-sm); border: 1px solid var(--border-subtle); background: var(--bg-surface); color: var(--text-secondary); display: inline-grid; place-items: center; cursor: pointer; }
 .top .theme-toggle:hover { background: var(--bg-hover); }
 .top .theme-toggle[hidden] { display: none; }
@@ -157,3 +157,16 @@ html.js-reveal .rise.in > * { opacity: 1; transform: none; }
   .scene .mcard { position: relative; top: auto; right: auto; width: auto; margin: -56px 0 0 18px; padding: 16px; }
 }
 @media (max-width: 380px) { .scene .cbar .mtr .tr { width: 30px; } }
+
+/* The language switch: a globe, then the other language's name, as the nav's links (the decider, 2026-11-28). */
+.top .lang { display: inline-flex; align-items: center; gap: 6px; }
+.top .lang .ico { width: 18px; height: 18px; flex: none; }
+/* The Store's line with the Windows mark, the Mac's with the Apple's (the decider, 2026-11-28): each standing on the
+   text's baseline, as tall as its capitals (1cap; .7em where cap is unknown). The Windows mark in the button's one
+   colour, its owner's file as a mask, no plate; the Apple's black or white with the theme, its leaf above the caps. */
+.store-soon .mark, .cta-note .mark { display: inline-block; vertical-align: baseline; margin-right: 8px; }
+.store-soon .mark { width: .7em; height: .7em; width: 1cap; height: 1cap; background: currentColor;
+  -webkit-mask: url(/img/brands/windows-logo-2021.svg) center / contain no-repeat; mask: url(/img/brands/windows-logo-2021.svg) center / contain no-repeat; }
+.cta-note .mark { width: auto; height: .85em; height: 1.2cap; }
+.cta-note .mark.on-dark, html[data-site="dark"] .cta-note .mark.on-light { display: none; }
+html[data-site="dark"] .cta-note .mark.on-dark { display: inline; }

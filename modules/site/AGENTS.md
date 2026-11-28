@@ -29,6 +29,10 @@ Astro's telemetry is off in every script.
 - **The look is proposal D's** (the decider, 2026-11-25): light only, the titles in Bricolage Grotesque served from
   `public/fonts/` with its licence beside it, the text in the system's font, the aurora mesh behind every page.
   `src/layouts/Page.astro` is every page's frame: a page passes `kind` for its `<main>`.
+- **Preview, then production** (the decider, 2026-11-28): `main` deploys to the preview (`main.kitokey.pages.dev`,
+  behind Access); `site-production`, kitokey.com, moves only by a fast-forward on the decider's « publie »
+  (`kitokey-team/promote-site.sh`). A site pull request merges after the decider's local look at it
+  (`kitokey-team/site-preview.sh`). The root is a 301 to `/en/` (`public/_redirects`), no page.
 - **Open since 2026-11-28** (the decider): `open` in `site.config.mjs`, never a build's variable; `robots.txt`
   lets every robot in and names the sitemap; no page but the 404 is `noindex` (`indexed={false}`); `tests/open.test.mjs`.
 

@@ -13,6 +13,8 @@ const other = lang === "en" ? "fr" : "en";
 const site = Astro.site;
 const url = (l) => new URL(`/${l}/${path}`, site).href;
 const source = "https://github.com/NapkinStack/kitokey";
+// The other language, by its name in full and in that language, after a globe (the decider, 2026-11-28): no flag, a
+// flag being a country, not a language. Its name is what it shows, so no aria-label (WCAG 2.5.3).
 ---
 <!doctype html>
 <html lang={lang}>
@@ -24,10 +26,13 @@ const source = "https://github.com/NapkinStack/kitokey";
     {(!open || !indexed) && <meta name="robots" content="noindex" />}
     <meta name="referrer" content="no-referrer" />
     <meta name="theme-color" content="#F2F4F7" />
+    {/* A page kept out of the index (the 404) names no canonical nor alternates: no mixed signal (the audit, 2026-11-28). */}
+    {indexed && <>
     <link rel="canonical" href={url(lang)} />
     <link rel="alternate" hreflang="en" href={url("en")} />
     <link rel="alternate" hreflang="fr" href={url("fr")} />
-    <link rel="alternate" hreflang="x-default" href={new URL("/", site).href} />
+    <link rel="alternate" hreflang="x-default" href={new URL("/en/", site).href} />
+    </>}
     <link rel="icon" href="/kitokey.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin />
     <script src="/theme.js" is:inline></script>
@@ -40,7 +45,7 @@ const source = "https://github.com/NapkinStack/kitokey";
       <div class="wrap">
         <a class="brand" href={`/${lang}/`}><img src="/kitokey.svg" width="26" height="26" alt="" />Kitokey</a>
         {nav.length > 0 && <nav class="nav" aria-label={say("sections", lang)}>{nav.map(([id, label]) => <a href={`#${id}`}>{label}</a>)}</nav>}
-        <a class="lang" href={`/${other}/${path}`} hreflang={other} lang={other} aria-label={`${other.toUpperCase()}, ${say("other", lang)}`}>{other.toUpperCase()}</a>
+        <a class="lang" href={`/${other}/${path}`} hreflang={other}><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.2-3.6-8.5s1.2-6.2 3.6-8.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg><span lang={other}>{say("other", lang)}</span></a>
         <button type="button" class="theme-toggle" aria-pressed="false" data-dark={say("theme", lang)[0]} data-light={say("theme", lang)[1]} aria-label={say("theme", lang)[0]} hidden>
           <svg class="ico i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
           <svg class="ico i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.8" /><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>

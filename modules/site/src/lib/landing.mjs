@@ -97,7 +97,7 @@ const raw = {
   // holds it in « keeps »; « Bientôt » on what main does not hold yet. French first.
   sovereign: {
     fr: {
-      kicker: "Confidentialité", h: "Vous restez souverain.", lead: "Pas de serveur Kitokey, pas de compte. Ce qui reste sur votre ordinateur, et ce qui n’en sort que si vous le décidez.",
+      kicker: "Confidentialité", h: "Vous restez souverain.", lead: "Pas de serveur Kitokey, pas de compte. Ce qui reste sur votre ordinateur, et ce qui n’en sort que si vous le décidez. Aucune de vos réunions ne passe par nous, ce qui simplifie vos obligations RGPD.",
       here: ["Reste sur votre ordinateur", "Toujours, dans le dossier de votre choix.", "Sur votre ordinateur"],
       stays: [["mic", "L’audio de l’appel", "Votre micro et le son de l’appel, en deux pistes."], ["file", "La transcription", "Écrite par un moteur d’écoute installé chez vous."], ["sparkles", "Le compte rendu", "Rédigé sur cet ordinateur, par défaut."]],
       leaves: ["Ne sort que si vous le choisissez", "Rien de ceci n’est activé au départ.", "Désactivé"],
@@ -106,7 +106,7 @@ const raw = {
       shot: "La page d’une réunion dans Kitokey : la revue produit de la semaine, sa forme d’onde à deux voix, son compte rendu, ses actions datées et sa transcription.",
     },
     en: {
-      kicker: "Privacy", h: "You stay in control.", lead: "No Kitokey server, no account. What stays on your computer, and what leaves it only if you decide so.",
+      kicker: "Privacy", h: "You stay in control.", lead: "No Kitokey server, no account. What stays on your computer, and what leaves it only if you decide so. None of your meetings goes through us, which keeps your GDPR obligations simpler.",
       here: ["Stays on your computer", "Always, in the folder you choose.", "On your computer"],
       stays: [["mic", "The call’s audio", "Your microphone and the call’s sound, in two tracks."], ["file", "The transcript", "Written by a listening engine installed on your computer."], ["sparkles", "The minutes", "Written on this computer, by default."]],
       leaves: ["Leaves only if you choose", "None of this is on at first.", "Off"],
@@ -133,7 +133,7 @@ const raw = {
   },
   ready: {
     fr: {
-      kicker: "Fonctions", h: "Après l’appel, tout est prêt.", lead: "Le compte rendu ne reste pas dans un tiroir : il part où vous travaillez.", soon: "Bientôt",
+      kicker: "Fonctions", h: "Votre assistant de réunion, au quotidien.", lead: "Le compte rendu ne reste pas dans un tiroir : il part où vous travaillez.", soon: "Bientôt",
       feats: [["share", "Partager d’un geste", "Vers Slack, Discord ou un webhook, quand vous le décidez : rien ne part jamais tout seul.", false],
         ["calendar", "Les dates dans votre agenda", "Les échéances dites pendant l’appel vont dans Google Agenda ou dans un fichier .ics.", false],
         ["headphones", "Réécouter un passage", "Un chiffre à vérifier ? Cliquez la phrase et vous entendez ce moment précis de l’appel.", false],
@@ -144,7 +144,7 @@ const raw = {
         ["format", "Personnaliser le format de vos comptes rendus", "Choisissez les rubriques de vos comptes rendus, et gardez un format par type de rendez-vous.", true]],
     },
     en: {
-      kicker: "Features", h: "After the call, everything is ready.", lead: "The minutes don’t sit in a drawer: they go where you work.", soon: "Soon",
+      kicker: "Features", h: "Your everyday meeting assistant.", lead: "The minutes don’t sit in a drawer: they go where you work.", soon: "Soon",
       feats: [["share", "Share in one gesture", "To Slack, Discord or a webhook, when you decide: nothing ever leaves on its own.", false],
         ["calendar", "Dates in your calendar", "Deadlines said during the call go to Google Calendar or into an .ics file you keep.", false],
         ["headphones", "Hear a passage again", "A figure to check? Click the line and you hear that very moment of the call again.", false],

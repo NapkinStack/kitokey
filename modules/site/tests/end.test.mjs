@@ -29,8 +29,10 @@ for (const lang of ["fr", "en"]) {
   test(`/${lang}/: no Store badge or link before its listing; Linux free, its three distributions as README.md builds them`, async () => {
     const html = await section(lang, ids[lang][0]);
     assert.doesNotMatch(html, /ms-store|get\.microsoft\.com|apps\.microsoft\.com/);
-    assert.match(html, new RegExp(`<span class="store-soon is-soon">${landing.price[lang].main[9]}</span>`));
-    const distros = [...html.matchAll(/<span><b>(Fedora|Ubuntu|Debian)<\/b>([^<]+)<\/span>/g)].map((m) => [m[1], m[2]]);
+    assert.match(html, new RegExp(`<span class="store-soon is-soon"><span><span class="mark" aria-hidden="true"></span>${landing.price[lang].main[9]}</span></span>`));
+    // Each distribution after its mark, as the install tabs show it (the audit, 2026-11-28).
+    const distros = [...html.matchAll(/<span><b><img class="mark-(fedora|ubuntu|debian)" src="\/img\/brands\/[a-z0-9-]+\.svg" alt=""[^>]*>(Fedora|Ubuntu|Debian)<\/b>([^<]+)<\/span>/g)]
+      .map((m) => (m[1] === m[2].toLowerCase() ? [m[2], m[3]] : m));
     assert.deepEqual(distros, landing.price[lang].linux[4]);
     assert.match(html, new RegExp(`<a class="install-l" href="#(installer|install)">`));
     for (const sys of ["windows-logo-2021.svg", "apple-logo-black.svg", "apple-logo-white.svg", "tux.svg"]) assert.ok(html.includes(`/img/brands/${sys}`), sys);
@@ -47,7 +49,7 @@ for (const lang of ["fr", "en"]) {
 
   test(`/${lang}/: nine questions, the first open, the client's and the professional secrecy's among them, no compliance promised`, async () => {
     const html = await section(lang, ids[lang][2]);
-    const asked = [...html.matchAll(/<details(?: open)?><summary>([^<]+)<svg/g)].map((m) => m[1]);
+    const asked = [...html.matchAll(/<details(?: open)?><summary><span>([^<]+)<\/span><svg/g)].map((m) => m[1]);
     assert.deepEqual(asked, landing.faq[lang][2].map(([q]) => q));
     assert.equal(asked.length, 9);
     assert.match(html, /<details open><summary>/);

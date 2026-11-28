@@ -39,7 +39,7 @@
   --ease-out: cubic-bezier(.2, .8, .2, 1);
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 4.5rem; overflow-x: clip; -webkit-text-size-adjust: 100%; }
+html { scroll-behavior: smooth; scroll-padding-top: 64px; overflow-x: clip; -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg-canvas); color: var(--text-primary); overflow-x: clip;
   font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Cantarell, "Noto Sans", sans-serif;
@@ -66,7 +66,9 @@ p { text-wrap: pretty; }
 /* The legal notice: each field and its value on a line, the field in the secondary text. */
 .legal { display: grid; grid-template-columns: minmax(10rem, max-content) 1fr; gap: .5rem 1.5rem; margin: 0; }
 .legal dt { color: var(--text-secondary); }
-.legal dd { margin: 0; }
+.legal dd { margin: 0; overflow-wrap: anywhere; }
+/* At a phone's width, each value under its name: none cut at the screen's edge (the audit, 2026-11-28). */
+@media (max-width: 480px) { .legal { grid-template-columns: 1fr; gap: .15rem; } .legal dd + dt { margin-top: .6rem; } }
 .prose .changed { color: var(--text-secondary); margin: 1rem 0 2rem; }
 .prose table { border-collapse: collapse; width: 100%; background: var(--bg-surface); border-radius: 12px; overflow: hidden; outline: 1px solid var(--border-subtle); }
 .prose th, .prose td { border-bottom: 1px solid var(--border-subtle); padding: .7rem .8rem; text-align: left; vertical-align: top; }
@@ -126,8 +128,18 @@ html[data-site="dark"] {
 }
 
 /* /404.html: two short blocks on the site's ground, French then English, each its way home. */
-.lost-page { display: grid; gap: 2.5rem; padding-top: clamp(4rem, 3rem + 6vw, 8rem); padding-bottom: clamp(4rem, 3rem + 6vw, 8rem); }
+.lost-page { display: grid; place-items: center; text-align: center; gap: 2.5rem; padding-top: clamp(4rem, 3rem + 6vw, 8rem); padding-bottom: clamp(4rem, 3rem + 6vw, 8rem); }
 .lost h1, .lost .lost-h { font-family: var(--display); font-size: clamp(2rem, 1.4rem + 2.6vw, 3.2rem); font-weight: 800; letter-spacing: -.03em; margin: 0 0 .5rem; color: var(--text-primary); }
 .lost p { margin: 0 0 1rem; font-size: 1.15rem; color: var(--text-secondary); }
 .lost .home { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1.1rem; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-weight: 650; text-decoration: none; }
 .lost .home:hover { background: var(--accent-hover); }
+.lost .lost-code { margin: 0; font-family: var(--display); font-size: clamp(5rem, 3rem + 10vw, 9rem); font-weight: 800; line-height: 1; letter-spacing: -.04em; color: var(--accent); }
+
+/* A section reached by the nav lands its heading just under the sticky header (scroll-padding-top, 64 px) and a small step
+   (the decider, 2026-11-28): its own top padding (104 px, 72 px under 640 px) taken back, but --sp-3. */
+main section[id] { scroll-margin-top: calc(var(--sp-3) - 104px); }
+@media (max-width: 640px) { main section[id] { scroll-margin-top: calc(var(--sp-3) - 72px); } }
+/* The install tabs' marks at one optical height, each its own colours (the decider, 2026-11-28). */
+.os-tab img { height: 18px; width: auto; flex: none; }
+/* Debian's red on the dark tabs: on a white plate of its own, its rect unchanged (box-shadow), its colours too. */
+.os-tab .mark-debian { background: #FFFFFF; border-radius: 3px; box-shadow: 0 0 0 3px #FFFFFF; }
