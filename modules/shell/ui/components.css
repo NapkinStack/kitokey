@@ -147,7 +147,8 @@
 
 /* Tabs (D123, the design system's): v5's segments — the list a sunken band, each tab its words in the soft text, the
    chosen one raised on the surface in the text's colour; WAI-ARIA APG's keys (window.js, `tabsOf`). */
-.tabs { display: flex; flex-wrap: wrap; gap: var(--sp-1); box-sizing: border-box; width: max-content; max-width: 100%; padding: 2px; border-radius: var(--r-sm); background: var(--color-sunken); }
+/* Inline: as wide as its tabs, never wider than its column — its tabs wrap there, and the column never grows to it. */
+.tabs { display: inline-flex; flex-wrap: wrap; gap: var(--sp-1); box-sizing: border-box; max-width: 100%; padding: 2px; border-radius: var(--r-sm); background: var(--color-sunken); }
 .tab {
   height: 32px; padding: 0 var(--sp-3); border: 1px solid transparent; border-radius: var(--r-xs); background: transparent;
   color: var(--color-text-soft); font: 600 var(--fs-body) var(--font-text); white-space: nowrap; cursor: pointer;
