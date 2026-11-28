@@ -10520,9 +10520,10 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             press(browser, "redo-transcript-item")
             wait_for(browser, lambda b: b.execute_script(dialog), 5)
             got = browser.execute_script(dialog) or {}
-            check("« Refaire la transcription… »: the engine card to transcribe, its button naming the making (D121, D122)",
+            loses = "const w = document.getElementById('redo-dialog-loses-corrections'); return w && w.closest('dialog[open]') ? w.textContent : null"
+            check("« Refaire la transcription… »: the engine card to transcribe, its button naming the making, no word of corrections where there are none (D121, D122)",
                   got.get("title") == "Refaire la transcription" and got.get("job") == "transcribe"
-                  and got.get("go") == ["Annuler", "Refaire la transcription"], got)
+                  and got.get("go") == ["Annuler", "Refaire la transcription"] and browser.execute_script(loses) is None, [got, browser.execute_script(loses)])
             keys(Keys.ESCAPE)
             wait_for(browser, lambda b: b.execute_script(dialog) is None, 3)
             (WORK / "summary-args").unlink(missing_ok=True)
@@ -10557,6 +10558,23 @@ def redo_from_the_bar(now: dt.datetime) -> None:
             check("the models not read: said under the bar, no dialog opened", bool(unread) and browser.execute_script(dialog) is None,
                   [browser.execute_script("return document.getElementById('trash-said')?.textContent"), browser.execute_script(dialog)])
             browser.execute_script("window.restore()")
+            # A transcript a person corrected: its dialog says, before it starts, that the corrections will be lost, as the
+            # card's panel says (ADR-0014; the author's own reading of #1337).
+            (meeting / "transcript.jsonl").write_text(
+                '{"type":"header","contract":"transcript/v1","engine":"whisper.cpp","model":"m","language":null,"context":null}\n'
+                '{"type":"segment","speaker":"me","track":"local","start":0.0,"end":1.0,"text":"Bonjour à tous.","edited":"2026-10-19T12:30:00+02:00"}\n'
+                '{"type":"complete","duration":1.0}\n')
+            browser.execute_script("location.hash = '#/'")
+            wait_for(browser, lambda b: b.find_element(By.ID, "list").is_displayed(), 5)
+            browser.execute_script(f"location.hash = '#/meeting/{meeting.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "redo-open"), 10)
+            press(browser, "redo-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, "redo-transcript-item")
+            warned = wait_for(browser, lambda b: b.execute_script(loses), 5) and browser.execute_script(loses)
+            check("« Refaire la transcription » of a corrected transcript says, before it starts, that its corrections will be lost (ADR-0014)",
+                  bool(warned) and "seront perdues" in warned, warned)
+            keys(Keys.ESCAPE)
     finally:
         tags.shutdown()
 
