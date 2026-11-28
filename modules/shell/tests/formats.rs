@@ -307,3 +307,38 @@ fn a_name_a_built_in_format_or_another_has_is_taken_whatever_its_case_and_accent
     );
     assert!(kept.own.is_empty(), "{kept:?}");
 }
+
+/// lina's survivors on #1324 (2026-11-28): the bounds as `format.schema.json` writes them, each pinned.
+#[test]
+fn a_carriage_return_is_refused_in_a_name_a_title_and_what_goes_in_a_section() {
+    let mut formats = Formats::default();
+    assert_eq!(formats.made("Point\rclient", weekly(), None), Err(Refused::Name));
+    assert_eq!(
+        formats.made("Point", vec![section("Con\rtexte", "x")], None),
+        Err(Refused::Section(0))
+    );
+    assert_eq!(
+        formats.made("Point", vec![section("Contexte", "Où en est\rle client")], None),
+        Err(Refused::Section(0))
+    );
+    assert!(formats.own.is_empty());
+}
+
+#[test]
+fn the_actions_are_the_section_chosen_wherever_it_stands() {
+    let mut formats = Formats::default();
+    for (at, id) in [(0, "contexte"), (1, "demandes")] {
+        let made = formats.made(&format!("Point {at}"), weekly(), Some(at)).unwrap();
+        assert_eq!(formats::file(formats.own(&made).unwrap())["actions"], id, "actions at {at}");
+    }
+}
+
+#[test]
+fn a_structure_taken_at_forty_characters_gets_one_of_forty_with_its_number() {
+    let mut formats = Formats::default();
+    let first = formats.made("Réunion hebdomadaire de l’équipe produit", weekly(), None).unwrap();
+    assert_eq!(first, "reunion_hebdomadaire_de_l_equipe_produit");
+    let second = formats.made("Reunion hebdomadaire de l equipe produit", weekly(), None).unwrap();
+    assert_eq!(second, "reunion_hebdomadaire_de_l_equipe_produ_2");
+    assert_eq!(second.chars().count(), 40);
+}
