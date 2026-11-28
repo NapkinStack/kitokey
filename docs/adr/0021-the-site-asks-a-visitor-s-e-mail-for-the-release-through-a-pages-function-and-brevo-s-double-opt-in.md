@@ -47,7 +47,7 @@ posted by the site's own server to the provider's API.
 
 | Reference | What it does | Applicable here? |
 |---|---|---|
-| [Brevo](https://www.brevo.com/) (Sendinblue SAS, Paris) | Contact lists, campaigns; servers in the EU ([data location](https://help.brevo.com/hc/en-us/articles/360001005510)); an API creating a contact by double opt-in, `POST /v3/contacts/doubleOptinConfirmation` with the list, the confirmation template and the page to land on ([reference](https://developers.brevo.com/reference/create-doi-contact)); hosted forms too | Yes — chosen |
+| [Brevo](https://www.brevo.com/) (Brevo SAS, Paris; Sendinblue until 2023) | Contact lists, campaigns; servers in the EU ([data location](https://help.brevo.com/hc/en-us/articles/360001005510)); an API creating a contact by double opt-in, `POST /v3/contacts/doubleOptinConfirmation` with the list, the confirmation template and the page to land on ([reference](https://developers.brevo.com/reference/create-doi-contact)); hosted forms too | Yes — chosen |
 | [MailerLite](https://mailerlite.com/legal/security-statement) (Lithuania) | The same, data in Google's EU regions; double opt-in for API sign-ups is a separate setting ([help](https://mailerlite.com/help/how-to-use-double-opt-in-when-collecting-subscribers)) | Yes — second choice |
 | [Buttondown](https://buttondown.com/legal/subprocessors) | A newsletter service, data in AWS us-west-2 | No — not kept in the EU |
 | Brevo's hosted form, the button a link to it | No code of ours; the visitor fills the form on Brevo's page | Weighed, rejected below |
