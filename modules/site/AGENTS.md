@@ -17,6 +17,8 @@ Astro's telemetry is off in every script.
 - It runs one thing on a server, `functions/notify.js` (`POST /notify`, ADR-0021): the release's form, passed to
   Brevo's double opt-in. Every page stays static: `astro build` writes files, no adapter. Its secret,
   `BREVO_API_KEY`, and the list's and template's ids are the Pages project's variables, never the repository's.
+  Brevo's double opt-in template must carry the tag `optin`, its link `{{ doubleoptin }}`: without the tag every
+  request is a 400 (the log line then says `"code"`, Brevo's error enum; never its message).
 - It writes no policy of its own: `/privacy/` is `docs/privacy.md`, read at build time.
 - It asks nothing of another domain: no analytics, no CDN, no font from another host, no embed.
 
