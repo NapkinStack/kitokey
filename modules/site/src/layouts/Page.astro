@@ -7,6 +7,7 @@ import "../styles/site.css";
 import "../styles/hero.css";
 import { open } from "../../site.config.mjs";
 import { say } from "../lib/words.mjs";
+import { landing } from "../lib/landing.mjs";
 
 const { lang, title, description, path, kind, nav = [], indexed = true } = Astro.props;
 const other = lang === "en" ? "fr" : "en";
@@ -32,6 +33,20 @@ const source = "https://github.com/NapkinStack/kitokey";
     <link rel="alternate" hreflang="en" href={url("en")} />
     <link rel="alternate" hreflang="fr" href={url("fr")} />
     <link rel="alternate" hreflang="x-default" href={new URL("/en/", site).href} />
+    {/* What a link to the page shows in a chat or a feed (Open Graph; X reads it too, its card asked large): its title,
+        its description, its address, its language, and the picture of the promise in that language (scripts/og.py). */}
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Kitokey" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={url(lang)} />
+    <meta property="og:locale" content={lang === "fr" ? "fr_FR" : "en_US"} />
+    <meta property="og:locale:alternate" content={lang === "fr" ? "en_US" : "fr_FR"} />
+    <meta property="og:image" content={new URL(`/og/og-${lang}.png`, site).href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content={`Kitokey. ${landing.hero[lang][0]} ${landing.hero[lang][1]}`} />
+    <meta name="twitter:card" content="summary_large_image" />
     </>}
     <link rel="icon" href="/kitokey.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/bricolage-latin.woff2" as="font" type="font/woff2" crossorigin />

@@ -49,6 +49,9 @@ Astro's telemetry is off in every script.
 
 ## Non-standard commands
 
+The picture a link shows (Open Graph, `public/og/og-<lang>.png`), drawn again when the hero's promise changes:
+`python3 scripts/og.py` (Pillow and ImageMagick's `magick`, on the person's machine; the build does not draw it).
+
 Out of the repository, whole (D114, criterion 1):
 
 ```sh
