@@ -4474,8 +4474,9 @@ def microphone_chosen(now: dt.datetime) -> None:
                 (taping / "mic-gone").touch()
                 check(f"{short} {theme}: gone again, said again", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
                 (taping / "mic-back-waits").touch()
-                wait_for(browser, lambda b: b.execute_script(said) != gone, 5)
-                check(f"{short} {theme}: back with no call, it says the microphone is not recorded for now", browser.execute_script(said) == waits, browser.execute_script(said))
+                # Waited for what it says, not for « gone » to end: between the two the line is empty for a tick (#1327).
+                check(f"{short} {theme}: back with no call, it says the microphone is not recorded for now",
+                      wait_for(browser, lambda b: b.execute_script(said) == waits, 5), browser.execute_script(said))
                 # Gone, and the recording ends so: the next one does not begin by saying it.
                 (taping / "mic-gone").touch()
                 check(f"{short} {theme}: gone a third time, said", wait_for(browser, lambda b: b.execute_script(said) == gone, 5), browser.execute_script(said))
