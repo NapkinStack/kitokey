@@ -1051,30 +1051,40 @@ async function askAgain(of, said, again) {
 // « Enregistré » in Settings. A failure stays said in place, beside its cause. The host is there from the
 // start, so that a screen reader hears its first words; the small window gives it a line of its bar.
 let toastFor = null;
+// Where the toast says it: never over the focus (WCAG 2.2 SC 2.4.11), nor over a control for its five seconds
+// (#1329's audit). At the window's foot when it is free; else at its top (`.high`); else, in a dense page, the
+// first band free of controls going up from the foot — over words only; else at the top if the focus is at the foot.
+function placeToast() {
+  const controls = [...document.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')]
+    .filter((c) => !toast.contains(c) && c.getClientRects().length);
+  const over = (c, t) => {
+    const r = c.getBoundingClientRect();
+    return t.left < r.right && r.left < t.right && t.top < r.bottom && r.top < t.bottom;
+  };
+  const focused = document.activeElement && document.activeElement !== document.body ? document.activeElement : null;
+  const free = (t) => !(focused && over(focused, t)) && !controls.some((c) => over(c, t));
+  const foot = toast.getBoundingClientRect();
+  if (free(foot)) return;
+  toast.classList.add("high");
+  if (free(toast.getBoundingClientRect())) return;
+  toast.classList.remove("high");
+  for (let top = foot.top - 4; top >= 8; top -= 4) {
+    if (free({ left: foot.left, right: foot.right, top, bottom: top + foot.height })) {
+      toast.style.top = `${top}px`;
+      toast.style.bottom = "auto";
+      return;
+    }
+  }
+  if (focused && over(focused, foot)) toast.classList.add("high");
+}
+
 function say(text) {
   clearTimeout(toastFor);
   toast.replaceChildren(icon("check"), element("span", "", text));
   toast.classList.remove("high");
+  toast.style.top = toast.style.bottom = "";
   toast.hidden = false;
-  // Never over the focus (WCAG 2.2 SC 2.4.11), nor over a control for its five seconds (#1329's audit): at the
-  // window's foot, or at its top when the foot covers one and the top does not, or when the foot covers the focus.
-  // The small window gives it a line of its own.
-  if (!document.body.classList.contains("small-window")) {
-    const controls = [...document.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')]
-      .filter((c) => !toast.contains(c) && c.getClientRects().length);
-    const over = (c, t) => {
-      const r = c.getBoundingClientRect();
-      return t.left < r.right && r.left < t.right && t.top < r.bottom && r.top < t.bottom;
-    };
-    const foot = toast.getBoundingClientRect();
-    const focused = document.activeElement;
-    const onFocus = !!focused && focused !== document.body && over(focused, foot);
-    if (onFocus || controls.some((c) => over(c, foot))) {
-      toast.classList.add("high");
-      const top = toast.getBoundingClientRect();
-      if (!onFocus && controls.some((c) => over(c, top))) toast.classList.remove("high");
-    }
-  }
+  if (!document.body.classList.contains("small-window")) placeToast();
   toastFor = setTimeout(() => {
     toast.hidden = true;
     toast.replaceChildren();
