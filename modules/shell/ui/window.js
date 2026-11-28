@@ -1056,11 +1056,24 @@ function say(text) {
   toast.replaceChildren(icon("check"), element("span", "", text));
   toast.classList.remove("high");
   toast.hidden = false;
-  // Never over the focus (WCAG 2.2 SC 2.4.11): over what has it, at the window's foot, it says it at the top.
-  const focused = document.activeElement;
-  if (focused && focused !== document.body && !document.body.classList.contains("small-window")) {
-    const [t, f] = [toast.getBoundingClientRect(), focused.getBoundingClientRect()];
-    if (t.left < f.right && f.left < t.right && t.top < f.bottom && f.top < t.bottom) toast.classList.add("high");
+  // Never over the focus (WCAG 2.2 SC 2.4.11), nor over a control for its five seconds (#1329's audit): at the
+  // window's foot, or at its top when the foot covers one and the top does not, or when the foot covers the focus.
+  // The small window gives it a line of its own.
+  if (!document.body.classList.contains("small-window")) {
+    const controls = [...document.querySelectorAll('button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])')]
+      .filter((c) => !toast.contains(c) && c.getClientRects().length);
+    const over = (c, t) => {
+      const r = c.getBoundingClientRect();
+      return t.left < r.right && r.left < t.right && t.top < r.bottom && r.top < t.bottom;
+    };
+    const foot = toast.getBoundingClientRect();
+    const focused = document.activeElement;
+    const onFocus = !!focused && focused !== document.body && over(focused, foot);
+    if (onFocus || controls.some((c) => over(c, foot))) {
+      toast.classList.add("high");
+      const top = toast.getBoundingClientRect();
+      if (!onFocus && controls.some((c) => over(c, top))) toast.classList.remove("high");
+    }
   }
   toastFor = setTimeout(() => {
     toast.hidden = true;
