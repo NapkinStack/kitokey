@@ -42,8 +42,9 @@ Astro's telemetry is off in every script.
 
 - No request to another host from any page (`tests/own-domain.test.mjs`, `_headers`' CSP).
 - `/en/privacy/` and `/fr/privacy/` say their half of the source, word for word (`tests/privacy.test.mjs`).
-- The release list's bounds (30 days unconfirmed, 12 months listed) are kept by `scripts/brevo-cleanup.mjs`, run each
-  day by `.github/workflows/site-brevo-cleanup.yml` (`tests/cleanup.test.mjs`), never by hand.
+- The release list's bounds (an unconfirmed address 4 months at most; the list deleted right after the release's
+  message, 12 months at most) are held by the decider by hand, each quarter, with the cutoffs 30 days and 9 months on
+  the `NOTIFY_SINCE` mark `/notify` sends (ADR-0021).
 - `/notify` calls Brevo only for a well-formed request, once, with a timeout, and logs neither the address nor the
   key (`tests/notify.test.mjs`).
 
