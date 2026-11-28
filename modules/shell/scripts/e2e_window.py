@@ -7530,6 +7530,79 @@ def page_estimate(now: dt.datetime) -> None:
             (WORK / "fail-minutes").unlink(missing_ok=True)
 
 
+def channel_added_from_page(now: dt.datetime) -> None:
+    """CA. D121, criterion 2: with no channel set up, « Partager » offers « Ajouter un canal », which opens the channel's
+    form — Settings' own, its kind, its name, its address — in a sheet of the page, a modal dialog (D120), never
+    Settings; Escape closes it, nothing kept; a channel added there is said, kept in the settings, and « Partager »
+    then sends to it. French light, English dark; axe with the sheet open."""
+    print("CA. « Partager » with no channel: « Ajouter un canal », Settings' form in a sheet of the page (D121)")
+    meetings = WORK / "channel-from-page"
+    folder = meetings / "2026-11-25_10-00"
+    session(folder, now - dt.timedelta(days=1), 20, {"local.wav": 1000})
+    (folder / "minutes.md").write_text(
+        "---\ncontract: minutes/v3\nmade: 2026-11-25T10:30:00+01:00\nprovider: local\nmodel: qwen3:8b\ncontext: null\n---\n\n"
+        "## 1.\n\nLe devis est validé.\n\n## 2.\n\n- Rien\n\n## 3.\n\n- Rien\n")
+    good = "https://hooks.example/services/T00/B00/made-up-secret-ca"
+    menu = ("const m = document.getElementById('share-menu'); if (!m || m.hidden || !m.getClientRects().length) return null;"
+            " return [...m.querySelectorAll('[role=menuitem]')].map((i) => [i.id, i.textContent.trim()])")
+    sheet = ("const d = document.querySelector('dialog[open]'); if (!d) return null;"
+             " return {modal: d.matches(':modal'), title: d.querySelector('h2')?.textContent ?? '', labelled: d.getAttribute('aria-labelledby'),"
+             " kinds: [...d.querySelectorAll('[role=radiogroup] input[type=radio]')].map((i) => i.value),"
+             " name: !!d.querySelector('input[type=text]'), address: !!d.querySelector('input[type=url]'),"
+             " focused: document.activeElement && d.contains(document.activeElement) ? document.activeElement.getAttribute('type') : null,"
+             " settings: !!document.querySelector('#settings:not([hidden])') && document.getElementById('settings').getClientRects().length > 0}")
+    for language, theme, words in (
+        ("fr_FR.UTF-8", "light", {"add": "Ajouter un canal", "send": "Envoyer…", "button": "Ajouter", "added": "Destination Équipe produit ajoutée."}),
+        ("en_US.UTF-8", "dark", {"add": "Add a channel", "send": "Send…", "button": "Add", "added": "Destination Équipe produit added."}),
+    ):
+        short = language[:2]
+        window = Window(meetings, language, "reminder = false\n")
+        window.env.update(GTK_THEME="Adwaita:dark" if theme == "dark" else "Adwaita")
+        with window as browser:
+            browser.set_window_size(1100, 800)
+            browser.execute_script(f"location.hash = '#/meeting/{folder.name}'")
+            wait_for(browser, lambda b: b.find_elements(By.ID, "share-open"), 10)
+            time.sleep(0.6)
+            press(browser, "share-open")
+            items = wait_for(browser, lambda b: b.execute_script(menu), 3) and browser.execute_script(menu)
+            check(f"{short}: no channel, « Partager » offers « {words['add']} », never a send to nowhere (D121)",
+                  bool(items) and [said for _, said in items].count(words["add"]) == 1 and words["send"] not in [said for _, said in items], items)
+            target = next((i for i, said in (items or []) if said == words["add"]), "share-send")
+            press(browser, target)
+            opened = wait_for(browser, lambda b: b.execute_script(sheet), 3)
+            got = browser.execute_script(sheet) or {}
+            check(f"{short}: a sheet of the page, modal, titled « {words['add']} », Settings' form in it — its kind, its name, its address —, the focus in it, Settings not opened",
+                  bool(opened) and got.get("modal") is True and got.get("title") == words["add"] and got.get("labelled")
+                  and got.get("kinds") == ["webhook", "discord", "slack"] and got.get("name") and got.get("address")
+                  and got.get("focused") is not None and got.get("settings") is False, got)
+            found = axe_violations(browser)
+            check(f"{short}, {theme}: the sheet open, no violation of axe's WCAG 2.2 A and AA rules", found == [], found)
+            shot_themed(browser, f"ca-sheet-{short}-{theme}", theme)
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+            closed = wait_for(browser, lambda b: b.execute_script(sheet) is None, 3)
+            check(f"{short}: Escape closes the sheet, nothing kept, the focus back on « Partager »",
+                  closed and "destinations" not in window.file.read_text() and browser.execute_script("return document.activeElement?.id") == "share-open",
+                  [closed, browser.execute_script("return document.activeElement?.id")])
+            press(browser, "share-open")
+            wait_for(browser, lambda b: b.execute_script(menu), 3)
+            press(browser, target)
+            wait_for(browser, lambda b: b.execute_script(sheet), 3)
+            browser.execute_script(
+                "const d = document.querySelector('dialog[open]'); const set = (e, v) => { e.value = v; e.dispatchEvent(new Event('input', {bubbles: true})); };"
+                " set(d.querySelector('input[type=text]'), 'Équipe produit'); set(d.querySelector('input[type=url]'), arguments[0]);", good)
+            browser.execute_script("const d = document.querySelector('dialog[open]'); [...d.querySelectorAll('button')].find((b) => b.textContent.trim() === arguments[0]).click()", words["button"])
+            kept = wait_for(browser, lambda b: b.execute_script(sheet) is None and "Équipe produit" in window.file.read_text(), 10)
+            said = browser.execute_script("return [...document.querySelectorAll('[role=status]')].map((e) => e.textContent.trim()).filter(Boolean)")
+            check(f"{short}: a channel added in the sheet: kept in the settings, the sheet closed, said once (#1252)",
+                  kept and said.count(words["added"]) == 1 and good not in " ".join(said), said)
+            time.sleep(0.6)
+            press(browser, "share-open")
+            items = wait_for(browser, lambda b: b.execute_script(menu), 3) and browser.execute_script(menu)
+            check(f"{short}: then « Partager » sends to it, « {words['add']} » no longer offered",
+                  bool(items) and words["add"] not in [said for _, said in items] and any(said.startswith(words["send"][:-1]) for _, said in items), items)
+            ActionChains(browser).send_keys(Keys.ESCAPE).perform()
+
+
 def meeting_actions_bar(now: dt.datetime) -> None:
     """MA. D121, criteria 1 and 6: a meeting's page holds one bar of actions — « Partager », « Agenda (n) » once a date
     is found, « Refaire » and « Plus » —, each its words and its icon, its accessible name beginning with its words
@@ -16309,6 +16382,7 @@ def main() -> int:
     focus_kept(now)
     focus_swept(now)
     meeting_actions_bar(now)
+    channel_added_from_page(now)
     meeting_trashed(now)
     sound_checked(now)
     ends_on_sigterm(now)
