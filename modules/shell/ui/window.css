@@ -776,3 +776,10 @@ body.small-window .check-sound { inset: 0 auto auto 0; width: 100%; max-width: 1
 .with-mark select { flex: 1 1 auto; min-width: 0; }
 /* A summary's section with nothing in it (#1234): said, in the soft colour. */
 .minutes .body .empty-section { color: var(--soft); }
+
+/* D128a: the sheet of the window's shortcuts (« ? »), each row its keys then what they do. */
+.keys-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); }
+.keys-table td { padding: var(--sp-2) 0; border-bottom: 1px solid var(--color-divider); }
+.keys-table th { padding: 0 0 var(--sp-2); text-align: left; font-size: var(--fs-caption); font-weight: 600; color: var(--color-text-soft); border-bottom: 1px solid var(--color-divider); }
+.keys-table td:first-child { width: 40%; }
+.keys-table kbd { padding: 2px var(--sp-2); border: 1px solid var(--color-edge); border-radius: var(--r-xs); background: var(--color-sunken); font: inherit; font-variant-numeric: tabular-nums; }

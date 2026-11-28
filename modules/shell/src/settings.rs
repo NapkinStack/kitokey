@@ -153,6 +153,9 @@ pub struct Settings {
     pub export: Option<PathBuf>,
     /// The full window's sidebar folded by the user (D61): opened again as it was left.
     pub folded: bool,
+    /// J, K and « ? » as the window's shortcuts (D128, WCAG 2.2 SC 2.1.4): a single key each, the user may turn them
+    /// off — a voice dictating would press them. On by default, as Gmail has them.
+    pub single_keys: bool,
     /// Every window's look, the system's by default (D98).
     pub appearance: Appearance,
     /// Where the user left the recording bar, in the screen's logical pixels (D90): it opens there
@@ -201,6 +204,7 @@ impl Default for Settings {
             log: Log::Info,
             welcomed: false,
             folded: false,
+            single_keys: true,
             appearance: Appearance::System,
             bar_at: None,
             language: None,
@@ -293,6 +297,7 @@ struct Written {
     log: Option<Log>,
     welcomed: Option<bool>,
     folded: Option<bool>,
+    single_keys: Option<bool>,
     appearance: Option<Appearance>,
     bar_at: Option<[i32; 2]>,
     language: Option<String>,
@@ -335,7 +340,7 @@ impl std::fmt::Display for Unread {
 }
 
 /// The keys a settings file may hold: those a refusal names.
-const KEYS: [&str; 31] = [
+const KEYS: [&str; 32] = [
     "reminder",
     "sessions",
     "export",
@@ -358,6 +363,7 @@ const KEYS: [&str; 31] = [
     "log",
     "welcomed",
     "folded",
+    "single_keys",
     "appearance",
     "bar_at",
     "language",
@@ -423,6 +429,7 @@ pub fn read(path: &Path) -> Result<Settings, Unread> {
     settings.window = written.window.unwrap_or(settings.window);
     settings.welcomed = written.welcomed.unwrap_or(settings.welcomed);
     settings.folded = written.folded.unwrap_or(settings.folded);
+    settings.single_keys = written.single_keys.unwrap_or(settings.single_keys);
     settings.appearance = written.appearance.unwrap_or(settings.appearance);
     settings.bar_at = written.bar_at;
     // One it does not speak, written by hand: the system's.
@@ -540,6 +547,9 @@ pub fn write(path: &Path, settings: &Settings) -> io::Result<()> {
     }
     if settings.folded != before.folded {
         set(&mut document, "folded", Value::from(settings.folded));
+    }
+    if settings.single_keys != before.single_keys {
+        set(&mut document, "single_keys", Value::from(settings.single_keys));
     }
     if settings.appearance != before.appearance {
         set(&mut document, "appearance", Value::from(settings.appearance.as_str()));
@@ -739,6 +749,7 @@ mod tests {
             log,
             welcomed,
             folded,
+            single_keys,
             appearance,
             bar_at,
             language,
