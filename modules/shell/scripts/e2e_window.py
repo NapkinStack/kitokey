@@ -432,6 +432,29 @@ def press(browser, element_id: str) -> None:
     browser.find_element(By.ID, element_id).click()
 
 
+# Keys a keyboard sends, through the compositor (Mutter's RemoteDesktop, as headless.sh makes the session's
+# keyboard), not WebDriver's: WebKitGTK matches `:focus-visible` differently for each (#1313).
+REAL_KEYS = (
+    "import sys, time\nfrom gi.repository import Gio, GLib\nbus = Gio.bus_get_sync(Gio.BusType.SESSION)\n"
+    "def call(path, interface, method, args=None, reply=None):\n"
+    "    return bus.call_sync('org.gnome.Mutter.RemoteDesktop', path, interface, method, args, reply, Gio.DBusCallFlags.NONE, -1, None)\n"
+    "s = call('/org/gnome/Mutter/RemoteDesktop', 'org.gnome.Mutter.RemoteDesktop', 'CreateSession', None, GLib.VariantType('(o)'))[0]\n"
+    "call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'Start')\n"
+    "for sym in sys.argv[1:]:\n"
+    "    for down in (True, False):\n"
+    "        call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'NotifyKeyboardKeysym', GLib.Variant('(ub)', (int(sym, 16), down)))\n"
+    "        time.sleep(0.05)\n"
+    "    time.sleep(0.3)\n"
+    "call(s, 'org.gnome.Mutter.RemoteDesktop.Session', 'Stop')\n"
+)
+
+
+def real_keys(*keysyms: str) -> bool:
+    """Each X keysym (hex: ff53 is →, ff51 ←, ff09 Tab) pressed and released as a keyboard does; True once sent."""
+    # The system's Python, where PyGObject is (headless.sh's own reason).
+    return subprocess.run(["/usr/bin/python3", "-c", REAL_KEYS, *keysyms], capture_output=True, text=True, timeout=20).returncode == 0
+
+
 def free(browser, element_id: str, case: str) -> None:
     """A Tester's button offered again before the next case's click: a click on it disabled is
     lost without an error, its code never asked, the last sentence read again (#799)."""
@@ -6407,6 +6430,10 @@ GALLERY = {
     "button": ("primary", "secondary", "ghost", "icon", "destructive", "hover", "pressed", "focus", "disabled"),
     "banner": ("info", "private", "warning"),
     "dialog": ("confirm", "destructive"),
+    "chip": ("neutral", "accent", "success", "private", "warning"),
+    "option-card": ("rest", "checked", "focus"),
+    "progress": ("running",),
+    "toast": ("copied", "saved"),
 }
 
 
@@ -6472,11 +6499,58 @@ def gallery_shown(now: dt.datetime) -> None:
             opened = wait_for(browser, lambda b: b.execute_script("return !!document.querySelector('dialog[open]')"), 5)
             focused = browser.execute_script("const e = document.activeElement; return [e.dataset.role, e.closest('dialog') !== null]")
             check(f"{short}, {theme}: the dialog opened modal, its cancel focused (PDR-0008)", opened and focused == ["cancel", True], (opened, focused))
+            # WAI-ARIA APG's modal dialog: Tab and Shift+Tab go round its controls, never onto the dialog itself nor
+            # out of it (ines, on main after #1298: one Tab stopped on the <dialog>).
+            inside = ("const e = document.activeElement, d = document.querySelector('dialog[open]');"
+                      " return [e.tagName, e.dataset.role ?? e.className, !!d && d.contains(e) && e !== d]")
+            went = []
+            for back in (False,) * 3 + (True,) * 3:
+                keys = ActionChains(browser)
+                (keys.key_down(Keys.SHIFT).send_keys(Keys.TAB).key_up(Keys.SHIFT) if back else keys.send_keys(Keys.TAB)).perform()
+                went.append(browser.execute_script(inside))
+            check(f"{short}, {theme}: Tab and Shift+Tab stay on the dialog's buttons, round and round (APG)",
+                  all(tag == "BUTTON" and held for tag, _, held in went), went)
             ActionChains(browser).send_keys(Keys.ESCAPE).perform()
             closed = wait_for(browser, lambda b: b.execute_script("return !document.querySelector('dialog[open]')"), 5)
             check(f"{short}, {theme}: Escape closes it, the focus back on what opened it",
                   closed and browser.execute_script("return document.activeElement.id") == "gallery-dialog-open",
                   (closed, browser.execute_script("return document.activeElement.id")))
+            # D120 2b. A toast says itself to a screen reader (`role=status`); a progress's bars are progress bars, each
+            # named and at its value; an option card a native radio in its label, one chosen; the engine card's
+            # « Par défaut » and its state are chips.
+            parts = browser.execute_script(
+                "const g = document.getElementById('gallery');"
+                "return [[...g.querySelectorAll('.toast')].map((t) => t.getAttribute('role')),"
+                " [...g.querySelectorAll('.progress [role=progressbar]')].map((b) => [!!b.getAttribute('aria-label'), b.getAttribute('aria-valuenow')]),"
+                " [...g.querySelectorAll('.option-card')].map((c) => [!!c.closest('label') || c.tagName === 'LABEL', c.querySelector('input[type=radio]')?.checked ?? null]),"
+                " [...g.querySelectorAll('.engine-card .default, .engine-card .state')].map((e) => e.classList.contains('chip'))]")
+            toasts, bars, options, chips = parts
+            check(f"{short}, {theme}: each toast a status (D120 2b)", toasts and set(toasts) == {"status"}, toasts)
+            check(f"{short}, {theme}: each progress bar named, at its value", len(bars) >= 2
+                  and all(named and now is not None for named, now in bars), bars)
+            check(f"{short}, {theme}: each option card a radio in its label, one chosen", len(options) >= 3
+                  and all(label for label, _ in options) and [chosen for _, chosen in options].count(True) == 1, options)
+            check(f"{short}, {theme}: the engine card's « Par défaut » and its state are chips", chips and all(chips), chips)
+            # A card's radio reached by an arrow, as a keyboard sends it: its card ringed, the focus seen (WCAG 2.4.7,
+            # #1313). WebKitGTK does not match `:focus-visible` there.
+            # Where the focus is in its group (its radio's place), whether it is checked, and its card's outline.
+            ringed = ("const a = document.activeElement, c = a.closest('.engine-card, .option-card'); if (!c) return null;"
+                      " const g = [...a.closest('.engine-cards, .option-cards').querySelectorAll('input[type=radio]')];"
+                      " const o = getComputedStyle(c); return [g.indexOf(a), a.checked, o.outlineStyle, parseFloat(o.outlineWidth)]")
+            arrowed = []
+            for group in ("#gallery .option-cards input:checked", "#gallery .engine-cards input:checked"):
+                browser.execute_script("document.querySelector(arguments[0]).focus()", group)
+                before = browser.execute_script(ringed)
+                # → from any radio but the last, ← from the last: WebKitGTK's arrows stop at a group's ends.
+                last = browser.execute_script(
+                    "const a = document.activeElement, g = a.closest('.engine-cards, .option-cards'); return !!g && [...g.querySelectorAll('input[type=radio]')].at(-1) === a")
+                there, back = ("ff51", "ff53") if last else ("ff53", "ff51")
+                sent = real_keys(there)
+                arrowed.append([sent, before, browser.execute_script(ringed)])
+                real_keys(back)
+            check(f"{short}, {theme}: a card's radio reached by an arrow shows its card's ring, 2 px at least (WCAG 2.4.7, #1313)",
+                  all(sent and before and got and got[0] != before[0] and got[1] and got[2] == "solid" and got[3] >= 2
+                      for sent, before, got in arrowed), arrowed)
             found = axe_violations(browser)
             check(f"{short}, {theme}: no violation of axe's WCAG 2.2 A and AA rules (D120)", found == [], found)
             for width in (420, 1100):
