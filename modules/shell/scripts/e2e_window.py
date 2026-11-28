@@ -4023,6 +4023,91 @@ def models_advanced(now: dt.datetime) -> None:
         tags.shutdown()
 
 
+
+def settings_tabbed(now: dt.datetime) -> None:
+    """DA. D123, criterion 1: Settings in five tabs, WAI-ARIA's tabs pattern (the design system's, #1334) — « Enregistrement »,
+    « Écoute et rédaction », « Partage », « Stockage et confidentialité », « Général » —; each setting of today in its tab,
+    the channels in « Partage »; a tab its own address (`#/settings/<tab>`), followed without a step in the history;
+    « Général » ending on « À propos »: the version, the licence and its source, the components' licences, the privacy
+    policy — each a closed address the shell opens —, and how the updates come on this system."""
+    print("DA. Settings in five tabs, each setting in its own, a tab its address, « À propos » last (D123)")
+    meetings = WORK / "tabbed"
+    meetings.mkdir(exist_ok=True)
+    browsed = WORK / "browsed.txt"
+    homes = {
+        "recording": ["reminder", "check-sound-open", "offer", "shortcut"],
+        "listening": ["after-title", "transcription-title", "meetings-language", "minutes-online", "offered-toggle"],
+        "sharing": ["destinations", "choose-export"],
+        "storage": ["choose-sessions", "keep"],
+        "general": ["app-language", "appearance", "general-advanced", "developer", "welcome-again", "app-version",
+                    "about-source", "about-licences", "about-privacy"],
+    }
+    listed = ("const l = document.querySelector('#settings [role=tablist]'); if (!l) return null;"
+              " const t = [...l.querySelectorAll('[role=tab]')];"
+              " return {label: l.getAttribute('aria-label'), names: t.map((x) => x.textContent.trim()), keys: t.map((x) => x.dataset.key),"
+              " chosen: t.map((x) => x.getAttribute('aria-selected') === 'true'),"
+              " shown: t.map((x) => { const p = document.getElementById(x.getAttribute('aria-controls')); return !!p && !p.hidden; })}")
+    home_of = ("return arguments[0].map((id) => { const e = document.getElementById(id); const p = e?.closest('[role=tabpanel]');"
+               " const t = p ? document.getElementById(p.getAttribute('aria-labelledby')) : null; return [id, t?.dataset.key ?? null]; })")
+    with Window(meetings, "fr_FR.UTF-8", "reminder = false\ndeveloper = true\n") as browser:
+        browser.execute_script("location.hash = '#/settings'")
+        drawn = wait_for(browser, lambda b: b.execute_script(listed) is not None, 10)
+        at_first = browser.execute_script("return [history.length, location.hash]")
+        seen = browser.execute_script(listed)
+        check("Settings open on five tabs in their order, the first chosen, a list named « Réglages » (D123)",
+              drawn and seen["names"] == ["Enregistrement", "Écoute et rédaction", "Partage", "Stockage et confidentialité", "Général"]
+              and seen["chosen"] == [True, False, False, False, False] and seen["shown"] == seen["chosen"] and seen["label"] == "Réglages", seen)
+        everything = [id for ids in homes.values() for id in ids]
+        found = dict(browser.execute_script(home_of, everything))
+        misplaced = {id: found.get(id) for key, ids in homes.items() for id in ids if found.get(id) != key}
+        check("each setting of today in its tab, the channels in « Partage », « Refaire la configuration » under « Général »'s « Avancé » (D123)",
+              drawn and misplaced == {}, misplaced)
+        # Each tab its address; a choice followed without a step in the history (sam, #1334).
+        def chosen_key(b):
+            got = b.execute_script(listed)
+            return got["keys"][got["chosen"].index(True)] if got and True in got["chosen"] else None
+        routed = []
+        for key in homes:
+            browser.execute_script("location.hash = arguments[0]", f"#/settings/{key}")
+            wait_for(browser, lambda b, key=key: chosen_key(b) == key, 5)
+            routed.append([key, chosen_key(browser)])
+        check("#/settings/<tab> opens that tab (D123)", routed == [[key, key] for key in homes], routed)
+        browser.execute_script("location.hash = '#/settings/recording'")
+        wait_for(browser, lambda b: b.execute_script(listed) is not None, 5)
+        before = browser.execute_script("return history.length")
+        browser.execute_script("document.querySelector('#settings [role=tab][data-key=sharing]')?.click()")
+        time.sleep(0.3)
+        after = browser.execute_script("return [history.length, location.hash]")
+        check("a tab chosen: its address in the bar, no step added to the history, Settings opened with none (D123)",
+              after == [before, "#/settings/sharing"] and at_first[1] in ("#/settings", "#/settings/recording"), (at_first, before, after))
+        # « À propos », last of « Général ».
+        browser.execute_script("location.hash = '#/settings/general'")
+        wait_for(browser, lambda b: b.find_elements(By.ID, "about-source"), 5)
+        about = browser.execute_script(
+            "const a = document.getElementById('about'); if (!a) return null; const g = document.querySelector('#settings [role=tabpanel]:not([hidden])');"
+            " return {last: !!g && a.closest('[role=tabpanel]') === g && g.lastElementChild.contains(a) && !a.nextElementSibling, text: a.textContent}")
+        check("« À propos » last of « Général »: the version, « Logiciel libre sous GPL v3 », the updates by the system's package manager (Copr, PPA) on Linux (D123)",
+              about is not None and about["last"] and "Version" in about["text"] and "Logiciel libre sous GPL v3" in about["text"]
+              and "par le gestionnaire de paquets de votre système (Copr, PPA)" in about["text"], about)
+        browsed.unlink(missing_ok=True)
+        for link in ("about-source", "about-licences", "about-privacy"):
+            press(browser, link)
+            time.sleep(0.4)
+        handed = browsed.read_text().split() if browsed.exists() else []
+        check("« Code source », « Licences des composants », « Politique de confidentialité »: each its closed address, opened by the shell (D123)",
+              handed == ["https://github.com/NapkinStack/kitokey",
+                         "https://github.com/NapkinStack/kitokey/blob/main/modules/shell/THIRD-PARTY-NOTICES.html",
+                         "https://kitokey.com/fr/privacy/"], handed)
+        # The page cannot hand the shell an address of its own.
+        refused = browser.execute_async_script(
+            "const done = arguments[arguments.length - 1]; window.__TAURI__.core.invoke('about_open', { which: 'https://example.org' }).then(() => done('opened'), (why) => done('refused'))")
+        check("an address of the page's own is refused (D123)", refused == "refused" and (browsed.read_text().split() if browsed.exists() else []) == handed, refused)
+        for key in homes:
+            browser.execute_script("location.hash = arguments[0]", f"#/settings/{key}")
+            time.sleep(0.4)
+            found = axe_violations(browser)
+            check(f"« {key} »: no violation of axe's WCAG 2.2 A and AA rules (D123)", found == [], found)
+
 def minutes_copied(now: dt.datetime) -> None:
     """AJ. A meeting's minutes copied in one click, ready to paste where the user writes (D45)."""
     print("AJ. the minutes copied in one click: their Markdown, titled as the page names them, « Copié » said in place (D45)")
@@ -16339,6 +16424,7 @@ def main() -> int:
     settings_narrow_without_model(now)
     appearance_chosen(now)
     focus_kept(now)
+    settings_tabbed(now)
     focus_swept(now)
     meeting_actions_bar(now)
     meeting_trashed(now)
